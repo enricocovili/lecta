@@ -1,0 +1,12 @@
+# Fixed latexmk configuration for Lecta. Project directories can never supply
+# their own rc file (latexmk runs with -norc -r this-file).
+$max_repeat = 5;
+$preview_mode = 0;
+$preview_continuous_mode = 0;
+$pdf_previewer = 'NONE';
+$dvi_previewer = 'NONE';
+$ps_previewer = 'NONE';
+$bibtex_use = 1;
+$show_time = 0;
+$silence_logfile_warnings = 0;
+$do_cd = 0;

@@ -1,0 +1,7 @@
+---
+// Old address of a lesson (by its global id): the lesson now lives at /admin/courses/<course>/lessons/<n>.
+import { backendGet } from "../../../lib/server";
+const r = await backendGet<{ course_id: number; number: number }>(Astro, `/api/lessons/${Number(Astro.params.id)}?pages=false`);
+if (!r.data) return Astro.rewrite("/404");
+return Astro.redirect(`/admin/courses/${r.data.course_id}/lessons/${r.data.number}`, 301);
+---

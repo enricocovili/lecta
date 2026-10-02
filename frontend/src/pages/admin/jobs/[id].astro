@@ -1,0 +1,8 @@
+---
+import Admin from "../../../layouts/Admin.astro";
+import JobPage from "../../../components/JobPage";
+const id = Number(Astro.params.id);
+---
+<Admin title={`Attività #${id}`} crumbs={[{ label: "Attività", href: "/admin/jobs" }, { label: `#${id}` }]}>
+  <JobPage client:load jobId={id} />
+</Admin>

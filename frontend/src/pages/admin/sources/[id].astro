@@ -1,0 +1,11 @@
+---
+import Admin from "../../../layouts/Admin.astro";
+import SourceView from "../../../components/SourceView";
+import { backendGet } from "../../../lib/server";
+const id = Number(Astro.params.id);
+const r = await backendGet<{ name: string }>(Astro, `/api/sources/${id}`);
+if (!r.data) return Astro.rewrite("/404");
+---
+<Admin title={r.data.name} crumbs={[{ label: "Sorgenti" }, { label: r.data.name }]}>
+  <SourceView client:only="react" id={id} />
+</Admin>

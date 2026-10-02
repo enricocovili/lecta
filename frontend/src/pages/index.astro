@@ -1,0 +1,92 @@
+---
+import Public from "../layouts/Public.astro";
+import { Icon } from "../components/icons";
+import { backendGet, getSite } from "../lib/server";
+import { dateIt, pagesIt, plural, sizeIt, type PubCourse } from "../components/public/format";
+const site = await getSite(Astro);
+const { data } = await backendGet<PubCourse[]>(Astro, "/api/public/courses");
+// The listing has no chapters: fetch every course's detail in parallel (fall back to the listing entry).
+const courses = await Promise.all(
+  (data ?? []).map(async (c) => (await backendGet<PubCourse>(Astro, `/api/public/courses/${encodeURIComponent(c.slug)}`)).data ?? c),
+);
+const meta = (c: PubCourse) =>
+  [
+    plural(c.chapter_count, "capitolo", "capitoli"),
+    c.page_count ? plural(c.page_count, "pagina", "pagine") : null,
+    `aggiornata il ${dateIt(c.updated_at)}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+---
+<Public>
+  <section class="pub-hero">
+    {site.byline && <div class="pub-kicker">{site.byline}</div>}
+    <h1 class="pub-title">{site.title}</h1>
+    {site.description && <p class="pub-lead">{site.description}</p>}
+  </section>
+
+  <div class="section-label pub-section">
+    <span>Materie · {courses.length}</span>
+    {courses.length > 0 && (
+      <a class="link" href="/api/public/courses.zip" download><Icon name="download" />Scarica tutto (ZIP)</a>
+    )}
+  </div>
+
+  {courses.length === 0 ? (
+    <div class="empty">
+      <Icon name="book" />
+      <div>Non c'è ancora nessuna materia pubblicata.</div>
+    </div>
+  ) : (
+    <div class="pub-courses">
+      {courses.map((c) => (
+        <article class="card flush pub-course" id={c.slug}>
+          <div class="pub-course-head">
+            <div class="pub-course-info">
+              <h2 class="card-title"><a href={`/courses/${c.slug}`}>{c.name}</a></h2>
+              <div class="pub-meta">{meta(c)}</div>
+            </div>
+            <div class="pub-course-actions">
+              <a class="btn primary" href={`/courses/${c.slug}`}><Icon name="file" />Leggi</a>
+              <a class="btn" href={`/courses/${c.slug}?mode=slides`}><Icon name="monitor" />Presentazione</a>
+              <a class="btn" href={c.pdf_url} download={`${c.slug}.pdf`}>
+                <Icon name="download" />PDF<span class="pub-size">· {sizeIt(c.pdf_size)}</span>
+              </a>
+              {c.source_url && (
+                <a class="btn" href={c.source_url} download={`${c.slug}-latex.zip`} title="Sorgente LaTeX (.zip)">
+                  <Icon name="code" />LaTeX<span class="pub-size">{c.source_size ? `· ${sizeIt(c.source_size)}` : ""}</span>
+                </a>
+              )}
+            </div>
+          </div>
+          {c.chapters && c.chapters.length > 0 && (
+            <details class="pub-chapters" open>
+              <summary>
+                <Icon name="chevron-down" className="pub-caret" />
+                <span class="when-open">Nascondi capitoli</span>
+                <span class="when-closed">Mostra capitoli</span>
+              </summary>
+              <ol class="pub-ch-list">
+                {c.chapters.map((ch) => (
+                  <li id={`${c.slug}-ch-${ch.slug}`}>
+                    <span class="pub-ch-n">{ch.position}</span>
+                    <a class="pub-ch-title" href={`/courses/${c.slug}#ch-${ch.slug}`}>{ch.title}</a>
+                    <span class="pub-ch-pages">{pagesIt(ch)}</span>
+                    {ch.pdf_url ? (
+                      <a class="btn ghost icon sm pub-ch-dl" href={ch.pdf_url} download={`${c.slug}-${ch.slug}.pdf`}
+                        aria-label={`Scarica il capitolo ${ch.position} (PDF)`} title={`PDF · ${sizeIt(ch.pdf_size)}`}>
+                        <Icon name="download" />
+                      </a>
+                    ) : (
+                      <span class="pub-ch-dl" />
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </details>
+          )}
+        </article>
+      ))}
+    </div>
+  )}
+</Public>

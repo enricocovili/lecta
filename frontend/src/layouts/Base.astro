@@ -1,0 +1,35 @@
+---
+import "../styles/global.css";
+import "../styles/pages.css";
+import "../styles/home.css";
+import "../styles/workspace.css";
+import "../styles/map.css";
+import "../styles/public.css";
+import "../styles/settings.css";
+import "../styles/lessons.css";
+interface Props {
+  title: string;
+  description?: string;
+  noindex?: boolean;
+  bodyClass?: string;
+}
+const { title, description = "", noindex = true, bodyClass = "" } = Astro.props;
+---
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#fcfbf7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1c1b18" media="(prefers-color-scheme: dark)" />
+    <script is:inline src="/theme.js"></script>
+  </head>
+  <body class={bodyClass}>
+    <slot />
+  </body>
+</html>

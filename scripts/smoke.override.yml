@@ -1,0 +1,13 @@
+# Used only by scripts/smoke.sh --full: an isolated copy of the stack whose
+# frontend joins a private test network instead of the real `webnet`.
+services:
+  lecta-frontend:
+    container_name: lecta-smoke-frontend
+    networks: !override
+      - internal
+      - smokeweb
+networks:
+  webnet: !reset null
+  smokeweb:
+    name: lecta-smoke-web
+    external: true

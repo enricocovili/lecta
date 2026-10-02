@@ -1,0 +1,54 @@
+---
+import Public from "../layouts/Public.astro";
+import { Icon } from "../components/icons";
+import { backendGet } from "../lib/server";
+type Result = { type: "course" | "chapter"; course: string; title: string; url: string; course_title?: string; pdf_url?: string | null };
+const q = Astro.url.searchParams.get("q")?.slice(0, 200) ?? "";
+const results = q ? ((await backendGet<Result[]>(Astro, `/api/public/search?q=${encodeURIComponent(q)}`)).data ?? []) : [];
+const pdfOf = (r: Result) => r.pdf_url ?? (r.type === "course" ? `/api/public/courses/${r.course}.pdf` : null);
+---
+<Public title="Cerca">
+  <h1 class="pub-search-title">Cerca</h1>
+  <form method="get" action="/search" class="pub-search-form" role="search">
+    <label class="searchbox">
+      <Icon name="search" />
+      <span class="sr-only">Cerca negli appunti</span>
+      <input type="search" name="q" value={q} placeholder="Materia o capitolo…" autofocus maxlength="200" />
+    </label>
+    <button class="btn primary" type="submit">Cerca</button>
+  </form>
+
+  {q && (
+    <div class="section-label">
+      <span>{results.length === 0 ? "Nessun risultato" : `${results.length} ${results.length === 1 ? "risultato" : "risultati"}`} per “{q}”</span>
+    </div>
+  )}
+  {q && results.length === 0 && (
+    <div class="empty">
+      <Icon name="search" />
+      <div>Niente di pubblicato corrisponde a questa ricerca.</div>
+    </div>
+  )}
+  {!q && <p class="muted">Cerca tra i titoli delle materie e dei capitoli pubblicati.</p>}
+  {results.length > 0 && (
+    <div class="card flush">
+      <ul class="pub-results">
+        {results.map((r) => {
+          const pdf = pdfOf(r);
+          return (
+            <li>
+              <span class={`badge ${r.type === "course" ? "accent" : ""}`}>{r.type === "course" ? "Materia" : "Capitolo"}</span>
+              <div class="pub-result-main">
+                <a href={r.url} class={r.type === "course" ? "pub-result-title serif" : "pub-result-title"}>{r.title}</a>
+                {r.course_title && <div class="pub-result-course">{r.course_title}</div>}
+              </div>
+              {pdf && (
+                <a class="btn sm" href={pdf} download><Icon name="download" />PDF</a>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  )}
+</Public>

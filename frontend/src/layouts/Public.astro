@@ -1,0 +1,53 @@
+---
+import Base from "./Base.astro";
+import { Icon, BrandMark } from "../components/icons";
+import { getSite } from "../lib/server";
+interface Props {
+  title?: string;
+  /** Full-height app page (the reader): no top bar, footer or centred container. */
+  app?: boolean;
+}
+const site = await getSite(Astro);
+const { title, app = false } = Astro.props;
+const auth = Astro.locals.auth;
+const q = Astro.url.pathname === "/search" ? (Astro.url.searchParams.get("q")?.slice(0, 200) ?? "") : "";
+---
+<Base
+  title={title ? `${title} · ${site.title}` : site.title}
+  description={site.description}
+  noindex={!site.allow_indexing}
+  bodyClass={app ? "pub-app" : "pub-site"}
+>
+  {app ? (
+    <slot />
+  ) : (
+    <>
+      <header class="topbar pub-topbar">
+        <a class="brand" href="/"><BrandMark />Lecta</a>
+        <div class="topbar-actions">
+          <form class="searchbox pub-search hide-mobile" method="get" action="/search" role="search">
+            <Icon name="search" />
+            <input type="search" name="q" value={q} placeholder="Cerca negli appunti" aria-label="Cerca negli appunti" maxlength="200" />
+          </form>
+          <a class="btn ghost icon show-mobile" href="/search" aria-label="Cerca"><Icon name="search" /></a>
+          <button class="btn ghost icon" data-theme-toggle type="button" aria-label="Cambia tema" title="Tema chiaro / scuro">
+            <Icon name="moon" className="i-moon" /><Icon name="sun" className="i-sun" />
+          </button>
+          {auth?.authenticated ? (
+            <a class="btn ghost pub-signin" href="/admin">Area di lavoro</a>
+          ) : (
+            <a class="btn ghost pub-signin" href="/login">Accedi</a>
+          )}
+        </div>
+      </header>
+      <main class="pub-main">
+        <slot />
+      </main>
+      <footer class="pub-footer">
+        <span>{site.title}</span>
+        <span class="sep">·</span>
+        {auth?.authenticated ? <a href="/admin">Area di lavoro</a> : <a href="/login">Accedi</a>}
+      </footer>
+    </>
+  )}
+</Base>

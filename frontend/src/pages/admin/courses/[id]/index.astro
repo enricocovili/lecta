@@ -1,0 +1,11 @@
+---
+import Workspace from "../../../../layouts/Workspace.astro";
+import CourseWorkspace from "../../../../components/workspace/CourseWorkspace";
+import { backendGet } from "../../../../lib/server";
+const id = Number(Astro.params.id);
+const r = await backendGet<{ name: string }>(Astro, `/api/courses/${id}`);
+if (!r.data) return Astro.rewrite("/404");
+---
+<Workspace title={r.data.name}>
+  <CourseWorkspace client:only="react" courseId={id} />
+</Workspace>

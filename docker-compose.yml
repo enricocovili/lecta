@@ -1,0 +1,133 @@
+# Lecta — self-hosted university notes.
+#
+# Only `lecta-frontend` joins the external `webnet` network (port 4321 inside
+# the network). No service publishes a port. Nothing here needs a .env file:
+# every variable is optional, secrets are generated on first boot, and all
+# application settings live in the web UI.
+name: lecta
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+services:
+  db:
+    build: ./db
+    image: lecta-db:local
+    <<: *hardening
+    environment:
+      POSTGRES_USER: lecta
+      POSTGRES_DB: lecta
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - secrets:/secrets
+    networks: [internal]
+    shm_size: 128mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lecta -d lecta"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  backend:
+    build: ./backend
+    image: lecta-app:local
+    <<: *hardening
+    command: ["backend"]
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - app-data:/data
+      - latex-work:/latex-work
+      - latex-sock:/run/lecta
+      - secrets:/secrets:ro
+    # internal: db, frontend, compile socket; egress: AI providers (via the privacy gate only)
+    networks: [internal, egress]
+    healthcheck:
+      test: ["CMD", "python", "/app/scripts/healthcheck.py", "backend"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  worker:
+    image: lecta-app:local
+    <<: *hardening
+    command: ["worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    volumes:
+      - app-data:/data
+      - latex-work:/latex-work
+      - latex-sock:/run/lecta
+      - secrets:/secrets:ro
+    networks: [internal, egress]
+    healthcheck:
+      test: ["CMD", "python", "/app/scripts/healthcheck.py", "worker"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  latex:
+    build: ./latex
+    image: lecta-latex:local
+    <<: *hardening
+    # No network at all: requests arrive over a unix socket in `latex-sock`.
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    volumes:
+      - latex-work:/latex-work
+      - latex-sock:/run/lecta
+    cpus: 2
+    mem_limit: 2560m
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "python3", "/app/healthcheck.py"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  lecta-frontend:
+    build: ./frontend
+    image: lecta-frontend:local
+    # Without this the container would be `lecta-lecta-frontend-1`.
+    container_name: lecta-frontend
+    <<: *hardening
+    depends_on:
+      backend:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks: [internal, webnet]
+    healthcheck:
+      test: ["CMD", "node", "/app/healthcheck.mjs"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+networks:
+  internal:
+    internal: true
+  egress: {}
+  webnet:
+    external: true
+
+volumes:
+  db-data:
+  app-data:
+  latex-work:
+  latex-sock:
+  secrets:

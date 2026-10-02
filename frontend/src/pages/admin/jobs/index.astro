@@ -1,0 +1,7 @@
+---
+import Admin from "../../../layouts/Admin.astro";
+import { JobsList } from "../../../components/Jobs";
+---
+<Admin title="Attività">
+  <JobsList client:load />
+</Admin>

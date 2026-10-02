@@ -1,0 +1,449 @@
+/* Lessons: the note-taking workspace (slides with ink + Markdown notes) and the list of lessons.
+ * Classes: `.les*` editor, `.les-ink` drawing surface, `.les-list-row` list. The top bar reuses `.wsb*`. */
+
+body.ws-page .les {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg);
+}
+.les-loading {
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-direction: row;
+}
+
+/* ------------------------------------------------------------------ top bar */
+
+.les-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0 0 0 0.35rem;
+  height: 40px;
+  padding: 0 0.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+}
+.les-title:hover {
+  border-color: var(--border);
+}
+.les-title:focus {
+  background: var(--bg-elev);
+}
+.les-course {
+  flex: none;
+  white-space: nowrap;
+  max-width: 22%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.les-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--fg-muted);
+  padding: 0 0.4rem;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.les-save.pending {
+  color: var(--fg);
+}
+.les-save.saving {
+  color: var(--warn-fg);
+}
+.les-save.offline {
+  color: var(--danger-fg);
+  font-weight: 600;
+}
+.les-save .icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ------------------------------------------------------------------ tools */
+
+.les-tools {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 5;
+}
+.les-tools .btn.icon {
+  width: 40px;
+  height: 40px;
+}
+.les-tools .btn-group .btn.active,
+.les-tools .btn.active {
+  background: var(--primary);
+  color: var(--primary-fg);
+  border-color: var(--primary);
+}
+.les-colors,
+.les-sizes {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.les-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-elev);
+  box-shadow: 0 0 0 1px var(--border-strong);
+  cursor: pointer;
+  padding: 0;
+}
+.les-swatch.on {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.les-size {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.les-size span {
+  display: block;
+  border-radius: 50%;
+  background: var(--fg);
+}
+.les-size.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.les-pager {
+  align-items: center;
+}
+.les-pageno {
+  min-width: 4.6rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+  padding: 0 0.3rem;
+}
+
+/* ------------------------------------------------------------------ body */
+
+.les-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.les-rail {
+  flex: none;
+  width: 76px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.4rem;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+}
+.les-rail-item {
+  position: relative;
+  height: 40px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.les-rail-item.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.les-rail-item .dot {
+  position: absolute;
+  bottom: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.les-rail-item .dot.notes {
+  left: 8px;
+  background: var(--accent-line);
+}
+.les-rail-item .dot.ink {
+  right: 8px;
+  background: var(--danger);
+}
+.les-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 1rem;
+  container-type: inline-size;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.les-pages {
+  width: calc(100% * var(--zoom, 1));
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 5rem;
+}
+.les-add-end {
+  align-self: center;
+}
+
+/* ------------------------------------------------------------------ one page */
+
+.les-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  scroll-margin-top: 0.5rem;
+}
+.les-row.stack,
+.les-row.slides {
+  grid-template-columns: minmax(0, 1fr);
+}
+@container (max-width: 860px) {
+  .les-row.side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.les-slide {
+  position: relative;
+  width: 100%;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: var(--shadow), 0 0 0 1px var(--border);
+  overflow: hidden;
+  line-height: 0;
+}
+.les-slide-canvas {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.les-tag {
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(28 27 23 / 62%);
+  color: #fff;
+  font: 500 0.72rem/1.4 var(--font);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.les-row:hover .les-tag,
+.les-row:focus-within .les-tag {
+  opacity: 1;
+}
+.les-ink {
+  position: absolute;
+  inset: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.les-ink canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.les-ink.tool-pen,
+.les-ink.tool-hl {
+  cursor: crosshair;
+}
+.les-ink.tool-eraser {
+  cursor: none;
+}
+.les-ink.tool-hand {
+  cursor: grab;
+}
+
+.les-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.les-notes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+}
+.les-notes-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+.les-notes-field {
+  display: block;
+  width: 100%;
+  resize: none;
+  overflow: hidden;
+  padding: 0.75rem 0.9rem;
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.6;
+  background: var(--paper);
+  color: #1c1b17; /* --paper stays a light colour: the text on it stays dark */
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.les-notes-field::placeholder {
+  color: #8a8578;
+}
+/* In dark mode the notes are dark too (the slide next to them stays white: it is the picture of the PDF). */
+:root[data-mode="dark"] .les-notes-field,
+:root[data-mode="dark"] .les-notes-md {
+  background: var(--bg-elev);
+  color: var(--fg);
+}
+:root[data-mode="dark"] .les-notes-field::placeholder {
+  color: var(--fg-faint);
+}
+.les-notes-field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.les-notes-md {
+  --fg: #1c1b17;
+  --fg-muted: #6b675e;
+  --border: #d9d5c8;
+  color: #1c1b17;
+  padding: 0.75rem 0.9rem;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+:root[data-mode="dark"] .les-notes-md {
+  --fg: #ecebe5;
+  --fg-muted: #a8a397;
+  --border: #2d2b26;
+}
+.les-add {
+  align-self: flex-start;
+  color: var(--fg-muted);
+}
+
+@media (pointer: coarse) {
+  .les-swatch {
+    width: 34px;
+    height: 34px;
+  }
+  .les-rail-item {
+    height: 46px;
+  }
+}
+@media (max-width: 860px) {
+  .les-course,
+  .les-lbl {
+    display: none;
+  }
+  .les-rail {
+    display: none;
+  }
+  .les-scroll {
+    padding: 0.5rem;
+  }
+  .les-title {
+    font-size: 1.1rem;
+  }
+  .les-tools {
+    padding: 0.35rem 0.5rem;
+    gap: 0.3rem 0.5rem;
+  }
+}
+
+@media (max-width: 600px) {
+  /* One scrolling row of tools instead of four rows above a phone-sized slide. */
+  .les-tools {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .les-tools > * {
+    flex: none;
+  }
+  .les-tools > .grow {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ the list */
+
+.les-filter {
+  width: min(320px, 60vw);
+}
+.les-list-row {
+  align-items: center;
+}
+.les-list-row .pg-row-title {
+  display: block;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* ------------------------------------------------------------------ sharing */
+
+.les-share {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+}
+.les-share-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.les-share-link input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+
+/* «Integra appunti» has no icon: its words stay on small screens too. */
+.les .wsb-review {
+  width: auto;
+  padding: 0 0.8rem;
+  white-space: nowrap;
+}

@@ -1,0 +1,14 @@
+---
+import Admin from "../../layouts/Admin.astro";
+import Upload from "../../components/Upload";
+---
+<Admin title="Carica materiale">
+  <div class="page-head">
+    <div>
+      <h1>Carica materiale</h1>
+      <div class="sub">I tuoi appunti della lezione e le slide: Lecta ne fa un testo discorsivo da studiare, con formule e immagini.</div>
+    </div>
+    <a class="btn show-mobile" href="/admin/quick">Carica dal telefono</a>
+  </div>
+  <Upload client:load />
+</Admin>

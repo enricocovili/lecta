@@ -1,0 +1,16 @@
+---
+// Full-screen app layout (no admin sidebar or top bar): the island draws its own chrome.
+// Used by the course workspace (draft + AI assistant).
+import Base from "./Base.astro";
+import Toasts from "../components/Toasts";
+import { getSite } from "../lib/server";
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+const site = await getSite(Astro);
+---
+<Base title={`${title} · ${site.title}`} bodyClass="ws-page">
+  <slot />
+  <Toasts client:load />
+</Base>

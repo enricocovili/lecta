@@ -1,0 +1,10 @@
+---
+// A lesson shared with a link: opens without signing in. The secret is in the address, so the page is kept out of search engines
+// (Base adds noindex) and the referrer never leaves the site (referrer-policy same-origin).
+import Workspace from "../../layouts/Workspace.astro";
+import SharedLesson from "../../components/lessons/SharedLesson";
+const token = Astro.params.token ?? "";
+---
+<Workspace title="Lezione condivisa">
+  <SharedLesson client:only="react" token={token} />
+</Workspace>

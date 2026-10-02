@@ -1,0 +1,97 @@
+---
+import Base from "./Base.astro";
+import Sidebar from "../components/Sidebar";
+import TopSearch from "../components/TopSearch";
+import Toasts from "../components/Toasts";
+import { Icon, BrandMark } from "../components/icons";
+import { getSite } from "../lib/server";
+interface Props {
+  title: string;
+  crumbs?: { label: string; href?: string }[];
+  active?: string;
+}
+const { title, crumbs = [] } = Astro.props;
+const site = await getSite(Astro);
+const path = Astro.url.pathname;
+const username = Astro.locals.auth?.username ?? "";
+const initials =
+  username
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w: string) => w[0]!.toUpperCase())
+    .join("") || "A";
+const is = (p: string) => path === p || path.startsWith(p + "/");
+const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/admin/courses") ? "courses" : is("/admin/upload") || is("/admin/quick") ? "upload" : path === "/admin" ? "home" : "";
+---
+<Base title={`${title} · ${site.title}`}>
+  <header class="topbar">
+    <a class="brand" href="/admin"><BrandMark />Lecta</a>
+    <TopSearch client:idle />
+    <div class="topbar-actions">
+      <a class="btn ghost icon show-mobile" href="/admin/search" aria-label="Cerca"><Icon name="search" /></a>
+      <button class="btn ghost icon" data-theme-toggle type="button" aria-label="Cambia tema" title="Tema chiaro / scuro">
+        <Icon name="moon" className="i-moon" /><Icon name="sun" className="i-sun" />
+      </button>
+      <a class="btn ghost hide-mobile" href="/" target="_blank" rel="noreferrer"><Icon name="eye" />Vista pubblica</a>
+      <a class="btn primary hide-mobile" href="/admin/upload"><Icon name="upload" />Carica</a>
+      <details class="dropdown" id="user-menu">
+        <summary class="avatar" aria-label="Account" title={username}>{initials}</summary>
+        <div class="menu-pop">
+          <div class="head">Connesso come <strong>{username}</strong></div>
+          <a href="/admin/courses" class="show-mobile"><Icon name="folder" />Materie</a>
+          <a href="/admin/lessons" class="show-mobile"><Icon name="notebook" />Lezioni</a>
+          <a href="/admin/inbox" class="show-mobile"><Icon name="inbox" />Da smistare</a>
+          <a href="/admin/settings"><Icon name="sliders" />Impostazioni</a>
+          <a href="/admin/jobs"><Icon name="activity" />Attività</a>
+          <a href="/admin/settings#ai"><Icon name="activity" />AI e costi</a>
+          <a href="/" target="_blank" rel="noreferrer"><Icon name="eye" />Vista pubblica</a>
+          <div class="sep"></div>
+          <button type="button" id="logout-btn"><Icon name="logout" />Esci</button>
+        </div>
+      </details>
+    </div>
+  </header>
+  <div class="shell">
+    <aside class="sidebar">
+      <Sidebar client:load currentPath={path} />
+    </aside>
+    <main class="main">
+      <div class="main-inner">
+        {crumbs.length > 0 && (
+          <div class="breadcrumbs">
+            {crumbs.map((c, i) => (
+              <>
+                {i > 0 && <span class="sep">/</span>}
+                {c.href ? <a href={c.href}>{c.label}</a> : <span>{c.label}</span>}
+              </>
+            ))}
+          </div>
+        )}
+        <slot />
+      </div>
+    </main>
+  </div>
+  <nav class="bottom-nav" aria-label="Navigazione rapida">
+    <a href="/admin" class={tab === "home" ? "active" : ""}><Icon name="home" />Home</a>
+    <a href="/admin/courses" class={tab === "courses" ? "active" : ""}><Icon name="folder" />Materie</a>
+    <a href="/admin/lessons" class={tab === "lessons" ? "active" : ""}><Icon name="notebook" />Lezioni</a>
+    <a href="/admin/quick" class="cta"><span class="ico-wrap"><Icon name="upload" /></span>Carica</a>
+    <a href="/admin/map" class={tab === "map" ? "active" : ""}><Icon name="map" />Mappa</a>
+  </nav>
+  <Toasts client:load />
+  <script>
+    import { post } from "../lib/api";
+    const menu = document.getElementById("user-menu") as HTMLDetailsElement | null;
+    document.addEventListener("click", (e) => {
+      if (menu?.open && !menu.contains(e.target as Node)) menu.open = false;
+    });
+    document.getElementById("logout-btn")?.addEventListener("click", async () => {
+      try {
+        await post("/api/auth/logout");
+      } finally {
+        location.href = "/";
+      }
+    });
+  </script>
+</Base>

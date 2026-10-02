@@ -1,0 +1,16 @@
+---
+import Public from "../layouts/Public.astro";
+import { Icon } from "../components/icons";
+Astro.response.status = 404;
+---
+<Public title="Pagina non trovata">
+  <section class="pub-404">
+    <div class="pub-kicker">Errore 404</div>
+    <h1>Pagina non trovata</h1>
+    <p class="pub-lead">Questo indirizzo non esiste, oppure la pagina non è pubblica.</p>
+    <div class="row">
+      <a class="btn primary" href="/"><Icon name="arrow-left" />Torna alle materie</a>
+      <a class="btn" href="/login">Accedi</a>
+    </div>
+  </section>
+</Public>

@@ -1,0 +1,12 @@
+---
+import Admin from "../../layouts/Admin.astro";
+import Dashboard from "../../components/Dashboard";
+import { Icon } from "../../components/icons";
+---
+<Admin title="Home" active="home">
+  <div class="page-head">
+    <h1>Home</h1>
+    <a class="btn" href="/admin/lessons?new=1"><Icon name="notebook" />Prendi appunti a lezione</a>
+  </div>
+  <Dashboard client:load />
+</Admin>

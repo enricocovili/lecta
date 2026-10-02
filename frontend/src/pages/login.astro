@@ -1,0 +1,19 @@
+---
+import Base from "../layouts/Base.astro";
+import { LoginForm } from "../components/AuthForms";
+import { BrandMark, Icon } from "../components/icons";
+---
+<Base title="Accedi · Lecta">
+  <main class="auth-page">
+    <div class="auth-top">
+      <a class="brand" href="/"><BrandMark />Lecta</a>
+      <button class="btn ghost icon" data-theme-toggle type="button" aria-label="Cambia tema" title="Tema chiaro / scuro">
+        <Icon name="moon" className="i-moon" /><Icon name="sun" className="i-sun" />
+      </button>
+    </div>
+    <div class="auth-wrap">
+      <LoginForm client:load />
+      <a class="auth-home" href="/"><Icon name="arrow-left" />Torna al sito pubblico</a>
+    </div>
+  </main>
+</Base>
