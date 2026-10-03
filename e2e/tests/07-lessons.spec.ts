@@ -6,6 +6,7 @@ const EXPECTED = [/status of 404/, /status of 409/];
 interface ApiLesson {
   id: number;
   number: number;
+  status: string;
   last_page_id: number | null;
   pages: { id: number; kind: string; notes: string; ink: unknown[] }[];
   course_guidelines: string;
@@ -151,6 +152,31 @@ test.describe.serial("Lezioni", () => {
     await expect(page.getByTestId("page-number")).toContainText("3 /", { timeout: 10_000 });
     await expect(pages.first().locator("textarea")).toHaveValue("- campionamento\n- Nyquist: $f_s > 2B$\nFine.");
     await expect(page.getByTestId("lesson-editor")).toBeVisible();
+    con.assertClean(EXPECTED);
+  });
+
+  test("the «Completata» switch marks a lesson completed by hand, in the list and in the editor", async ({ page }) => {
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`/admin/lessons?course=${courseId}`);
+    const row = page.getByTestId("lesson-row");
+    const href = (await row.getByRole("link", { name: "Apri" }).getAttribute("href"))!;
+    const toggle = row.getByRole("switch", { name: "Completata" });
+    await expect(toggle).toBeVisible();
+    await expect(toggle).not.toBeChecked();
+    await row.getByText("Completata").click();
+    await expect(toggle).toBeChecked();
+    await expect.poll(async () => (await stored(page, href)).status).toBe("completed");
+    await page.reload();
+    await expect(page.getByTestId("lesson-row").getByRole("switch", { name: "Completata" })).toBeChecked();
+
+    // In the editor's top bar the same switch puts it back in progress.
+    await page.goto(href);
+    const inEditor = page.getByTestId("lesson-editor").getByRole("switch", { name: "Completata" });
+    await expect(inEditor).toBeChecked();
+    await page.getByTestId("lesson-status").getByText("Completata").click();
+    await expect(inEditor).not.toBeChecked();
+    await expect.poll(async () => (await stored(page)).status).toBe("working");
     con.assertClean(EXPECTED);
   });
 

@@ -448,16 +448,28 @@ body.ws-page .les {
   white-space: nowrap;
 }
 
-/* The lesson's state (in corso / completata): a pill that the owner clicks to switch. */
-button.les-status {
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.85rem;
-}
-button.les-status:hover {
-  filter: brightness(0.95);
-}
-.les .les-status {
+/* The lesson's state (in corso / completata): a «Completata» switch for the owner, a pill in the read-only view. */
+.les-status-switch {
+  display: inline-flex;
   flex: none;
+}
+.les-status-switch .switch {
+  font-size: 0.85rem;
+  gap: 0.45rem;
+}
+.les .les-status,
+.les .les-status-switch {
+  flex: none;
+  margin-left: 0.5rem;
+}
+@media (max-width: 600px) {
+  /* The top bar is full on a phone: the switch keeps «Completata» as its name, out of sight. */
+  .les .les-status-switch .switch > span:first-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }

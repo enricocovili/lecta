@@ -28,7 +28,9 @@ and comes back on the next visit if the server has not changed that page meanwhi
 Every lesson has a `status`: **working** («In corso») while it is being written, **completed** («Completata») once its
 text is merged into the subject's notes. A generation that writes into a chapter (`new_chapter`, `append`, `new_course`)
 sets it; material that only reaches the inbox does not. It then stays completed, also when the lesson is edited again:
-only the user moves it back, by clicking the state in the list or in the editor's top bar (`PATCH … {status}`).
+only the user moves it back. The owner sees a «Completata» switch (on = completed) in the list and in the editor's top
+bar, and can turn it on or off at any time without a generation (`PATCH … {status}`); the shared read-only view shows
+the state as a pill.
 
 ## Ink format
 
