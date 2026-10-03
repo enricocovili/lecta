@@ -1,4 +1,4 @@
-// «Integra appunti» for a lesson: asks for the subject's guidelines (or tells that the text will be generated automatically),
+// «Aggiungi al testo» for a lesson: asks for the subject's guidelines (or tells that the text will be generated automatically),
 // then hands the lesson to the import.
 import { useEffect, useState } from "react";
 import { get, post } from "../../lib/api";
@@ -55,7 +55,7 @@ export default function GenerateDialog({ lesson, beforeSend, onClose }: { lesson
   const nothingTyped = lesson.notes_pages === 0;
   return (
     <Modal
-      title="Integra gli appunti nel testo della materia"
+      title="Aggiungi gli appunti al testo della materia"
       onClose={onClose}
       wide
       actions={
@@ -65,7 +65,7 @@ export default function GenerateDialog({ lesson, beforeSend, onClose }: { lesson
           </button>
           <button className="btn primary" onClick={go} disabled={busy} data-testid="generate-go">
             {busy && <Icon name="loader" className="spin" />}
-            {guidelines.trim() ? "Integra con queste linee guida" : "Integra in automatico"}
+            {guidelines.trim() ? "Aggiungi con queste linee guida" : "Aggiungi al testo"}
           </button>
         </>
       }

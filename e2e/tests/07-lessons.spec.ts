@@ -180,7 +180,7 @@ test.describe.serial("Lezioni", () => {
     con.assertClean(EXPECTED);
   });
 
-  test("Integra appunti asks for the guidelines, or says the text will be automatic, then writes it into the subject", async ({ page }) => {
+  test("Aggiungi al testo asks for the guidelines, or says the text will be automatic, then writes it into the subject", async ({ page }) => {
     test.setTimeout(300_000);
     const con = watchConsole(page);
     await login(page);
@@ -193,10 +193,10 @@ test.describe.serial("Lezioni", () => {
     const dialog = page.getByRole("dialog");
     // No guidelines yet: the notice says the text will be generated automatically.
     await expect(dialog.getByTestId("guidelines-notice")).toContainText("genererò il testo in automatico");
-    await expect(dialog.getByTestId("generate-go")).toContainText("Integra in automatico");
+    await expect(dialog.getByTestId("generate-go")).toContainText("Aggiungi al testo");
     await dialog.getByTestId("guidelines").fill("Scrivi in modo discorsivo, con un esempio per ogni definizione.");
     await expect(dialog.getByTestId("guidelines-notice")).toHaveCount(0);
-    await expect(dialog.getByTestId("generate-go")).toContainText("Integra con queste linee guida");
+    await expect(dialog.getByTestId("generate-go")).toContainText("Aggiungi con queste linee guida");
     await dialog.getByTestId("generate-go").click();
     await page.waitForURL(/\/admin\/jobs\/\d+$/);
     await expect(page.locator(".page-head [data-status]").first()).toHaveAttribute("data-status", "succeeded", { timeout: 240_000 });

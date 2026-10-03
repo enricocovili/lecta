@@ -108,9 +108,9 @@ export default function LessonsPage() {
                     const d = await get<{ course_guidelines: string }>(`/api/lessons/${r.id}`);
                     setToGenerate({ ...r, slides: r.has_pdf ? r.pdf_pages : 0, course_guidelines: d.course_guidelines });
                   }}
-                  title="Integra appunti e slide nel testo da studiare della materia"
+                  title="Aggiungi appunti e slide al testo da studiare della materia"
                 >
-                  Integra appunti
+                  Aggiungi al testo
                 </button>
                 <button className="btn ghost icon sm" onClick={() => setToDelete(r)} aria-label={`Elimina ${r.title}`} title="Elimina">
                   <Icon name="trash" />

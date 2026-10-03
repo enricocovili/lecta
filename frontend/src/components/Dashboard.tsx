@@ -167,7 +167,7 @@ function jobRow(j: ActivityJob, courses: Map<number, CourseState>): Row {
     ...done,
     subtitle: uploadSubtitle(j) || "Completato",
     stage: { label: "Completato", value: 1 },
-    action: j.course_id ? { label: "Apri con l'AI", href: `/admin/courses/${j.course_id}` } : { label: "Dettagli", href: `/admin/jobs/${j.id}` },
+    action: j.course_id ? { label: "Apri", href: `/admin/courses/${j.course_id}` } : { label: "Dettagli", href: `/admin/jobs/${j.id}` },
   };
 }
 
@@ -191,7 +191,7 @@ function buildRows(data: DashboardData): Row[] {
       at: b.at,
       when: fmtWhen(b.at),
       action: {
-        label: "Correggi con l'AI",
+        label: "Correggi",
         href: `/admin/courses/${c.id}?${fe?.chapter_id ? `chapter=${fe.chapter_id}&` : ""}chat=1&ask=${encodeURIComponent(`L'ultima compilazione è fallita${where ? ` ${where}` : ""}${fe?.message ? `: ${fe.message}` : ""}. Puoi correggere?`)}`,
       },
     });
@@ -457,8 +457,7 @@ export default function Dashboard() {
                 <ReviewLine c={c} />
                 <div className="row">
                   <a className="btn primary" href={`/admin/courses/${c.id}`}>
-                    <Icon name="sparkles" />
-                    Lavora con l'AI
+                    Apri
                   </a>
                   <a className="btn" href={pdfHref(c)} target="_blank" rel="noreferrer">
                     PDF
@@ -491,7 +490,7 @@ export default function Dashboard() {
       )}
 
       <div className="section-label">
-        <span>Attività dell'AI</span>
+        <span>Ultime modifiche</span>
       </div>
       {aiTurns.length === 0 ? (
         <div className="empty">

@@ -1,5 +1,5 @@
 // A lesson's state: «In corso» while it is being worked on, «Completata» once its text is merged into the subject's notes
-// (an «Integra appunti» that wrote into a chapter sets it). The owner switches it by hand with a «Completata» switch;
+// (an «Aggiungi al testo» that wrote into a chapter sets it). The owner switches it by hand with a «Completata» switch;
 // the read-only view shows it as a pill.
 import { useState } from "react";
 import { patch } from "../../lib/api";
@@ -23,7 +23,7 @@ export default function LessonStatusPill({ id, status, editable, onChange }: { i
     <span
       className="les-status-switch"
       data-testid="lesson-status"
-      title={status === "completed" ? "Integrata negli appunti. Spegni per rimetterla in corso" : "In corso: non ancora integrata negli appunti. Accendi per segnarla completata"}
+      title={status === "completed" ? "Aggiunta al testo della materia. Spegni per rimetterla in corso" : "In corso: non ancora aggiunta al testo della materia. Accendi per segnarla completata"}
     >
       <Switch
         checked={status === "completed"}

@@ -29,7 +29,7 @@ function OccurrenceCard({ o, course }: { o: Occurrence; course: MapCourse | unde
       <div className="map-occ-actions">
         <a className="btn sm" href={`/admin/courses/${o.course_id}${o.chapter_id ? `?chapter=${o.chapter_id}` : ""}`}>
           <Icon name="sparkles" />
-          Apri con l'AI
+          Apri
         </a>
         <a className="btn sm" href={pdfHref(course, o.course_id)} target="_blank" rel="noreferrer">
           <Icon name="download" />

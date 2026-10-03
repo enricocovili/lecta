@@ -147,7 +147,7 @@ function CourseCard({ c, st }: { c: Course; st: CourseState | undefined }) {
       <div className="row pg-course-actions">
         <a className="btn" href={`/admin/courses/${c.id}`}>
           <Icon name="sparkles" />
-          Apri con l'AI
+          Apri
         </a>
         <a className="btn" href={pdfHref(c)} target="_blank" rel="noreferrer">
           <Icon name="download" />

@@ -66,7 +66,7 @@ export default function Sidebar({ currentPath }: { currentPath: string }) {
       </div>
 
       <div className="nav-group-title">
-        <span>Lavora con l'AI</span>
+        <span>Le tue materie</span>
         <a href="/admin/courses?new=1" title="Nuova materia" aria-label="Nuova materia">
           <Icon name="plus" />
         </a>

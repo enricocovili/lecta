@@ -106,7 +106,7 @@ export default function AiPanel({
             <span className="ai-empty-ico">
               <Icon name="sparkles" />
             </span>
-            <h2>Lavora sul documento con l’AI</h2>
+            <h2>Lavora sul documento</h2>
             <p>
               L’assistente conosce tutto il corso: capitoli, appunti e fonti. Seleziona un pezzo di testo nella bozza per chiedere una spiegazione o una modifica, oppure scrivi
               qui sotto. Le modifiche sono immediate e puoi annullarle con un clic.

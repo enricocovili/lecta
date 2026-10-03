@@ -169,7 +169,7 @@ export default function AdminSearch() {
                         </span>
                       </span>
                       <span className="sch-open">
-                        Apri con l'AI <Icon name="arrow-right" />
+                        Apri <Icon name="arrow-right" />
                       </span>
                     </span>
                     {f.snippet && (
