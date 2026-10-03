@@ -81,14 +81,14 @@ function ChapterItem({
           <button type="button" className="rail-ch-title" onClick={() => onGoto()} title={ch.title}>
             <span className="rail-n mono">{n}</span>
             <span className="rail-t">{ch.title}</span>
-            {changed && <span className="rail-ai" title="Modificato di recente dall’AI" aria-label="Modificato di recente dall’AI" />}
+            {changed && <span className="rail-ai" title="Modificato di recente dall’assistente" aria-label="Modificato di recente dall’assistente" />}
           </button>
         )}
         {!editing && (
           <Pop label={`Azioni sul capitolo ${ch.title}`} className="ghost icon xs" menuClass="rail-menu" summary={<Icon name="more" />}>
             <button type="button" onClick={onAsk}>
               <Icon name="sparkles" />
-              Chiedi all’AI su questo capitolo
+              Chiedi all’assistente su questo capitolo
             </button>
             <button
               type="button"
@@ -137,7 +137,7 @@ function ChapterItem({
           confirmLabel="Elimina"
           message={
             <>
-              Eliminare <strong>{ch.title}</strong>? Il capitolo viene tolto dal documento. Puoi tornare indietro solo chiedendolo all’AI.
+              Eliminare <strong>{ch.title}</strong>? Il capitolo viene tolto dal documento. Puoi tornare indietro solo chiedendolo all’assistente.
             </>
           }
           onConfirm={async () => {
@@ -243,7 +243,7 @@ export default function Outline({
     <nav className="rail" aria-label="Struttura del documento">
       <div className="rail-scroll">
         <div className="rail-label">Indice</div>
-        {chapters.length === 0 && <p className="rail-none small muted">Nessun capitolo. Aggiungine uno o chiedi all’AI di iniziare.</p>}
+        {chapters.length === 0 && <p className="rail-none small muted">Nessun capitolo. Aggiungine uno o chiedi all’assistente di iniziare.</p>}
         <ol className="rail-list">
           {chapters.map((ch, i) => (
             <ChapterItem

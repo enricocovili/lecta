@@ -349,7 +349,7 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
         </a>
         <button type="button" className="btn" onClick={() => void ask("Parti dalle fonti caricate: crea i capitoli e scrivi una prima bozza del corso.", { mode: "edit", noScope: true })}>
           <Icon name="sparkles" />
-          Chiedi all’AI di iniziare
+          Scrivi una prima bozza
         </button>
       </div>
     </div>

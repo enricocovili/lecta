@@ -51,7 +51,7 @@ export default function SelectionToolbar({
       className={`sel-toolbar ${pos?.below ? "below" : ""}`}
       data-testid="selection-toolbar"
       role="toolbar"
-      aria-label="Chiedi all'AI su questo testo"
+      aria-label="Chiedi all'assistente su questo testo"
       style={{ top: pos?.top ?? -1000, left: pos?.left ?? 0, visibility: pos ? "visible" : "hidden" }}
       onPointerDown={(e) => {
         onPress?.();

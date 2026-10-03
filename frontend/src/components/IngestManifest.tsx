@@ -205,7 +205,7 @@ export default function IngestManifest({ jobId, active }: { jobId: number; activ
                         {r.compile && (
                           <>
                             {" · "}
-                            {r.compile === "ok" ? <span className="text-ok">compila</span> : <span className="text-danger">ha errori di compilazione: chiedi all’AI di correggerli</span>}
+                            {r.compile === "ok" ? <span className="text-ok">compila</span> : <span className="text-danger">ha errori di compilazione: correggili dal testo della materia</span>}
                           </>
                         )}
                       </div>

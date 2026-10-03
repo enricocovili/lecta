@@ -361,7 +361,7 @@ function ReviewLine({ c }: { c: CourseState }) {
     return (
       <a className="home-review none" href={courseText(c.id, { ask: "Fai una revisione completa del corso." })}>
         <Icon name="sparkles" />
-        Nessuna revisione: chiedi all'AI un giudizio sul corso
+        Nessuna revisione: chiedi un giudizio sul corso
       </a>
     );
   }
@@ -431,7 +431,7 @@ export default function Dashboard() {
             {data.courses.map((c) => (
               <div key={c.id} className="card home-course">
                 <div className="row between nowrap">
-                  {c.ai_running ? <StatusPill tone="warn" label="L'AI sta lavorando" /> : <StatusPill tone={COURSE_TONE[c.status]} label={COURSE_LABEL[c.status]} />}
+                  {c.ai_running ? <StatusPill tone="warn" label="In aggiornamento" /> : <StatusPill tone={COURSE_TONE[c.status]} label={COURSE_LABEL[c.status]} />}
                   <PublishSwitch course={c} onChanged={changed} />
                 </div>
                 <h3 className="card-title">

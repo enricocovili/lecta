@@ -50,7 +50,7 @@ export default function PdfPane({ courseId, revision, active, onFix }: { courseI
           <div className="pdfpane-err-actions">
             <button type="button" className="btn sm primary" onClick={() => onFix(`La compilazione del PDF è fallita con questi errori:\n\n${errs || "(errore senza dettagli)"}\n\nCorreggili.`)}>
               <Icon name="sparkles" />
-              Chiedi all’AI di correggere
+              Chiedi all’assistente di correggere
             </button>
             <button type="button" className="btn sm" onClick={() => void run()}>
               Riprova

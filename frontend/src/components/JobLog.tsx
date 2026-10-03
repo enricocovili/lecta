@@ -66,7 +66,7 @@ const KIND_HELP: Record<string, string> = {
   truncated: "La risposta ha raggiunto il limite di token in uscita prima di finire (i modelli di ragionamento possono consumarlo tutto pensando).",
   refused: "Il modello ha rifiutato o il filtro dei contenuti ha bloccato la risposta.",
   invalid_json: "Il modello ha risposto, ma non con il JSON richiesto.",
-  compile_error: "Il capitolo scritto non compila (dopo la correzione automatica resta da far correggere all'AI).",
+  compile_error: "Il capitolo scritto non compila (dopo la correzione automatica resta da correggere nel testo della materia).",
   split_unit: "Risposta troncata al limite di token: le pagine sono state rilette in due metà.",
   reply_unterminated: "La risposta non terminava con %%END: è stata usata così com'era.",
   pages_with_picture: "Alcune pagine sono state lette insieme alla loro immagine (scansioni, formule, annotazioni a mano).",
