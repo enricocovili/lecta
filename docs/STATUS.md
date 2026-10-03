@@ -150,20 +150,18 @@ Tests: `scripts/test.sh` (backend), `scripts/e2e.sh` (browser, isolated stack),
 
 ## Open work
 
-Open work, ideas and plans are tracked as issues on the [Features board](https://github.com/users/enricocovili/projects/1)
-(Status: Idea › Da definire › Pronta › In corso › Fatta; Area as the commit prefixes; Priorità P0–P2). A commit that
-finishes an issue says `Closes #N`. What was open when the board was set up:
+Open work, ideas and bugs are tracked on the [Features board](https://github.com/users/enricocovili/projects/1); see
+"Planning" in the README. Known gaps in what was built:
 
-* **Real AI providers and models** ([#1](https://github.com/enricocovili/lecta/issues/1)): the Anthropic, OpenAI and
-  Gemini adapters were never called against the real services (#2); quality, cost and latency of the import (#3), of the
-  assistant (#4) and of lessons with strokes as pictures (#5) are unmeasured. The fake provider only checks the mechanics.
-* Drawing on a real tablet and stylus (#6).
-* Splitting one group across several chapters has no end-to-end test: the fake classifier always returns one placement (#7).
-* Language detection and "photo vs. page of notes" are heuristics (#8).
-* Idle memory is about 1 GB, ~720 MB of it the worker with the embedding model resident (#11); setting the embedding model
+* **Real AI providers and models**: the Anthropic, OpenAI and Gemini adapters were never called against the real
+  services; quality, cost and latency of the import, of the assistant and of lessons with strokes as pictures are
+  unmeasured. The fake provider only checks the mechanics.
+* Drawing was tested with mouse and synthetic pen/touch events, not on a real tablet and stylus.
+* Splitting one group across several chapters has no end-to-end test: the fake classifier always returns one placement.
+* Language detection and "photo vs. page of notes" are heuristics.
+* Idle memory is about 1 GB, ~720 MB of it the worker with the embedding model resident; setting the embedding model
   to *off* in Settings saves it (retrieval then runs lexical-only).
-* `docs/PLAN.md` describes the architecture before the redesigns (#13); the interface prototype PDF still shows the old
-  name (#12).
+* `docs/PLAN.md` describes the architecture before the redesigns; the interface prototype PDF still shows the old name.
 
 ## Limitations (by design)
 
@@ -176,8 +174,8 @@ finishes an issue says `Closes #N`. What was open when the board was set up:
 
 ## Known issues
 
-* The frontend build prints a harmless Astro warning about Shiki and CSP (Shiki isn't used): #10.
-* PyMuPDF logs a deprecation warning for the `fitz` import name: #9.
+* The frontend build prints a harmless Astro warning about Shiki and CSP (Shiki isn't used).
+* PyMuPDF logs a deprecation warning for the `fitz` import name.
 
 ## Where things are
 
