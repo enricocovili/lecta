@@ -140,10 +140,11 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     }
   };
 
+  // The eraser's ring (the CSS cursor is hidden over the page): it follows the pointer while hovering and while erasing.
   const cursorAt = (x: number | null, y: number | null) => {
     const l = live.current;
     const ctx = l?.getContext("2d");
-    if (!l || !ctx || cur.current) return;
+    if (!l || !ctx || (cur.current && cur.current.kind !== "erase")) return;
     ctx.clearRect(0, 0, l.width, l.height);
     if (x === null || y === null) return;
     const scale = props.current.width * dpr;
@@ -174,6 +175,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       const c: Current = { kind: "erase", id: e.pointerId, removed: new Set(), dirty: null };
       cur.current = c;
       eraseAt(c, pt.x, pt.y);
+      cursorAt(pt.x, pt.y);
       return;
     }
     const hl = tool === "hl";
@@ -198,12 +200,14 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       return;
     }
     const events = (e.nativeEvent as PointerEvent).getCoalescedEvents?.() ?? [];
+    let last = { x: 0, y: 0 };
     for (const ev of events.length ? events : [e.nativeEvent as PointerEvent]) {
-      const pt = point(ev);
+      const pt = (last = point(ev));
       if (c.kind === "erase") eraseAt(c, pt.x, pt.y);
       else if (farEnough(c.stroke.p, pt.x, pt.y)) c.stroke.p.push(pt.x, pt.y, ev.pressure || 0.5);
     }
     if (c.kind === "draw") schedule();
+    else cursorAt(last.x, last.y);
   };
 
   const finish = (e: React.PointerEvent, cancelled: boolean) => {
