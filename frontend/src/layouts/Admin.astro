@@ -22,11 +22,11 @@ const initials =
     .map((w: string) => w[0]!.toUpperCase())
     .join("") || "A";
 const is = (p: string) => path === p || path.startsWith(p + "/");
-const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/admin/courses") ? "courses" : is("/admin/upload") || is("/admin/quick") ? "upload" : path === "/admin" ? "home" : "";
+const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/admin/courses") ? "courses" : is("/admin/upload") || is("/admin/quick") ? "upload" : "";
 ---
 <Base title={`${title} · ${site.title}`}>
   <header class="topbar">
-    <a class="brand" href="/admin"><BrandMark />Lecta</a>
+    <a class="brand" href="/admin" title="Home"><BrandMark />Lecta</a>
     <TopSearch client:idle />
     <div class="topbar-actions">
       <a class="btn ghost icon show-mobile" href="/admin/search" aria-label="Cerca"><Icon name="search" /></a>
@@ -73,7 +73,6 @@ const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/a
     </main>
   </div>
   <nav class="bottom-nav" aria-label="Navigazione rapida">
-    <a href="/admin" class={tab === "home" ? "active" : ""}><Icon name="home" />Home</a>
     <a href="/admin/courses" class={tab === "courses" ? "active" : ""}><Icon name="folder" />Materie</a>
     <a href="/admin/lessons" class={tab === "lessons" ? "active" : ""}><Icon name="notebook" />Lezioni</a>
     <a href="/admin/quick" class="cta"><span class="ico-wrap"><Icon name="upload" /></span>Carica</a>

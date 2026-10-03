@@ -58,15 +58,11 @@ export default function Sidebar({ currentPath }: { currentPath: string }) {
   return (
     <nav className="sidebar-nav" aria-label="Navigazione" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div className="nav">
-        <NavItem href="/admin" icon="home" label="Home" active={currentPath === "/admin" || currentPath === "/admin/"} />
         <NavItem href="/admin/courses" icon="folder" label="Materie" active={is("/admin/courses")} />
         <NavItem href="/admin/lessons" icon="notebook" label="Lezioni" active={is("/admin/lessons")} />
         <NavItem href="/admin/upload" icon="upload" label="Carica" active={is("/admin/upload") || is("/admin/quick")} />
         <NavItem href="/admin/inbox" icon="inbox" label="Da smistare" active={is("/admin/inbox")} count={counts?.inbox_count ?? 0} hot />
         <NavItem href="/admin/map" icon="map" label="Mappa" active={is("/admin/map")} />
-        <NavItem href="/admin/search" icon="search" label="Cerca" active={is("/admin/search")} />
-        <NavItem href="/admin/jobs" icon="activity" label="Attività" active={is("/admin/jobs")} count={counts?.jobs_active ?? 0} />
-        <NavItem href="/admin/settings" icon="sliders" label="Impostazioni" active={is("/admin/settings")} />
       </div>
 
       <div className="nav-group-title">
