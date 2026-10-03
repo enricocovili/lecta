@@ -1,0 +1,59 @@
+# Puts a new issue on the Features board in the column of its kind:
+# `idea` → 💡 Idea, `bug` → ✅ Pronta (🔍 Da definire when someone else reported it).
+# A new issue is always placed; a label added later only places an issue that has no Status yet.
+# Needs the PROJECT_TOKEN secret: a classic token with only the `project` scope
+# (the workflow's own token can't reach a user-owned project).
+name: Board
+
+on:
+  issues:
+    types: [opened, labeled]
+
+concurrency:
+  group: board-${{ github.event.issue.number }}
+
+permissions: {}
+
+jobs:
+  place:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'idea') || contains(github.event.issue.labels.*.name, 'bug')
+    env:
+      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      PROJECT: PVT_kwHOBB8I684BlkEZ
+      STATUS_FIELD: PVTSSF_lAHOBB8I684BlkEZzhkQdBk
+      ISSUE: ${{ github.event.issue.node_id }}
+      IS_BUG: ${{ contains(github.event.issue.labels.*.name, 'bug') }}
+      BY_OWNER: ${{ github.event.issue.author_association == 'OWNER' }}
+      EVENT: ${{ github.event.action }}
+    steps:
+      - name: Place the issue
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::PROJECT_TOKEN is not set: the issue was not placed on the board."
+            exit 0
+          fi
+          if [ "$IS_BUG" = true ]; then
+            if [ "$BY_OWNER" = true ]; then status=2375ac35; else status=c3fd306a; fi  # ✅ Pronta / 🔍 Da definire
+          else
+            status=3be4abad  # 💡 Idea
+          fi
+          item=$(gh api graphql -f project="$PROJECT" -f issue="$ISSUE" -f query='
+            mutation($project: ID!, $issue: ID!) {
+              addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }
+            }' --jq .data.addProjectV2ItemById.item.id)
+          current=$(gh api graphql -f item="$item" -f query='
+            query($item: ID!) {
+              node(id: $item) { ... on ProjectV2Item { fieldValueByName(name: "Status") {
+                ... on ProjectV2ItemFieldSingleSelectValue { optionId } } } }
+            }' --jq '.data.node.fieldValueByName.optionId // ""')
+          if [ -n "$current" ] && [ "$EVENT" = labeled ]; then
+            echo "Already has a Status, left where it is."
+            exit 0
+          fi
+          gh api graphql -f project="$PROJECT" -f item="$item" -f field="$STATUS_FIELD" -f status="$status" -f query='
+            mutation($project: ID!, $item: ID!, $field: ID!, $status: String!) {
+              updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field,
+                value: {singleSelectOptionId: $status}}) { projectV2Item { id } }
+            }' >/dev/null
+          echo "Placed in column $status."
