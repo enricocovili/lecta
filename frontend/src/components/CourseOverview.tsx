@@ -157,6 +157,23 @@ export default function CourseOverview({ courseId }: { courseId: number }) {
         </section>
       </div>
 
+      <section aria-labelledby="co-lab" data-testid="overview-lab">
+        <div className="section-label">
+          <span id="co-lab">Laboratorio</span>
+        </div>
+        <div className="card co-lab">
+          <span className="status-ico pg-kind-ico">
+            <Icon name="flask" />
+          </span>
+          <div className="grow">
+            <div className="pg-row-title">
+              In sviluppo <span className="pill sm">presto</span>
+            </div>
+            <div className="pg-row-sub">Qui arriverà il laboratorio di ogni capitolo e di ogni lezione.</div>
+          </div>
+        </div>
+      </section>
+
       {settings && (
         <Modal title="Impostazioni della materia" wide onClose={() => setSettings(false)}>
           <CourseSettings

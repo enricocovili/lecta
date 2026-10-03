@@ -80,6 +80,7 @@ const P: Record<string, string> = {
   hand: '<path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.3l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/>',
   notebook: '<path d="M5 3h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5z"/><path d="M9 3v18M13 8h3M13 12h3"/>',
   smartphone: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.2"/><path d="M11 18.5h2"/>',
+  flask: '<path d="M10 2v7.3a2 2 0 0 1-.3 1L4.4 19a2 2 0 0 0 1.7 3h11.8a2 2 0 0 0 1.7-3l-5.3-8.7a2 2 0 0 1-.3-1V2"/><path d="M8.5 2h7M7 16h10"/>',
 };
 
 export type IconName = keyof typeof P;

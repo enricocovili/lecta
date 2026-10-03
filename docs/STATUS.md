@@ -128,6 +128,7 @@ The app was called Appunti until 2026-10-02 (DECISIONS 91–92). What changed an
 * **No «Da smistare»** (DECISIONS 97): placement picks a chapter of the lesson's course or starts a new one; the inbox and
   its table are gone (migration `0019`; the inbox on this server was empty).
 * **Course page** (DECISIONS 98): a course opens on its lessons and chapters; the text is at `/admin/courses/{id}/testo`.
+  The **Laboratorio** section is a placeholder («In sviluppo»); what it will do is open (#24).
 
 ## Definition of done: how each point is verified
 

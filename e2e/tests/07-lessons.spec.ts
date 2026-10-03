@@ -225,6 +225,10 @@ test.describe.serial("Lezioni", () => {
     await expect(lesson).toHaveCount(1);
     await expect(lesson).toContainText("Lezione 1 - Sistemi LTI");
     await expect(lesson.getByRole("switch")).toBeChecked(); // its text is in the course: completed
+    // The lab is announced, with nothing to click yet.
+    const lab = page.getByTestId("overview-lab");
+    await expect(lab).toContainText("In sviluppo");
+    await expect(lab.locator("a, button")).toHaveCount(0);
     const chapter = page.getByTestId("overview-chapter").first();
     const href = (await chapter.getAttribute("href"))!;
     expect(href).toMatch(new RegExp(`^/admin/courses/${courseId}/testo\\?chapter=\\d+$`));

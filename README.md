@@ -82,7 +82,8 @@ real compile service.
 
 **A course** opens on its page (`/admin/courses/{id}`): its **lessons** (with the «Completata» switch and
 «Nuova lezione»), the **chapters** of its text (one click opens the text at that chapter), publishing ON/OFF,
-the PDF and LaTeX downloads and the course settings. **Apri il testo** leads into the text.
+the PDF and LaTeX downloads and the course settings. **Apri il testo** leads into the text. A
+**Laboratorio** section, tied to a chapter or a lesson, is announced there and still in development.
 
 The text of a course opens at `/admin/courses/{id}/testo`: the centre is the **draft**, the left
 rail is the outline (chapters and sections, sources, structure actions), the right panel is the
