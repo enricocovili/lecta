@@ -217,6 +217,28 @@ test.describe.serial("Lezioni", () => {
     con.assertClean(EXPECTED);
   });
 
+  test("the course page lists the lessons with their state and the chapters, each one click away", async ({ page }) => {
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`/admin/courses/${courseId}`);
+    const lesson = page.getByTestId("overview-lesson");
+    await expect(lesson).toHaveCount(1);
+    await expect(lesson).toContainText("Lezione 1 - Sistemi LTI");
+    await expect(lesson.getByRole("switch")).toBeChecked(); // its text is in the course: completed
+    const chapter = page.getByTestId("overview-chapter").first();
+    const href = (await chapter.getAttribute("href"))!;
+    expect(href).toMatch(new RegExp(`^/admin/courses/${courseId}/testo\\?chapter=\\d+$`));
+    await chapter.click();
+    await page.waitForURL(/\/admin\/courses\/\d+\/testo\?chapter=\d+$/);
+    await expect(page.getByTestId("doc-preview")).toBeVisible();
+    // The text leads back to the course page, and the course page to a lesson.
+    await page.getByRole("link", { name: "Torna alla materia" }).click();
+    await page.waitForURL(new RegExp(`/admin/courses/${courseId}$`));
+    await page.getByTestId("overview-lesson").getByRole("link", { name: "Lezione 1 - Sistemi LTI" }).click();
+    await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/1$/);
+    con.assertClean(EXPECTED);
+  });
+
   test("Ctrl+Z undoes the last thing done whatever it was: drawing, text, a removed slide", async ({ page }) => {
     test.setTimeout(120_000);
     const con = watchConsole(page);

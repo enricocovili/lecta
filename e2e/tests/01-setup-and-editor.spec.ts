@@ -30,14 +30,20 @@ test.describe.serial("workspace", () => {
     await ctx.close();
   });
 
-  test("create a course: the workspace opens with the outline and the draft", async ({ page }) => {
+  test("create a course: its page lists the chapters, and its text opens with the outline and the draft", async ({ page }) => {
     const con = watchConsole(page);
     await login(page);
     await page.goto("/admin/courses?new=1");
     await page.getByLabel("Nome").fill("Algebra Lineare");
     await page.getByLabel(/^Capitoli/).fill("Spazi vettoriali\nMatrici");
     await page.getByRole("button", { name: "Crea materia" }).click();
-    await page.waitForURL(/\/admin\/courses\/\d+(\/testo)?$/);
+    await page.waitForURL(/\/admin\/courses\/\d+$/);
+    await expect(page.getByRole("heading", { name: "Algebra Lineare" })).toBeVisible();
+    // The course page: no lessons yet, the chapters of the text.
+    await expect(page.getByText("Ancora nessuna lezione")).toBeVisible();
+    await expect(page.getByTestId("overview-chapter")).toHaveText([/Spazi vettoriali/, /Matrici/]);
+    await page.getByTestId("course-overview").getByRole("link", { name: "Apri il testo" }).first().click();
+    await page.waitForURL(/\/admin\/courses\/\d+\/testo$/);
     await expect(page.getByRole("heading", { name: "Algebra Lineare" })).toBeVisible();
 
     // The outline on the left and the draft in the middle both know the chapters.

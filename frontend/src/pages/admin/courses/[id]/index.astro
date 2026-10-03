@@ -1,4 +1,13 @@
 ---
-// For now the course opens on its text (the workspace), keeping ?chapter, ?chat and ?ask.
-return Astro.redirect(`/admin/courses/${Number(Astro.params.id)}/testo${Astro.url.search}`);
+import Admin from "../../../../layouts/Admin.astro";
+import CourseOverview from "../../../../components/CourseOverview";
+import { backendGet } from "../../../../lib/server";
+const id = Number(Astro.params.id);
+const r = await backendGet<{ name: string }>(Astro, `/api/courses/${id}`);
+if (!r.data) return Astro.rewrite("/404");
+// Links made before the overview existed (?chapter, ?chat, ?ask) wanted the text.
+if (Astro.url.search) return Astro.redirect(`/admin/courses/${id}/testo${Astro.url.search}`);
 ---
+<Admin title={r.data.name} crumbs={[{ label: "Materie", href: "/admin/courses" }, { label: r.data.name }]}>
+  <CourseOverview client:load courseId={id} />
+</Admin>

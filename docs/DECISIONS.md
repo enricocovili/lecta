@@ -463,3 +463,8 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
     `inbox.assign` job, the «new course from the inbox» path, the confidence threshold and the `inbox_items` table
     (migration `0019`, which logs how many open items it drops) are gone. *Why:* an inbox only made sense for material
     without a course, which no longer exists.
+98. **A course opens on its page, not in its text.** `/admin/courses/{id}` shows the lessons of the course and the
+    chapters of its text, with publishing, downloads and settings; the workspace (draft, outline, assistant) moved to
+    `/admin/courses/{id}/testo`. Links that want the text (a chapter, the assistant, a question) go there directly
+    (`lib/links.ts`), and an old course link with `?chapter`, `?chat` or `?ask` is sent on to it. *Why:* a course is
+    made of lessons and of the text that comes out of them; opening straight into the draft hid the lessons.

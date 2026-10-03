@@ -667,3 +667,48 @@ a.pg-row-title:hover {
     display: none;
   }
 }
+
+/* ------------------------------------------------------------------ course overview */
+
+.co .page-head .sub.row {
+  gap: 0.6rem;
+  align-items: center;
+}
+.co-actions {
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.co-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 1.75rem;
+  align-items: start;
+}
+.co-grid .section-label .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+.co-chapter {
+  color: var(--fg);
+}
+.co-chapter:hover {
+  background: var(--bg-hover);
+  text-decoration: none;
+}
+.co-num {
+  width: 1.6rem;
+  flex: none;
+  text-align: right;
+}
+@media (max-width: 900px) {
+  .co-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .co-actions {
+    width: 100%;
+  }
+}

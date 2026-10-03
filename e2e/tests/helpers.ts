@@ -27,11 +27,13 @@ export async function login(page: Page) {
   await page.waitForURL("**/admin");
 }
 
-/** Open a course from the courses list: the workspace with the draft of the document. */
+/** Open a course from the courses list, then its text: the workspace with the draft of the document. */
 export async function openCourse(page: Page, name: string | RegExp) {
   await page.goto("/admin/courses");
   await page.getByRole("link", { name }).first().click();
-  await page.waitForURL(/\/admin\/courses\/\d+/);
+  await page.waitForURL(/\/admin\/courses\/\d+$/);
+  await page.getByTestId("course-overview").getByRole("link", { name: "Apri il testo" }).first().click();
+  await page.waitForURL(/\/admin\/courses\/\d+\/testo$/);
   await expect(page.getByTestId("doc-preview")).toBeVisible();
 }
 

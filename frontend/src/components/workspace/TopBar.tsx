@@ -29,7 +29,7 @@ export default function TopBar({
 }) {
   return (
     <header className="wsb">
-      <a className="btn ghost icon wsb-back" href="/admin/courses" aria-label="Torna alle materie" title="Materie">
+      <a className="btn ghost icon wsb-back" href={`/admin/courses/${course.id}`} aria-label="Torna alla materia" title="La materia: lezioni e capitoli">
         <Icon name="arrow-left" />
       </a>
       <button type="button" className="btn ghost icon wsb-rail" onClick={onToggleRail} aria-label="Indice" aria-pressed={railOpen} title="Mostra o nascondi l’indice">

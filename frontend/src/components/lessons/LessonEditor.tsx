@@ -2,6 +2,7 @@
 // mouse, stylus or finger) and Markdown notes next to it, saved as you write. Made to work on a tablet or a foldable laptop.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, fmtDate, get, patch } from "../../lib/api";
+import { courseText } from "../../lib/links";
 import { Icon } from "../icons";
 import Pop from "../workspace/Pop";
 import { Confirm, Seg, toastError, useLocalStorage } from "../ui";
@@ -324,7 +325,7 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
           </button>
           )}
           {owner && lesson.generated_at && lesson.last_result?.chapters?.length ? (
-            <a className="btn ghost hide-mobile" href={`/admin/courses/${lesson.course_id}`} title="Apri la materia con il testo generato">
+            <a className="btn ghost hide-mobile" href={courseText(lesson.course_id, { chapter: lesson.last_result.chapters[0].chapter_id })} title="Apri il testo generato da questa lezione">
               <Icon name="book" />
               <span className="wsb-lbl">Testo del {fmtDate(lesson.generated_at)}</span>
             </a>

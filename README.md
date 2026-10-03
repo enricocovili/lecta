@@ -80,11 +80,16 @@ real compile service.
 
 ## The workspace
 
+**A course** opens on its page (`/admin/courses/{id}`): its **lessons** (with the «Completata» switch and
+«Nuova lezione»), the **chapters** of its text (one click opens the text at that chapter), publishing ON/OFF,
+the PDF and LaTeX downloads and the course settings. **Apri il testo** leads into the text.
+
 The text of a course opens at `/admin/courses/{id}/testo`: the centre is the **draft**, the left
 rail is the outline (chapters and sections, sources, structure actions), the right panel is the
 **AI assistant**. `?chapter={id}` scrolls to a chapter, `?chat=1` opens the assistant, `?ask=…`
-also puts a question in its box; the old addresses (`/admin/editor/{id}`, `…/chapters/{id}`) lead
-there.
+also puts a question in its box; the old addresses (`/admin/editor/{id}`, `…/chapters/{id}`, and
+the course address with one of those parameters) lead there. The arrow at the top left goes back
+to the course page.
 
 * **Draft vs. PDF**: the draft is typeset by the same LaTeX as the PDF, with the
   course's own preamble (theorem boxes, numbering, references, TikZ, tables, pictures

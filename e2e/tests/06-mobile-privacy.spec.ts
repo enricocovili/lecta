@@ -23,10 +23,15 @@ test("pages fit a phone screen and never load anything from another origin", asy
     expect(overflow, `horizontal overflow on ${p}`).toBeLessThanOrEqual(2);
   }
 
-  // The workspace on a phone: the document, and the assistant one tap away (tab bar).
+  // The course page fits too.
   await page.goto(courseHref!);
-  await expect(page.getByTestId("doc-preview")).toBeVisible();
+  await expect(page.getByTestId("course-overview")).toBeVisible();
   let overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow, "horizontal overflow on the course page").toBeLessThanOrEqual(2);
+  // The text on a phone: the document, and the assistant one tap away (tab bar).
+  await page.goto(`${courseHref}/testo`);
+  await expect(page.getByTestId("doc-preview")).toBeVisible();
+  overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow, "horizontal overflow in the workspace").toBeLessThanOrEqual(2);
   await page.getByRole("navigation", { name: "Vista" }).getByRole("button", { name: "Assistente" }).click();
   await expect(page.getByTestId("ai-panel")).toBeVisible();
