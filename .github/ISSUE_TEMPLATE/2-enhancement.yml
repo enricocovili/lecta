@@ -1,0 +1,33 @@
+name: ✨ Miglioria
+description: Un cambiamento o un'aggiunta già decisi, da fare. Entra nel backlog (✅ Pronta).
+labels: [enhancement]
+projects: [enricocovili/1]
+body:
+  - type: textarea
+    id: change
+    attributes:
+      label: Cosa cambia
+      description: Cosa si potrà fare, o cosa farà diversamente Lecta.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Perché
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Come
+      description: Una proposta di come farlo, se c'è già.
+  - type: textarea
+    id: done
+    attributes:
+      label: Fatto quando
+      description: Come si verifica che è finito.
+      placeholder: |
+        - [ ] …
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Lessons, Draft, Assistant, Import, LaTeX, PDF, Publishing, Deploy, UI, Docs, Non so]

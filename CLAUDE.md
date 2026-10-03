@@ -23,11 +23,10 @@ Plans and ideas live on the [Features board](https://github.com/users/enricocovi
 --owner enricocovili`), linked to this repo. Status: 💡 Idea (draft item) › 🔍 Da definire (issue) › ✅ Pronta (split
 into sub-issues) › 🚧 In corso › ✔️ Fatta › 🗑️ Scartata; fields **Area** (the commit prefixes) and **Priorità** (P0–P2).
 
-* **Two kinds of issue**, by label: `idea` (to explore, not decided: starts in 💡 Idea) and `bug` (a bug or problem
-  that needs fixing: starts in ✅ Pronta; `.github/workflows/board.yml` places them). New issues come from the forms in
-  `.github/ISSUE_TEMPLATE/`; an issue made
-  with `gh issue create` gets one of the two labels. Planned work that is neither (a feature already decided, a
-  verification) has no kind label.
+* **Three kinds of issue**, by label: `idea` (to explore, not decided: starts in 💡 Idea), `bug` (something broken
+  that needs fixing) and `enhancement` (a change or addition already decided); bugs and enhancements start in ✅ Pronta
+  (`.github/workflows/board.yml` places them). New issues come from the forms in `.github/ISSUE_TEMPLATE/`; an issue
+  made with `gh issue create` gets exactly one of the three labels.
 * **Starting from an issue** ("do #12"): read it and its sub-issues with `gh issue view`, set it to 🚧 In corso, and
   use its sub-issues as the step list below (create them first if the issue has none and the work needs several
   commits).

@@ -1,5 +1,5 @@
 # Puts a new issue on the Features board in the column of its kind:
-# `idea` → 💡 Idea, `bug` → ✅ Pronta (🔍 Da definire when someone else reported it).
+# `idea` → 💡 Idea, `bug` and `enhancement` → ✅ Pronta (🔍 Da definire when someone else opened it).
 # A new issue is always placed; a label added later only places an issue that has no Status yet.
 # Needs the PROJECT_TOKEN secret: a classic token with only the `project` scope
 # (the workflow's own token can't reach a user-owned project).
@@ -17,13 +17,16 @@ permissions: {}
 jobs:
   place:
     runs-on: ubuntu-latest
-    if: contains(github.event.issue.labels.*.name, 'idea') || contains(github.event.issue.labels.*.name, 'bug')
+    if: >-
+      contains(github.event.issue.labels.*.name, 'idea') ||
+      contains(github.event.issue.labels.*.name, 'bug') ||
+      contains(github.event.issue.labels.*.name, 'enhancement')
     env:
       GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
       PROJECT: PVT_kwHOBB8I684BlkEZ
       STATUS_FIELD: PVTSSF_lAHOBB8I684BlkEZzhkQdBk
       ISSUE: ${{ github.event.issue.node_id }}
-      IS_BUG: ${{ contains(github.event.issue.labels.*.name, 'bug') }}
+      TO_DO: ${{ contains(github.event.issue.labels.*.name, 'bug') || contains(github.event.issue.labels.*.name, 'enhancement') }}
       BY_OWNER: ${{ github.event.issue.author_association == 'OWNER' }}
       EVENT: ${{ github.event.action }}
     steps:
@@ -33,7 +36,7 @@ jobs:
             echo "::notice::PROJECT_TOKEN is not set: the issue was not placed on the board."
             exit 0
           fi
-          if [ "$IS_BUG" = true ]; then
+          if [ "$TO_DO" = true ]; then
             if [ "$BY_OWNER" = true ]; then status=2375ac35; else status=c3fd306a; fi  # ✅ Pronta / 🔍 Da definire
           else
             status=3be4abad  # 💡 Idea
