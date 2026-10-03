@@ -429,3 +429,20 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
     generic `frontend` could clash with another stack there. A fixed name means two copies of the stack cannot run side
     by side, so `scripts/smoke.override.yml` gives the isolated test copy `lecta-smoke-frontend`. *Alternative:* a service
     called `frontend` with a `lecta-frontend` network alias (leaves a `frontend` alias on the shared network).
+94. **The draft is typeset by the real LaTeX, block by block, instead of pandoc HTML** (replaces 71 and 87). The HTML
+    draft kept drifting from the PDF (custom macros dropped, TikZ as placeholders, tables, numbering, references). Now a
+    chapter is split into blocks (`services/blocks`: paragraphs, headings, whole environments, never inside braces,
+    environments or verbatim) and one engine run of a wrapper document (`services/draft`: the course's `main.tex`
+    preamble, each block from its own file on its own page, page styles off) typesets them; `mutool` turns the pages into
+    SVG cropped to the ink, sized against the text width so every block shares one scale. Blocks are cached as
+    *variants*: their text and inputs (pictures, figures, the values of the labels they cite, preamble) plus the counter
+    state they started from and the one they left. Python walks the chain to see whether anything is missing; the wrapper
+    walks it again in TeX with the real counters and skips every block whose cached start state matches, so an edit
+    typesets that block and the numbered blocks after it, and a block that changes and prints no counter (most
+    paragraphs) fits any state. Labels are fed from the aux of earlier runs; when a run changes one, a second pass
+    typesets the blocks that cite it. With pdflatex the preamble is precompiled once with mylatexformat (~0.5 s instead
+    of ~1.6 s per run with TikZ & co.). Selection is per block (click, Shift+click) and sends the blocks' LaTeX.
+    *Alternatives:* a per-section PDF in pdf.js with SyncTeX (bigger units, slower, fake page breaks); pandoc HTML with
+    LaTeX-rendered islands for what it gets wrong (the prose would still not look like the PDF). *Costs:* text in the
+    draft is pictures (not selectable as text, and small on a phone), and the first view of a course typesets every
+    chapter (a couple of seconds each).

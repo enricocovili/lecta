@@ -7,13 +7,38 @@ export interface TocEntry {
   line: number;
 }
 
-export interface PreviewChapter {
+/** One picture of a block typeset by LaTeX; sizes in bp, `x` from the text's left edge. */
+export interface DraftPage {
+  url: string;
+  w: number;
+  h: number;
+  x: number;
+  /** holds a photo: not inverted in the dark theme */
+  raster?: boolean;
+}
+
+/** A paragraph, heading or environment of the chapter source (lines start…end), typeset as one or more pictures. */
+export interface DraftBlock {
+  start: number;
+  end: number;
+  pages: DraftPage[];
+  error: string | null;
+  heading?: string;
+  id?: string;
+  src?: string;
+}
+
+export interface DraftChapter {
   chapter: { id: number; title: string; path: string; position: number };
-  html: string;
+  /** text width in bp */
+  width: number;
+  /** null while the chapter is being typeset */
+  blocks: DraftBlock[] | null;
   toc: TocEntry[];
   warnings: string[];
-  blob?: string;
+  typeset?: number;
   took_ms?: number;
+  error?: string;
 }
 
 export interface Hunk {

@@ -33,8 +33,8 @@ test("upload the mixed zip: the notes are written into the course by themselves"
   await page.waitForURL(/\/admin\/courses\/\d+(\?chapter=\d+)?$/);
   const doc = page.getByTestId("doc-preview");
   await expect(doc).toBeVisible();
-  await expect(doc.locator(".katex").first()).toBeVisible({ timeout: 30_000 });
-  await expect(doc.locator("figure").first()).toBeVisible();
+  await expect(doc.locator(".doc-block img").first()).toBeVisible({ timeout: 60_000 });
+  await expect(doc.locator(".doc-block img.raster").first()).toBeVisible(); // a picture from the sources
   // The outline lists the chapter and the AI panel is ready to work on it.
   await expect(page.getByRole("navigation", { name: "Struttura del documento" }).locator(".rail-ch").first()).toBeVisible();
   await expect(page.getByTestId("ai-composer")).toBeVisible();

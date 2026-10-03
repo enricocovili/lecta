@@ -6,7 +6,7 @@ import { Icon } from "../icons";
 import { kindIcon } from "../pagekit";
 import { Confirm, toastError, useApi } from "../ui";
 import Pop from "./Pop";
-import type { CourseChapter, PreviewChapter } from "./types";
+import type { CourseChapter, DraftChapter } from "./types";
 
 interface SourceRow {
   id: number;
@@ -39,7 +39,7 @@ function ChapterItem({
   active: boolean;
   open: boolean;
   changed: boolean;
-  sections: PreviewChapter["toc"];
+  sections: DraftChapter["toc"];
   courseId: number;
   onGoto: (sectionId?: string) => void;
   onToggle: () => void;
@@ -196,7 +196,7 @@ export default function Outline({
 }: {
   courseId: number;
   chapters: CourseChapter[];
-  preview: PreviewChapter[] | null;
+  preview: DraftChapter[] | null;
   activeChapterId: number | null;
   aiChanged: Set<number>;
   onGoto: (chapterId: number, sectionId?: string) => void;

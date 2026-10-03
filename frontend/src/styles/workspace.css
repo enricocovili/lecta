@@ -443,8 +443,7 @@ body.ws-page {
 .doc-ch-head {
   margin-bottom: 1.4rem;
 }
-.doc-ch-n,
-.doc-body > h1:first-child::before {
+.doc-ch-n {
   display: block;
   font-family: var(--font);
   font-size: 0.74rem;
@@ -454,11 +453,7 @@ body.ws-page {
   color: var(--fg-muted);
   margin-bottom: 0.35rem;
 }
-.doc-body > h1:first-child::before {
-  content: "Capitolo " counter(ch);
-}
-.doc-ch-title,
-.doc-body h1 {
+.doc-ch-title {
   font-family: var(--serif);
   font-weight: 500;
   font-size: 2.3rem;
@@ -470,253 +465,62 @@ body.ws-page {
   font-family: var(--font);
   font-size: 0.95rem;
 }
-.doc-body h2,
-.doc-body h3,
-.doc-body h4 {
-  font-family: var(--serif);
-  font-weight: 600;
-  line-height: 1.25;
-  scroll-margin-top: 1rem;
+/* A block of the draft: a paragraph, heading or environment typeset by LaTeX, as one or more SVG pictures sized
+   relative to the text width (so every block shares one scale). Click to pick it, Shift+click to extend. */
+.doc-block {
+  position: relative;
+  margin: 0 -6px 0.5rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
-.doc-body h2 {
-  font-size: 1.6rem;
-  margin: 2.4rem 0 0.7rem;
-  letter-spacing: -0.01em;
+.doc-block:empty {
+  display: none;
 }
-.doc-body h3 {
-  font-size: 1.28rem;
-  margin: 1.9rem 0 0.5rem;
+.doc-block.doc-heading {
+  margin-top: 1rem;
 }
-.doc-body h4 {
-  font-size: 1.1rem;
-  font-style: italic;
-  margin: 1.5rem 0 0.4rem;
-}
-.doc-body p {
-  margin: 0 0 1rem;
-  hyphens: auto;
-}
-.doc-body ul,
-.doc-body ol {
-  margin: 0 0 1rem;
-  padding-left: 1.5rem;
-}
-.doc-body li {
-  margin: 0.25rem 0;
-}
-.doc-body a {
-  color: var(--accent);
-}
-.doc-body blockquote {
-  margin: 1.2rem 0;
-  padding: 0.1rem 1.1rem;
-  border-left: 3px solid var(--border-strong);
-  color: var(--fg-muted);
-}
-.doc-body code {
-  font-family: var(--mono);
-  font-size: 0.86em;
-  background: var(--bg-sunken);
-  border-radius: 4px;
-  padding: 0.08em 0.3em;
-}
-.doc-body pre {
-  margin: 1.2rem 0;
-  font-size: 0.86rem;
-  line-height: 1.5;
-  white-space: pre;
-  overflow-x: auto;
-}
-.doc-body pre code {
-  background: none;
-  padding: 0;
-}
-.doc-body hr {
-  margin: 2rem 0;
-}
-.doc-body img {
-  max-width: 100%;
+.doc-block img {
+  display: block;
+  max-width: none;
   height: auto;
+}
+.doc-block:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.doc-block:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.doc-block.picked {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.doc-block-error {
+  margin: 0.3rem 0;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--danger);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--danger-soft);
+  color: var(--danger-fg);
+  font-family: var(--font);
+}
+.doc-block-error pre {
+  margin: 0.4rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.82rem;
+  color: var(--fg);
+}
+/* The pictures are black ink on nothing: the dark theme inverts them, except those holding a photo. */
+:root[data-mode="dark"] .doc-block img:not(.raster) {
+  filter: invert(0.88) hue-rotate(180deg);
+}
+:root[data-mode="dark"] .doc-block img.raster {
+  background: #fff;
   border-radius: 4px;
-}
-.doc-body figure {
-  margin: 1.6rem 0;
-  text-align: center;
-}
-.doc-body figcaption {
-  margin-top: 0.5rem;
-  font-family: var(--font);
-  font-size: 0.86rem;
-  line-height: 1.4;
-  color: var(--fg-muted);
-}
-/* Pictures as the PDF sets them: the box carries the limits of the course's own picture commands
-   (--mw: widest, in % of the line; --mh: tallest, as a fraction of the text height, which is ~1.6 line widths). */
-.doc-body {
-  container-type: inline-size;
-}
-.doc-body .img-box img,
-.doc-body .side-fig img,
-.doc-body .pair-fig img {
-  max-width: 100%;
-  max-height: calc(var(--mh, 0.25) * 160cqw);
-  width: auto;
-}
-.doc-body .img-box > figure {
-  width: var(--mw, 50%);
-  margin: 1.2rem auto;
-}
-/* \lectaimagewithtext: the small figure on the left, the text that explains it beside it */
-.doc-body .side-fig {
-  display: flow-root;
-  margin: 1.3rem 0;
-}
-.doc-body .side-fig > figure {
-  float: left;
-  width: var(--mw, 39%);
-  margin: 0.2rem 1.3rem 0.6rem 0;
-}
-.doc-body .side-fig > :not(figure):last-child {
-  margin-bottom: 0;
-}
-/* \lectaimagepair: two pictures on one row, each with its caption */
-.doc-body .pair-fig {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin: 1.3rem 0;
-}
-.doc-body .pair-fig > figure {
-  flex: 0 0 var(--mw, 48%);
-  margin: 0;
-}
-@media (max-width: 640px) {
-  .doc-body .side-fig > figure {
-    float: none;
-    width: 100%;
-    margin-right: 0;
-  }
-  .doc-body .pair-fig {
-    display: block;
-  }
-  .doc-body .pair-fig > figure {
-    margin-bottom: 1rem;
-  }
-}
-.doc-body figure.placeholder {
-  padding: 1.5rem 1rem;
-  border: 1.5px dashed var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--fg-muted);
-  font-family: var(--font);
-  font-size: 0.9rem;
-}
-.doc-body table {
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-  margin: 1.4rem auto;
-  border-collapse: collapse;
-  /* as the PDF sets it (booktabs): a rule above and below, one under the header, no grid */
-  border-top: 1.5px solid var(--fg);
-  border-bottom: 1.5px solid var(--fg);
-  font-size: 0.98rem;
-  line-height: 1.5;
-}
-.doc-body th,
-.doc-body td {
-  padding: 0.35rem 0.8rem;
-  text-align: left;
-  vertical-align: top;
-}
-.doc-body thead th {
-  border-bottom: 1px solid var(--fg);
-  font-weight: 700;
-}
-
-/* formulas */
-.doc .math.display {
-  display: block;
-  overflow-x: auto;
-  overflow-y: hidden;
-  margin: 1.1rem 0;
-  text-align: center;
-}
-.doc .math .katex-display {
-  margin: 0;
-}
-.doc .katex {
-  font-size: 1.06em;
-}
-
-/* theorem-like boxes and review notes */
-.doc-body .thm {
-  --thm: var(--accent);
-  --thm-bg: var(--accent-soft);
-  margin: 1.4rem 0;
-  padding: 0.85rem 1.1rem 0.4rem;
-  border-left: 3px solid var(--thm);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  background: var(--thm-bg);
-}
-.doc-body .thm > :last-child {
-  margin-bottom: 0.6rem;
-}
-.doc-body .thm-title {
-  margin-bottom: 0.4rem;
-  font-family: var(--font);
-  font-size: 0.78rem;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--thm);
-}
-.doc-body .thm-definition {
-  --thm: var(--accent);
-}
-.doc-body .thm-theorem,
-.doc-body .thm-lemma,
-.doc-body .thm-proposition,
-.doc-body .thm-corollary {
-  --thm: color-mix(in srgb, var(--accent) 60%, var(--danger));
-  --thm-bg: color-mix(in srgb, var(--thm) 9%, var(--bg-elev));
-}
-.doc-body .thm-example {
-  --thm: var(--ok-fg);
-  --thm-bg: var(--ok-soft);
-}
-.doc-body .thm-remark {
-  --thm: var(--fg-muted);
-  --thm-bg: var(--bg-sunken);
-}
-.doc-body .thm-proof {
-  --thm: var(--border-strong);
-  --thm-bg: transparent;
-  padding-left: 1rem;
-}
-.doc-body .thm-proof .thm-title {
-  color: var(--fg-muted);
-}
-.doc-body .review-note {
-  margin: 1.2rem 0;
-  padding: 0.7rem 1rem;
-  border-left: 3px solid var(--warn);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  background: var(--warn-soft);
-  color: var(--warn-fg);
-  font-family: var(--font);
-  font-size: 0.93rem;
-  line-height: 1.5;
-}
-.doc-body .review-note::before {
-  content: "Nota";
-  display: block;
-  margin-bottom: 0.2rem;
-  font-size: 0.72rem;
-  font-weight: 650;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
 }
 
 /* where the AI just worked */
@@ -1708,12 +1512,8 @@ body.ws-page {
     font-size: 1.06rem;
     line-height: 1.68;
   }
-  .doc-ch-title,
-  .doc-body h1 {
+  .doc-ch-title {
     font-size: 1.85rem;
-  }
-  .doc-body h2 {
-    font-size: 1.4rem;
   }
   .ai-list {
     padding: 0.85rem 0.8rem 1rem;

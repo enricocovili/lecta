@@ -18,11 +18,21 @@ import Pop from "./Pop";
 import type { DraftSelection } from "./selection";
 import type { SelectionAction } from "./SelectionToolbar";
 import TopBar from "./TopBar";
-import type { ChangedFile, FlashTarget, Mode, PreviewChapter, Scope, SelectionScope } from "./types";
+import type { ChangedFile, DraftChapter, FlashTarget, Mode, Scope, SelectionScope } from "./types";
 import { recentAiChapters, useAssistant } from "./useAssistant";
 import { PHONE, useMedia } from "./util";
 
 const COMPACT = "(max-width: 1180px)";
+/** Chapters typeset at the same time (the compile service runs two jobs at once; the rest come from the cache). */
+const DRAFT_PARALLEL = 3;
+
+async function inPool<T>(items: T[], n: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) await fn(items[next++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+}
 
 const REMOVE_PROMPT =
   "Rimuovi questo passaggio dal testo. Se serve, fai piccole correzioni di formattazione al resto (spaziature, elenchi, riferimenti, " +
@@ -35,7 +45,7 @@ const targetsOf = (files: ChangedFile[]): FlashTarget[] =>
 
 export default function CourseWorkspace({ courseId }: { courseId: number }) {
   const [course, setCourse] = useState<Course | null>(null);
-  const [preview, setPreview] = useState<PreviewChapter[] | null>(null);
+  const [preview, setPreview] = useState<DraftChapter[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [flash, setFlash] = useState<FlashRequest | null>(null);
@@ -81,11 +91,29 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
     try {
       do {
         dirty.current = false;
-        const [c, p] = await Promise.all([get<Course>(`/api/courses/${courseId}`), get<{ chapters: PreviewChapter[] }>(`/api/courses/${courseId}/preview`)]);
-        c.chapters = [...(c.chapters ?? [])].sort((a, b) => a.position - b.position);
+        const c = await get<Course>(`/api/courses/${courseId}`);
+        const chs = [...(c.chapters ?? [])].sort((a, b) => a.position - b.position);
+        c.chapters = chs;
         setCourse(c);
-        setPreview([...p.chapters].sort((a, b) => a.chapter.position - b.chapter.position));
+        // What is shown stays until its new version arrives; a new chapter waits for LaTeX with a spinner.
+        setPreview((prev) =>
+          chs.map((ch) => {
+            const info = { id: ch.id, title: ch.title, path: ch.path, position: ch.position };
+            const old = prev?.find((p) => p.chapter.id === ch.id);
+            return old ? { ...old, chapter: info } : { chapter: info, width: 455, blocks: null, toc: [], warnings: [] };
+          }),
+        );
         setPreviewError(null);
+        // Every chapter is typeset (or comes from the cache) on its own: each one shows up as soon as it is ready.
+        await inPool(chs, DRAFT_PARALLEL, async (ch) => {
+          let d: DraftChapter;
+          try {
+            d = await get<DraftChapter>(`/api/courses/${courseId}/chapters/${ch.id}/draft`);
+          } catch (e) {
+            d = { chapter: { id: ch.id, title: ch.title, path: ch.path, position: ch.position }, width: 455, blocks: [], toc: [], warnings: [], error: e instanceof Error ? e.message : String(e) };
+          }
+          setPreview((prev) => prev && prev.map((p) => (p.chapter.id === ch.id ? d : p)));
+        });
         setRevision((r) => r + 1);
         if (pending.current.length) {
           setFlash({ id: ++flashId.current, targets: pending.current, scroll: false });
@@ -299,7 +327,10 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
     );
   }
 
-  const warnings = (preview ?? []).flatMap((p) => p.warnings.map((text) => ({ chapter: p.chapter.title, text })));
+  const warnings = (preview ?? []).flatMap((p) => [
+    ...p.warnings.map((text) => ({ chapter: p.chapter.title, text })),
+    ...(p.blocks ?? []).filter((b) => b.error).map((b) => ({ chapter: p.chapter.title, text: `Errore LaTeX, ${b.error}` })),
+  ]);
   const showRail = compact ? drawer : railOpen;
   const showAi = phone ? mtab === "ai" : aiOpen;
   const showDocPane = !phone || mtab === "doc";
@@ -381,7 +412,7 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
             <span className="grow" />
             {warnings.length > 0 && view === "draft" && (
               <Pop
-                label="Cose che l’anteprima non può mostrare"
+                label="Avvisi della composizione LaTeX"
                 className="sm ghost"
                 menuClass="doc-warn-pop"
                 summary={

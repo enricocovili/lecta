@@ -45,6 +45,7 @@ PAD = 1.5  # around a picture, in bp
 MAX_VARIANTS = 3  # kept per content key
 PRUNE_ABOVE = 4000  # files in a course's cache before stale variants are removed
 PRUNE_AGE_S = 30 * 86400
+SRC_LIMIT = 6000
 
 _LEVELS = {"section": 1, "subsection": 2, "subsubsection": 3, "paragraph": 4}
 _HEADING_RE = re.compile(r"\\(part|chapter|section|subsection|subsubsection|paragraph)\*?\s*(?:\[[^\]]*\])?\s*\{")
@@ -379,7 +380,8 @@ class ChapterRender:
                 k = len(pages)
                 (self.dir / "v").mkdir(parents=True, exist_ok=True)
                 (self.dir / "v" / f"{vid}-{k}.svg").write_text(svg)
-                pages.append(size | {"n": k})
+                # A photo in it: the dark theme must not invert this picture.
+                pages.append(size | {"n": k, "raster": "<image" in svg})
             end = marks["E"][i]
             neutral = start == end and not _PRINTS_COUNTER_RE.search(self.texts[i]) and i not in errors
             v = {"start": start, "end": end, "pages": pages, "error": errors.get(i), "neutral": neutral}
@@ -440,13 +442,13 @@ class ChapterRender:
                 item["error"] = v.get("error")
                 if v.get("id"):
                     item["pages"] = [
-                        {"url": f"/api/courses/{self.course.id}/draft/svg/{v['id']}-{p['n']}.svg", "w": p["w"], "h": p["h"], "x": p["x"]}
+                        {"url": f"/api/courses/{self.course.id}/draft/svg/{v['id']}-{p['n']}.svg", "w": p["w"], "h": p["h"], "x": p["x"],
+                         "raster": p.get("raster", False)}
                         for p in v["pages"]
                     ]
             else:
                 item["error"] = "non composto"
-            if item["error"] or not item["pages"]:
-                item["src"] = b.src[:4000]
+            item["src"] = b.src[:SRC_LIMIT]  # what a selection of the block sends to the assistant
             blocks.append(item)
         return {
             "chapter": {"id": self.chapter.id, "title": self.chapter.title, "path": self.chapter.path, "position": self.chapter.position},

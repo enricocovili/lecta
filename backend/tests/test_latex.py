@@ -73,11 +73,10 @@ async def test_small_pictures_beside_their_text_compile_and_show_in_the_draft(ad
     text = "".join(p.get_text() for p in fitz.open(stream=pdf.content, filetype="pdf"))
     for needle in ("Il campionatore preleva", "Schema del campionatore", "Solo testo", "Uno", "Due", "Da sola"):
         assert needle in text, needle
-    html = (await admin.get(f"/api/courses/{c['id']}/chapters/{ch['id']}/preview")).json()["html"]
-    # Nothing is lost in the draft: the text beside a picture, both pictures of a pair, the lone one, with the PDF's limits.
-    assert html.count('class="side-fig"') == 2 and 'class="pair-fig"' in html and 'class="img-box"' in html
-    assert "Il campionatore preleva" in html and "Solo testo" in html and html.count("<img") == 4
-    assert "--mw:39%;--mh:0.27" in html and "--mw:48%;--mh:0.32" in html and "--mw:50%;--mh:0.22" in html
+    blocks = (await admin.get(f"/api/courses/{c['id']}/chapters/{ch['id']}/draft")).json()["blocks"]
+    # The draft is the same LaTeX: every block is drawn, the ones with a photo say so (the dark theme leaves them alone).
+    assert len(blocks) == 6 and all(b["pages"] and not b["error"] for b in blocks)
+    assert [b["pages"][0]["raster"] for b in blocks] == [False, False, True, False, True, True]
 
 
 async def test_tables_without_rules_get_them_in_the_pdf_only(admin):

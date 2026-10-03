@@ -1,4 +1,4 @@
-// The small toolbar that floats next to the text selected in the draft.
+// The small toolbar that floats next to the blocks picked in the draft.
 import { useLayoutEffect, useRef, useState } from "react";
 import type { DraftSelection } from "./selection";
 
@@ -18,8 +18,8 @@ export default function SelectionToolbar({
 }: {
   sel: DraftSelection;
   onAction: (a: SelectionAction) => void;
-  /** The pointer went down on the toolbar: the browser may clear the selection, keep the toolbar meanwhile. */
-  onPress: () => void;
+  /** The pointer went down on the toolbar. */
+  onPress?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number; below: boolean } | null>(null);
@@ -54,8 +54,8 @@ export default function SelectionToolbar({
       aria-label="Chiedi all'AI su questo testo"
       style={{ top: pos?.top ?? -1000, left: pos?.left ?? 0, visibility: pos ? "visible" : "hidden" }}
       onPointerDown={(e) => {
-        onPress();
-        e.preventDefault(); // keep the selection
+        onPress?.();
+        e.preventDefault(); // keep the focus where it is
       }}
       onMouseDown={(e) => e.preventDefault()}
     >

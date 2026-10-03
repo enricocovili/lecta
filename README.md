@@ -4,8 +4,8 @@ Self-hosted platform for university notes, worked on with an AI assistant.
 
 * A **private workspace** for one admin: courses → chapters, uploads that turn
   into study notes by themselves, and an **AI assistant** that can read and change
-  everything in a course. You read a fast **HTML draft** of the document, select
-  text to ask about it, and the assistant's changes are applied at once (one click
+  everything in a course. You read a **draft** typeset by the real LaTeX, block by
+  block, pick blocks to ask about them, and the assistant's changes are applied at once (one click
   undoes a whole answer). There is no LaTeX editor: the LaTeX project is stored
   behind the scenes and can be downloaded (`.zip`) whenever you want.
 * A **public site** that exposes only the courses you switched ON, always in
@@ -80,14 +80,17 @@ real compile service.
 
 ## The workspace
 
-Open a course: the centre is the **draft** (the notes rendered as HTML in about
-100 ms, maths with KaTeX), the left rail is the outline (chapters and sections,
+Open a course: the centre is the **draft**, the left rail is the outline (chapters and sections,
 sources, structure actions), the right panel is the **AI assistant**.
 
-* **Draft vs. PDF**: the draft is an approximation made with pandoc (theorem
-  boxes, review notes, pictures and formulas are shown; TikZ drawings appear as
-  placeholders). The PDF tab compiles the real document on demand; publishing
-  always uses the real build.
+* **Draft vs. PDF**: the draft is typeset by the same LaTeX as the PDF, with the
+  course's own preamble (theorem boxes, numbering, references, TikZ, tables, pictures
+  look exactly as in the PDF), but **block by block**: every paragraph, heading and
+  environment is its own SVG picture, cached. An edit typesets only the blocks that
+  changed and the numbered ones it renumbers (with pdflatex well under a second; the
+  first view of a course takes a couple of seconds per chapter). A block with a LaTeX
+  error says where and shows its source; the others are still drawn. The PDF tab
+  compiles the whole document on demand; publishing always uses the full build.
 * **Downloads**: *Sorgente LaTeX* (`GET /api/courses/{id}/source.zip`: `main.tex`,
   `preamble.tex`, chapters, images, figures, a README on how to compile) and *PDF*
   (compiled now). The public reader offers the PDF and the LaTeX source of the
@@ -242,12 +245,13 @@ what to do:
 * **Applied immediately.** The first write of a turn snapshots the course; the change
   card under the answer lists the files (+/− lines) and has **Annulla**, which restores
   the whole turn (refused if those files changed again since: undo the newer ones first).
-* **Select to ask**: select text in the draft and a small menu offers three buttons.
+* **Pick to ask**: click a block of the draft (Shift+click extends to a range of blocks)
+  and a small menu offers three buttons.
   *Rimuovi* takes that passage out at once (the assistant also makes small formatting fixes
   around it, nothing else; mode `edit`). *Spiega* and *Correggi* open the chat with the
   passage as context and wait for what you want to know (mode `explain`, the answer never
-  touches the document) or what to correct (mode `edit`). The selection travels with its
-  source line range.
+  touches the document) or what to correct (mode `edit`). The pick travels with its
+  source line range and LaTeX.
 * **Document feedback**: an earlier review (score, strengths, issues with a *Correggi* button)
   still shows in the chat and on the home page; the top bar no longer has a *Revisione AI* button.
 * Turns run in the background (closing the tab doesn't stop them; reopen and the
@@ -408,7 +412,7 @@ docker-compose.yml     the stack (no ports, webnet external)
 backend/               FastAPI app + worker (same image)
   app/api/             routers            app/egress/   AI gateway + provider adapters (tool calling)
   app/pipeline/        import (pdfextract, read, apply), placement, publishing, the assistant (agent, agent_tools), indexing
-  app/services/        projects, compile client, preview (HTML draft), source_export, retrieval, embeddings, settings…
+  app/services/        projects, compile client, blocks + draft (typeset draft), source_export, retrieval, embeddings, settings…
   app/security/        auth, CSRF, ASGI guard       alembic/   migrations
   tests/               pytest suite (+ synthetic fixtures)
 latex/                 compile service (TeX Live, stdlib Python, unix socket)

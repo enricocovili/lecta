@@ -45,7 +45,6 @@ def test_stitch_keeps_the_text_of_an_image_beside_its_text():
 
 def test_picture_commands_are_parsed_in_one_place():
     from app.services import latexmacros as lm
-    from app.services.preview import DEFAULT_LIMITS, image_limits
 
     src = "x \\lectaimage[c]{a} y \\lectaimagewithtext[t]{b}{testo {annidato} qui} z \\lectaimagepair{1}{c}{2}{d}"
     assert lm.image_names(src) == ["a", "b", "c", "d"]
@@ -54,11 +53,6 @@ def test_picture_commands_are_parsed_in_one_place():
         "\\lectaimagepair{1}{images/c.png}{2}{images/d.png}"
     )
     assert lm.without_images(src).split() == ["x", "c", "y", "t", "testo", "{annidato}", "qui", "z", "1", "2"]
-    # The limits come from the course's own definitions.
-    pre = ("\\newcommand{\\lectaimage}[2][]{\\includegraphics[max width=0.42\\linewidth,max height=0.16\\textheight]{#2}}\n"
-           "\\newcommand{\\lectaimagewithtext}[3][]{\\begin{minipage}[c]{0.3\\linewidth}\\includegraphics[max width=\\linewidth]{#2}\\end{minipage}#3}\n")
-    lim = image_limits(pre)
-    assert lim["lectaimage"] == (42, 16) and lim["lectaimagewithtext"][0] == 30 and lim["lectaimagepair"] == DEFAULT_LIMITS["lectaimagepair"]
 
 
 def test_units_respect_limits():

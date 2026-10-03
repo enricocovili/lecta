@@ -35,11 +35,11 @@ export async function openCourse(page: Page, name: string | RegExp) {
   await expect(page.getByTestId("doc-preview")).toBeVisible();
 }
 
-/** Select a whole paragraph of the draft (triple click): the floating toolbar appears next to it. */
-export async function selectParagraph(page: Page, index = 0) {
-  const para = page.getByTestId("doc-preview").locator("p[data-line]").nth(index);
-  await para.scrollIntoViewIfNeeded();
-  await para.click({ clickCount: 3 });
+/** Pick a block of the draft (a paragraph or an environment typeset by LaTeX): the floating toolbar appears next to it. */
+export async function pickBlock(page: Page, index = 0) {
+  const block = page.getByTestId("doc-preview").locator(".doc-block:not(.doc-heading):has(img)").nth(index);
+  await block.scrollIntoViewIfNeeded();
+  await block.click();
   await expect(page.getByTestId("selection-toolbar")).toBeVisible();
-  return para;
+  return block;
 }

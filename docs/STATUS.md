@@ -67,7 +67,8 @@ only checks the mechanics).
 The interface no longer edits LaTeX; it is built around the draft and the assistant (DECISIONS 70–77,
 contract in `docs/AI-WORKSPACE.md`):
 
-* **Draft**: HTML preview of every chapter (pandoc + KaTeX), blocks mapped to source lines; PDF on demand.
+* **Draft**: every chapter typeset by LaTeX block by block (SVG, cached per block and counter state, DECISIONS 94),
+  blocks mapped to source lines; full PDF on demand.
 * **Assistant**: agent with tools over the whole course (files, `main.tex`, preamble, chapters, sources
   with page images), changes applied at once, **undo per turn**, background turns with replayable
   events, select-to-ask toolbar, document review with score and issues.

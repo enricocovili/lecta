@@ -1,20 +1,20 @@
 import { expect, test } from "@playwright/test";
-import { login, openCourse, selectParagraph, watchConsole } from "./helpers";
+import { login, openCourse, pickBlock, watchConsole } from "./helpers";
 
 // A busy assistant (409) and the probing of private URLs (404) may show up in the console.
 const EXPECTED = [/status of 404/, /status of 409/];
 
 test.describe.serial("AI workspace", () => {
-  test("select text in the draft, Spiega opens the chat on it and waits for the question; the answer streams in", async ({ page }) => {
+  test("pick a block of the draft, Spiega opens the chat on it and waits for the question; the answer streams in", async ({ page }) => {
     test.setTimeout(240_000);
     const con = watchConsole(page);
     await login(page);
     await openCourse(page, /Teoria dei Segnali/);
     const doc = page.getByTestId("doc-preview");
-    // The draft is rendered, formulas included.
-    await expect(doc.locator(".katex").first()).toBeVisible({ timeout: 30_000 });
+    // The draft is typeset by LaTeX.
+    await expect(doc.locator(".doc-block img").first()).toBeVisible({ timeout: 60_000 });
 
-    await selectParagraph(page);
+    await pickBlock(page);
     // The menu has three buttons, nothing else.
     const menu = page.getByTestId("selection-toolbar");
     await expect(menu.getByRole("button")).toHaveText(["Rimuovi", "Spiega", "Correggi"]);
@@ -46,7 +46,7 @@ test.describe.serial("AI workspace", () => {
     const con = watchConsole(page);
     await login(page);
     await openCourse(page, /Teoria dei Segnali/);
-    await selectParagraph(page);
+    await pickBlock(page);
     await page.getByTestId("selection-toolbar").getByRole("button", { name: "Correggi" }).click();
     await expect(page.getByTestId("ai-composer")).toBeFocused();
     await expect(page.getByTestId("ai-composer")).toHaveAttribute("placeholder", /da correggere/);
@@ -62,8 +62,8 @@ test.describe.serial("AI workspace", () => {
     await login(page);
     await openCourse(page, /Teoria dei Segnali/);
     const doc = page.getByTestId("doc-preview");
-    await expect(doc.locator(".katex").first()).toBeVisible({ timeout: 30_000 });
-    const examples = doc.locator(".thm-example");
+    await expect(doc.locator(".doc-block img").first()).toBeVisible({ timeout: 60_000 });
+    const examples = doc.locator(".doc-block");
     const before = await examples.count();
 
     await page.getByTestId("ai-composer").fill("Aggiungi un esempio dopo la definizione");
@@ -72,7 +72,7 @@ test.describe.serial("AI workspace", () => {
     const card = page.getByTestId("ai-change-card").last();
     await expect(card).toBeVisible({ timeout: 120_000 });
     await expect(page.getByTestId("ai-undo")).toBeVisible({ timeout: 60_000 });
-    // No approval step: the draft already shows the new example.
+    // No approval step: the draft already shows the new example (one more block).
     await expect(examples).toHaveCount(before + 1, { timeout: 30_000 });
     await expect(card).toHaveAttribute("data-status", "applied");
 
@@ -106,7 +106,7 @@ test.describe.serial("AI workspace", () => {
     const con = watchConsole(page);
     await login(page);
     await openCourse(page, /Teoria dei Segnali/);
-    await selectParagraph(page);
+    await pickBlock(page);
     await page.getByTestId("selection-toolbar").getByRole("button", { name: "Rimuovi" }).click();
     const user = page.getByTestId("ai-panel").locator('[data-testid="ai-message"][data-role="user"]').last();
     await expect(user).toContainText("Rimuovi questo passaggio");

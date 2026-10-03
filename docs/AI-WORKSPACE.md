@@ -6,33 +6,6 @@ Lecta is no longer a LaTeX editor. The user reads a **draft** of the document an
 
 All endpoints below are admin-only (`/api`, cookie + CSRF like the rest) unless stated otherwise.
 
-## Draft preview (HTML, ~100 ms)
-
-`GET /api/courses/{cid}/chapters/{chid}/preview`
-
-```json
-{
-  "chapter": {"id": 3, "title": "Campionamento", "path": "chapters/03-campionamento.tex", "position": 3},
-  "html": "<h2 data-line=\"3\" id=\"s-3\">…</h2><p data-line=\"5\">…</p>",
-  "toc": [{"id": "s-3", "title": "Il teorema", "level": 1, "line": 3}],
-  "warnings": ["Figura TikZ «schema» non disponibile nell'anteprima"],
-  "blob": "<sha256 of the source>",
-  "took_ms": 84
-}
-```
-
-* `html` is a sanitised fragment (no script/handlers) to inject with `dangerouslySetInnerHTML`.
-* Every top-level block (`p, h1-h4, ul, ol, table, figure, div.thm, pre, …`) has `data-line="N"`: the 1-based line of
-  the chapter source where it starts. Nested blocks of a theorem box etc. have it too when known.
-* Maths is left for the client: `<span class="math inline">\(x^2\)</span>` and
-  `<span class="math display">\[…\]</span>` (render with KaTeX, self-hosted; keep the TeX in `data-tex`).
-* Boxes: `<div class="thm thm-definition|theorem|lemma|proposition|corollary|example|remark|proof">` with a first child
-  `<div class="thm-title">Definizione (Nome)</div>`; review notes are `<div class="review-note">`.
-* Pictures: `<figure><img src="/api/courses/{cid}/files/raw?path=images/x.png"><figcaption>…</figcaption></figure>`.
-  Unavailable drawings are `<figure class="placeholder"><div>…</div></figure>`.
-
-`GET /api/courses/{cid}/preview` returns `{"chapters": [<the object above for every chapter>]}` (whole document).
-
 ## Draft typeset by LaTeX (blocks as SVG)
 
 `GET /api/courses/{cid}/chapters/{chid}/draft` (`GET /api/courses/{cid}/draft`: `{"chapters": [...]}` for all)
@@ -43,7 +16,8 @@ All endpoints below are admin-only (`/api`, cookie + CSRF like the rest) unless 
   "width": 455.24,
   "blocks": [
     {"start": 1, "end": 1, "heading": "chapter", "id": "ch3-l1", "error": null,
-     "pages": [{"url": "/api/courses/7/draft/svg/<variant>-0.svg", "w": 458.2, "h": 61.3, "x": -1.5}]},
+     "pages": [{"url": "/api/courses/7/draft/svg/<variant>-0.svg", "w": 458.2, "h": 61.3, "x": -1.5, "raster": false}],
+     "src": "\\chapter{Campionamento}"},
     {"start": 5, "end": 9, "error": "riga 7: Undefined control sequence.", "pages": [...], "src": "…"}
   ],
   "toc": [{"id": "ch3-l3", "title": "Il teorema", "level": 1, "line": 3}],
@@ -61,7 +35,8 @@ All endpoints below are admin-only (`/api`, cookie + CSRF like the rest) unless 
   `w / width` of the column, shifted by `x / width`.
 * Typeset blocks are cached by their text, what they include and the counters they start from: only the blocks that
   changed (and the numbered ones they renumber) are typeset again; `typeset` says how many. A block that failed has
-  `error` (with the source line) and its `src`; the other blocks are still shown.
+  `error` (with the source line); the other blocks are still shown. `src` is the block's LaTeX (what a selection
+  sends), `raster` says a picture holds a photo (the dark theme inverts only the others).
 * With pdflatex the run starts from the course preamble precompiled once (mylatexformat, remade when the preamble
   changes): an edit of one block typesets in well under a second even with TikZ, pgfplots and tcolorbox loaded.
 * `GET /api/courses/{cid}/draft/svg/{name}`: a picture (`image/svg+xml`, immutable, strict CSP).
@@ -85,7 +60,7 @@ Send a message (starts a turn in the background, returns at once):
   "content": "Spiegami meglio questo passaggio",
   "scope": {
     "chapter_id": 3,
-    "selection": {"from_line": 12, "to_line": 14, "text": "the selected text, maths as $tex$"},
+    "selection": {"from_line": 12, "to_line": 14, "text": "the LaTeX of the picked blocks"},
     "mode": "ask"
   }
 }
@@ -106,7 +81,7 @@ Stream the reply (Server-Sent Events; replays from the start, or after `?after=<
 | `text` | `{"delta": "…"}` assistant text (markdown) |
 | `tool` | `{"id": "t1", "name": "read_file", "label": "Legge chapters/03-….tex", "status": "running"}` |
 | `tool_done` | `{"id": "t1", "ok": true, "summary": "212 righe"}` |
-| `change` | `{"files": [ChangedFile]}` cumulative, after each write: refresh the preview |
+| `change` | `{"files": [ChangedFile]}` cumulative, after each write: refresh the draft |
 | `done` | `{"reply": Message}` final |
 | `error` | `{"message": "…"}` final |
 
@@ -129,7 +104,7 @@ Other calls:
 ```
 * `change` (when the turn wrote something): `{"status": "applied|undone", "files": [ChangedFile], "chapters": [{"id", "title", "op": "created|renamed|deleted|moved"}]}`.
 * `ChangedFile`: `{"path": "chapters/03-….tex", "chapter_id": 3|null, "op": "modify|create|delete|rename", "added": 12, "removed": 3, "hunks": [{"from_line": 40, "to_line": 52}]}`.
-  `hunks` are line ranges in the **new** text: highlight the matching preview blocks for a few seconds.
+  `hunks` are line ranges in the **new** text: highlight the draft blocks they overlap for a few seconds.
 * `suggestions`: short follow-up prompts to show as chips under the reply.
 * `review` (mode `"review"`): `{"verdict": "…", "score": 7, "strengths": ["…"], "issues": [{"chapter": "Campionamento", "chapter_id": 3, "text": "…", "fix": "prompt to send to fix it"}]}`.
   Show as a feedback card; each issue has a “Correggi” button that sends `fix` with `mode: "edit"`.
