@@ -62,6 +62,8 @@ All endpoints below are admin-only (`/api`, cookie + CSRF like the rest) unless 
 * Typeset blocks are cached by their text, what they include and the counters they start from: only the blocks that
   changed (and the numbered ones they renumber) are typeset again; `typeset` says how many. A block that failed has
   `error` (with the source line) and its `src`; the other blocks are still shown.
+* With pdflatex the run starts from the course preamble precompiled once (mylatexformat, remade when the preamble
+  changes): an edit of one block typesets in well under a second even with TikZ, pgfplots and tcolorbox loaded.
 * `GET /api/courses/{cid}/draft/svg/{name}`: a picture (`image/svg+xml`, immutable, strict CSP).
 
 ## The assistant (chat sessions with tools)

@@ -305,11 +305,17 @@ class ChapterRender:
         for i, t in enumerate(self.texts):
             (bdir / f"{i}.tex").write_text(t + "\n")
         (wd / f"{job}.tex").write_text(doc)
+        # pdflatex starts from the preamble precompiled once (the compile service makes it the first time).
+        fmt = None
+        if self.inputs.engine == "pdflatex":
+            fmt = f"_fmt-{self.inputs.prehash[:32]}"
+            if not (wd / f"{fmt}.tex").is_file():
+                (wd / f"{fmt}.tex").write_text(WRAP_HEAD + self.inputs.main_pre + "\\begin{document}\\end{document}\n")
         (wd / f"{job}.aux").write_text("\\relax\n" + "".join(line + "\n" for line in labels.values()))
         lset = await get_section(db, "latex")
         res = await latex.blocks({
             "key": f"course-{self.course.id}", "workdir": latex.rel(wd), "job": job, "engine": self.inputs.engine,
-            "figure_cache": latex.rel(projects.work_dir(self.course.id, "figcache")), "timeout": lset.timeout_s,
+            "figure_cache": latex.rel(projects.work_dir(self.course.id, "figcache")), "timeout": lset.timeout_s, "format": fmt,
         })
         if res.get("status") == "superseded":
             raise Superseded()

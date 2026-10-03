@@ -282,6 +282,17 @@ async def test_blocks_endpoint_typesets_once_and_returns_svg_pages():
     assert res["pages"] == 2 and res["marks"].strip() == "D"
     svgs = sorted((projects.config.latex_root / res["svg_dir"]).glob("*.svg"))
     assert [p.name for p in svgs] == ["1.svg", "2.svg"] and svgs[0].read_text().startswith("<svg")
+    # pdflatex can start from a precompiled preamble: made the first time, then reused.
+    (wd / "_fmt-0123456789abcdef.tex").write_text("\\documentclass{article}\\usepackage{amsmath}\\begin{document}\\end{document}\n")
+    (wd / "_blk-7.tex").write_text(
+        "\\documentclass{article}\\usepackage{amsmath}\\begin{document}\\pagestyle{empty}\n"
+        "\\newwrite\\o\\immediate\\openout\\o=\\jobname.lecta\n"
+        "Uno $\\begin{aligned}a&=b\\end{aligned}$.\\clearpage\\immediate\\write\\o{D}\\end{document}\n"
+    )
+    body = {"workdir": latex.rel(wd), "job": "_blk-7", "timeout": 60, "format": "_fmt-0123456789abcdef"}
+    first, second = await latex.blocks(body), await latex.blocks(body)
+    assert (first["status"], first["format"], first["pages"]) == ("ok", "built", 1), first["log"][-2000:]
+    assert (second["status"], second["format"]) == ("ok", "cached") and "preloaded format=_fmt-0123456789abcdef" in second["log"]
     # A job name outside the protocol is refused.
     with pytest.raises(latex.CompileServiceError):
         await latex.blocks({"workdir": latex.rel(wd), "job": "../main", "timeout": 60})

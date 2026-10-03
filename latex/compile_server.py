@@ -49,6 +49,7 @@ RC_FILE = Path(__file__).with_name("latexmkrc")
 
 ENGINES = {"pdflatex": "-pdf", "xelatex": "-pdfxe", "lualatex": "-pdflua"}
 _BLOCK_JOB_RE = re.compile(r"^_blk-[0-9]{1,12}$")
+_FORMAT_RE = re.compile(r"^_fmt-[0-9a-f]{16,64}$")
 MAX_MARKS = 8 * 1024 * 1024
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,99}$")
 _REL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+/-]{0,250}$")
@@ -315,10 +316,32 @@ def _read_small(path: Path, limit: int) -> str:
         return f.read(limit).decode("utf-8", "replace")
 
 
+async def ensure_format(work: Path, name: str, timeout: int, background: bool) -> str:
+    """pdflatex only: dump `<name>.tex` (the wrapper's preamble, written by the backend) into `<name>.fmt` with
+    mylatexformat, so a run starts with the preamble already loaded (~0.5 s instead of ~1.6 s with TikZ & co.).
+    → "cached" | "built" | "failed" (remembered: the run then loads the preamble itself)."""
+    fmt, failed = work / f"{name}.fmt", work / f"{name}.failed"
+    if fmt.is_file() and not fmt.is_symlink():
+        return "cached"
+    if failed.exists() or not (work / f"{name}.tex").is_file():
+        return "failed"
+    argv = ["pdflatex", "-ini", "-interaction=nonstopmode", f"-jobname={name}", "&pdflatex", "mylatexformat.ltx", f"{name}.tex"]
+    code, _, timed_out = await run_sandboxed(argv, work, timeout, background)
+    if code != 0 or timed_out or not fmt.is_file() or fmt.is_symlink():
+        fmt.unlink(missing_ok=True)
+        failed.write_text("")
+        return "failed"
+    for old in work.glob("_fmt-*"):  # one format per work dir: the preamble it was made from is gone
+        if not old.name.startswith(name + ".") and not old.is_dir():
+            old.unlink(missing_ok=True)
+    return "built"
+
+
 async def do_blocks(req: dict) -> dict:
     """Typeset `<job>.tex` (written by the backend) once, without latexmk: labels come from the aux the backend
     put there, so one pass is enough. Every page then becomes `<job>-svg/<n>.svg`, and `<job>-svg/bbox.xml` holds the
-    ink box of each page. The wrapper reports what it did in `<job>.lecta` (which block went to which page)."""
+    ink box of each page. The wrapper reports what it did in `<job>.lecta` (which block went to which page).
+    `format` (pdflatex): the name of a preamble to precompile and start from (see ensure_format)."""
     work = resolve_workdir(req["workdir"])
     cache = resolve_workdir(req.get("figure_cache") or f"{req['workdir']}-figcache")
     engine = req.get("engine", "pdflatex")
@@ -341,6 +364,15 @@ async def do_blocks(req: dict) -> dict:
     shutil.rmtree(out_dir, ignore_errors=True)
     out_dir.mkdir()
     argv = [engine, "-interaction=nonstopmode", "-file-line-error", "-no-shell-escape", f"{job}.tex"]
+    fmt_status = None
+    fmt = req.get("format")
+    if fmt is not None:
+        if not isinstance(fmt, str) or not _FORMAT_RE.match(fmt):
+            raise BadRequest("bad format")
+        if engine == "pdflatex":
+            fmt_status = await ensure_format(work, fmt, timeout, background)
+            if fmt_status != "failed":
+                argv.insert(1, f"-fmt={fmt}")
     code, out, timed_out = await run_sandboxed(argv, work, timeout, background)
     log = read_log(work / f"{job}.log") or out
     marks = _read_small(work / f"{job}.lecta", MAX_MARKS)
@@ -365,6 +397,7 @@ async def do_blocks(req: dict) -> dict:
         "bbox": bbox,
         "pages": pages,
         "svg_dir": str(out_dir.relative_to(WORK_ROOT)),
+        "format": fmt_status,
         "log": log[-400_000:],
         "figures": [{k: v for k, v in f.items() if k != "log" or f["status"] in ("error", "timeout")} for f in figures],
         "seconds": round(time.monotonic() - t0, 2),
