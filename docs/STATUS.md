@@ -148,39 +148,36 @@ docker compose logs backend | grep "setup code"
 Tests: `scripts/test.sh` (backend), `scripts/e2e.sh` (browser, isolated stack),
 `scripts/smoke.sh [--full]` (deployment). Details are in the README.
 
-## Not done / limitations
+## Open work
 
-* **Real AI providers were never called** (by design: no keys, fake provider only).
-  The Anthropic, OpenAI, Gemini and OpenAI-compatible adapters follow the
-  public REST APIs, but only the OpenAI-compatible adapter was exercised
-  (against a local mock server). Streaming, JSON-mode quirks and error handling
-  for the real services are untested. The first real use may need small adapter
-  fixes, e.g. model-specific parameters via the provider's *Advanced options (JSON)*.
-* **Prompt quality with real models is unvalidated.** The shipped prompts are
-  written for strong models and are editable/versioned in Settings → Prompts,
-  but the output quality of notes, alignment, diagrams and placement with real
-  models has not been measured. The fake provider only checks the pipeline
-  mechanics; its outputs are deliberately simple.
-* **Splitting one group across several chapters** is implemented (the classifier
-  returns several placements with the section titles for each). The fake
-  classifier always returns one placement, so the split path has no end-to-end test.
-* **Language detection** is a small stopword heuristic (it/en/fr/de/es), and
-  "photo vs. page of notes" is a colour/paper heuristic. Both can be wrong on
-  unusual inputs; the course language can be changed in course settings.
+Open work, ideas and plans are tracked as issues on the [Features board](https://github.com/users/enricocovili/projects/1)
+(Status: Idea › Da definire › Pronta › In corso › Fatta; Area as the commit prefixes; Priorità P0–P2). A commit that
+finishes an issue says `Closes #N`. What was open when the board was set up:
+
+* **Real AI providers and models** ([#1](https://github.com/enricocovili/lecta/issues/1)): the Anthropic, OpenAI and
+  Gemini adapters were never called against the real services (#2); quality, cost and latency of the import (#3), of the
+  assistant (#4) and of lessons with strokes as pictures (#5) are unmeasured. The fake provider only checks the mechanics.
+* Drawing on a real tablet and stylus (#6).
+* Splitting one group across several chapters has no end-to-end test: the fake classifier always returns one placement (#7).
+* Language detection and "photo vs. page of notes" are heuristics (#8).
+* Idle memory is about 1 GB, ~720 MB of it the worker with the embedding model resident (#11); setting the embedding model
+  to *off* in Settings saves it (retrieval then runs lexical-only).
+* `docs/PLAN.md` describes the architecture before the redesigns (#13); the interface prototype PDF still shows the old
+  name (#12).
+
+## Limitations (by design)
+
 * **LuaTeX's Lua `io` library isn't restricted by `openin_any`.** Mitigation: the
   compile container has no network and only mounts build directories, with no
   secrets or uploads (DECISIONS #19).
 * **Rate limits are in memory** (per backend process; there is only one).
 * Binary files in proposals (e.g. fallback images) can be included/excluded but not edited.
-* **Idle memory** is about 1 GB, most of it the worker (~720 MB), which keeps the
-  embedding model resident as required. Set the embedding model to *off* in
-  Settings to save it (retrieval then runs lexical-only).
 * The TeX Live image is large (~5.5 GB, full scheme as specified).
 
 ## Known issues
 
-* The frontend build prints a harmless Astro warning about Shiki and CSP (Shiki isn't used).
-* PyMuPDF logs a deprecation warning for the `fitz` import name.
+* The frontend build prints a harmless Astro warning about Shiki and CSP (Shiki isn't used): #10.
+* PyMuPDF logs a deprecation warning for the `fitz` import name: #9.
 
 ## Where things are
 
