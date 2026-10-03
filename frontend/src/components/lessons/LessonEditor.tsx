@@ -8,6 +8,7 @@ import { Confirm, Seg, toastError, useLocalStorage } from "../ui";
 import GenerateDialog from "./GenerateDialog";
 import ShareDialog from "./ShareDialog";
 import { COLORS, HL_COLORS, HL_WIDTHS, PEN_WIDTHS, type Tool } from "./ink";
+import LessonStatusPill, { type LessonStatus } from "./LessonStatus";
 import PageRow, { type Actions, type DrawSettings } from "./PageRow";
 import { usePdfDoc } from "./SlideView";
 import { useLessonPages, type LessonSource, type PageState, type SaveState } from "./useLesson";
@@ -19,6 +20,7 @@ export interface LessonData {
   course_name: string;
   course_guidelines: string;
   title: string;
+  status: LessonStatus;
   has_pdf: boolean;
   pdf_pages: number;
   generated_at: string | null;
@@ -256,6 +258,8 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
     };
   }, [awake]);
 
+  const [status, setStatus] = useState<LessonStatus>(lesson.status);
+
   const rename = async () => {
     const t = title.trim();
     if (!t) return setTitle(lesson.title);
@@ -311,6 +315,7 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         />
         <span className="les-course muted small">{lesson.course_name}</span>
+        {owner && <LessonStatusPill id={lesson.id} status={status} editable onChange={setStatus} />}
         <div className="wsb-actions">
           {!readOnly && (
           <button type="button" className={`les-save ${store.saveState}`} data-testid="save-state" role="status" aria-live="polite" onClick={() => void save()} title="Salva ora (Ctrl+S). Il salvataggio automatico avviene ogni minuto.">

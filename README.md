@@ -132,7 +132,8 @@ switch between slide + notes side by side, notes below, or slides only. Everythi
 when the connection drops) and the screen stays on.
 
 **Integra appunti** turns the lesson into the study text of the subject: your notes are the backbone (a section per slide),
-the slides complete them, and what you drew or wrote on a slide is read from a picture of the annotated slide. Before it
+the slides complete them, and what you drew or wrote on a slide is read from a picture of the annotated slide. A lesson is **In corso** until its text is merged into the
+subject's notes, then **Completata** (click the state to switch it by hand). Before it
 starts you are asked for the subject's **writing guidelines** (kept for next time, editable in the subject's settings); with
 none, a notice says the text will be generated automatically. Downloads: the slides with your strokes (PDF) and the notes (`.md`).
 **Condividi** gives links that open the lesson without signing in: read-only (slides, notes and strokes, following the lecture as you

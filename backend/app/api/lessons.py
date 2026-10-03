@@ -51,7 +51,7 @@ def page_out(p: LessonPage) -> dict[str, Any]:
 
 def lesson_out(lesson: Lesson, course_name: str | None = None, stats: dict[str, int] | None = None) -> dict[str, Any]:
     out: dict[str, Any] = {
-        "id": lesson.id, "course_id": lesson.course_id, "number": lesson.number, "title": lesson.title, "has_pdf": bool(lesson.pdf_blob),
+        "id": lesson.id, "course_id": lesson.course_id, "number": lesson.number, "title": lesson.title, "status": lesson.status, "has_pdf": bool(lesson.pdf_blob),
         "pdf_name": lesson.pdf_name, "pdf_pages": lesson.pdf_pages, "generated_at": lesson.generated_at,
         "last_result": lesson.last_result, "chapter_id": lesson.chapter_id, "last_page_id": lesson.last_page_id, "created_at": lesson.created_at, "updated_at": lesson.updated_at,
     }
@@ -95,6 +95,7 @@ class LessonIn(BaseModel):
 class LessonPatch(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=300)
     course_id: int | None = None
+    status: Literal["working", "completed"] | None = None
 
 
 @router.get("/lessons")
@@ -158,6 +159,8 @@ async def patch_lesson(lesson_id: int, body: LessonPatch, db: AsyncSession = Dep
     lesson = await _lesson(db, lesson_id)
     if body.title is not None:
         lesson.title = body.title.strip()
+    if body.status is not None:
+        lesson.status = body.status
     if body.course_id is not None and body.course_id != lesson.course_id:
         target = await _course(db, body.course_id)
         lesson.number = await _next_number(db, target.id)  # before the move: the query flushes the lesson

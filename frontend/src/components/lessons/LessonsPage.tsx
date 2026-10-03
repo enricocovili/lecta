@@ -5,6 +5,7 @@ import { Icon } from "../icons";
 import type { TreeCourse } from "../types";
 import { Confirm, Empty, Loading, Modal, Progress, toastError } from "../ui";
 import GenerateDialog, { type LessonSummary } from "./GenerateDialog";
+import LessonStatusPill, { type LessonStatus } from "./LessonStatus";
 
 interface Row {
   id: number;
@@ -12,6 +13,7 @@ interface Row {
   course_id: number;
   course_name: string;
   title: string;
+  status: LessonStatus;
   has_pdf: boolean;
   pdf_pages: number;
   page_count: number;
@@ -94,6 +96,7 @@ export default function LessonsPage() {
                     {r.generated_at ? ` · testo generato il ${fmtDate(r.generated_at)}` : ""}
                   </div>
                 </div>
+                <LessonStatusPill id={r.id} status={r.status} editable onChange={(status) => setRows((all) => all && all.map((x) => (x.id === r.id ? { ...x, status } : x)))} />
                 <span className="pg-time small muted hide-mobile">{fmtDate(r.updated_at)}</span>
                 <a className="btn sm" href={`/admin/courses/${r.course_id}/lessons/${r.number}`}>
                   <Icon name="pencil" />

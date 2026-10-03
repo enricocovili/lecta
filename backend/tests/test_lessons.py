@@ -250,6 +250,20 @@ async def test_lessons_are_numbered_within_their_course(admin):
     assert moved["number"] == 2
 
 
+async def test_a_lesson_is_working_until_set_completed(admin):
+    _, lesson = await new_lesson(admin, n=0)
+    assert lesson["status"] == "working"
+    r = await admin.patch(f"/api/lessons/{lesson['id']}", json={"status": "completed"})
+    assert r.status_code == 200 and r.json()["status"] == "completed"
+    # Editing a completed lesson does not reopen it: only the user does.
+    pid = (await admin.get(f"/api/lessons/{lesson['id']}")).json()["pages"][0]["id"]
+    await admin.put(f"/api/lessons/{lesson['id']}/pages/{pid}", json={"notes": "dopo"})
+    listed = (await admin.get("/api/lessons")).json()
+    assert next(l for l in listed if l["id"] == lesson["id"])["status"] == "completed"
+    assert (await admin.patch(f"/api/lessons/{lesson['id']}", json={"status": "working"})).json()["status"] == "working"
+    assert (await admin.patch(f"/api/lessons/{lesson['id']}", json={"status": "done"})).status_code == 422
+
+
 async def test_the_last_open_page_is_remembered(admin):
     _, lesson = await new_lesson(admin, n=3)
     lid, pages = lesson["id"], lesson["pages"]
@@ -329,6 +343,7 @@ async def test_generating_a_lesson_writes_the_course_text(admin, worker, monkeyp
 
     course, lesson = await new_lesson(admin, title="Campionamento", n=3)
     lid, pages = lesson["id"], lesson["pages"]
+    assert lesson["status"] == "working"
     await admin.put(f"/api/lessons/{lid}/pages/{pages[0]['id']}", json={"notes": "- la frequenza di campionamento deve superare 2B"})
     await admin.put(f"/api/lessons/{lid}/pages/{pages[1]['id']}", json={"ink": [stroke(), stroke("hl", "#ffeb3b", 0.03, ((0.1, 0.4), (0.7, 0.4)))]})
     extra = (await admin.post(f"/api/lessons/{lid}/pages", json={"after_page_id": pages[2]["id"]})).json()
@@ -365,6 +380,7 @@ async def test_generating_a_lesson_writes_the_course_text(admin, worker, monkeyp
 
     done = (await admin.get(f"/api/lessons/{lid}")).json()
     assert done["generated_at"] and done["last_result"]["job_id"] == job_id
+    assert done["status"] == "completed"  # merged into the notes
     assert done["last_result"]["chapters"][0]["chapter_id"] == detail["chapters"][0]["id"]
     assert done["course_guidelines"] == guide
 

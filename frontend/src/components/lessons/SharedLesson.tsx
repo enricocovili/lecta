@@ -41,7 +41,7 @@ export default function SharedLesson({ token }: { token: string }) {
     );
   }
   const lesson: LessonData = {
-    id: 0, number: 0, course_id: 0, course_name: data.course_name, course_guidelines: "", title: data.title, has_pdf: data.has_pdf, pdf_pages: data.pdf_pages,
+    id: 0, number: 0, course_id: 0, course_name: data.course_name, course_guidelines: "", title: data.title, status: "working", has_pdf: data.has_pdf, pdf_pages: data.pdf_pages,
     generated_at: null, chapter_id: null, last_page_id: null, last_result: null, pages: data.pages,
   };
   const access: Access = data.mode;

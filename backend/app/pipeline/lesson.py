@@ -134,4 +134,7 @@ async def finish(lesson_id: int, job_id: int, results: list[dict[str, Any]]) -> 
         written = [r for r in results if r.get("type") in ("new_chapter", "append", "new_course") and r.get("chapter_id")]
         if written and lesson.course_id == written[0].get("course_id"):
             lesson.chapter_id = int(written[0]["chapter_id"])
+        # Merged into the notes: the lesson is done (material left in the inbox is not merged yet).
+        if written:
+            lesson.status = "completed"
         await db.commit()

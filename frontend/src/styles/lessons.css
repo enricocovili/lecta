@@ -447,3 +447,17 @@ body.ws-page .les {
   padding: 0 0.8rem;
   white-space: nowrap;
 }
+
+/* The lesson's state (in corso / completata): a pill that the owner clicks to switch. */
+button.les-status {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+}
+button.les-status:hover {
+  filter: brightness(0.95);
+}
+.les .les-status {
+  flex: none;
+}

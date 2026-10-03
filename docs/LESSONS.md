@@ -23,6 +23,13 @@ status next to the title reads "Da salvare" until then and can be clicked to sav
 page is added. Edits are mirrored in `localStorage` as they are made. Work that could not be sent stays in memory and in `localStorage`, is retried with a growing delay
 and comes back on the next visit if the server has not changed that page meanwhile.
 
+## State: in corso / completata
+
+Every lesson has a `status`: **working** («In corso») while it is being written, **completed** («Completata») once its
+text is merged into the subject's notes. A generation that writes into a chapter (`new_chapter`, `append`, `new_course`)
+sets it; material that only reaches the inbox does not. It then stays completed, also when the lesson is edited again:
+only the user moves it back, by clicking the state in the list or in the editor's top bar (`PATCH … {status}`).
+
 ## Ink format
 
 Strokes are stored the way the browser draws them, in **units of the page's width** (x and y both, so any zoom or screen
@@ -44,7 +51,7 @@ points per page, sane coordinates, colour and width.
 | `POST /api/lessons` `{course_id, title}` | new lesson with one blank page |
 | `POST /api/lessons/{id}/slides?name=` | raw PDF body: adds the slides (only once; untouched blank pages are replaced) |
 | `GET /api/courses/{course_id}/lessons/{n}` · `GET /api/lessons/{id}?pages=false` | the lesson (+ pages with notes and ink), `course_guidelines` |
-| `PATCH /api/lessons/{id}` `{title?, course_id?}` · `DELETE` | |
+| `PATCH /api/lessons/{id}` `{title?, course_id?, status?}` · `DELETE` | `status`: `working` \| `completed` |
 | `PUT /api/lessons/{id}/last-page` `{page_id}` | the page being looked at (the editor sends it a moment after the page settles); opening the lesson scrolls there |
 | `PUT /api/lessons/{id}/pages/{pid}` `{notes?, ink?}` | what is sent replaces what is stored, the rest is untouched → `{version}` |
 | `POST /api/lessons/{id}/pages` `{after_page_id?}` · `DELETE …/pages/{pid}` | add a blank page · remove any page, slides included (the last one stays); a removed slide leaves the lesson but not the stored PDF |

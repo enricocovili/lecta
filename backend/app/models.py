@@ -166,6 +166,9 @@ class Lesson(Base):
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
     number: Mapped[int] = mapped_column(Integer)  # 1, 2, 3… within the course: the lesson's address is course/lessons/number
     title: Mapped[str] = mapped_column(String(300))
+    # working | completed: completed once its text is merged into the course notes (a generation wrote it into a chapter);
+    # it stays so until it is set back by hand.
+    status: Mapped[str] = mapped_column(String(12), default="working", server_default="working")
     pdf_blob: Mapped[str | None] = mapped_column(String(64))  # the slides, in the blob store
     pdf_name: Mapped[str | None] = mapped_column(Text)
     pdf_pages: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
