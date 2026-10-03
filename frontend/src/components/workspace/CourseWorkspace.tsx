@@ -1,5 +1,5 @@
 // The course workspace: the draft of the document in the middle, the outline on the left and the AI
-// assistant on the right. /admin/courses/{id}?chapter={id} scrolls to a chapter, ?chat=1 opens the
+// assistant on the right. /admin/courses/{id}/testo?chapter={id} scrolls to a chapter, ?chat=1 opens the
 // assistant, ?ask=… prefills its message box.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { get } from "../../lib/api";

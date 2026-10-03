@@ -3,6 +3,7 @@ import { fmtSize, get } from "../lib/api";
 import { Icon } from "./icons";
 import { kindIcon } from "./pagekit";
 import { Loading, Modal, useApi, usePoll, type Tone } from "./ui";
+import { courseText } from "../lib/links";
 
 export interface ItemView {
   id: number;
@@ -104,7 +105,7 @@ export function resultText(r: ImportResult): string {
 }
 
 export function resultHref(r: ImportResult): string | null {
-  if (r.course_id) return `/admin/courses/${r.course_id}${r.chapter_id ? `?chapter=${r.chapter_id}` : ""}`;
+  if (r.course_id) return courseText(r.course_id, { chapter: r.chapter_id });
   return null;
 }
 

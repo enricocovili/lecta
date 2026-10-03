@@ -38,10 +38,14 @@ test("pages fit a phone screen and never load anything from another origin", asy
   await page.getByRole("button", { name: "Indice" }).first().click();
   await expect(page.getByRole("navigation", { name: "Struttura del documento" })).toBeVisible();
 
-  // The old editor URL lands in the workspace.
+  // The old editor URL lands in the text of the course.
   const courseId = courseHref!.split("/").pop();
   await page.goto(`/admin/editor/${courseId}`);
   await expect(page.getByTestId("doc-preview")).toBeVisible();
+  // A course link that asks for the assistant opens the text with the assistant.
+  await page.goto(`/admin/courses/${courseId}?chat=1`);
+  await page.waitForURL(/\/admin\/courses\/\d+\/testo\?chat=1$/);
+  await expect(page.getByTestId("ai-panel")).toBeVisible();
   expect(foreign, foreign.join("\n")).toEqual([]);
   con.assertClean([/status of 404/]);
 });

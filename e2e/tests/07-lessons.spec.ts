@@ -50,8 +50,8 @@ test.describe.serial("Lezioni", () => {
     await page.goto("/admin/courses?new=1");
     await page.getByLabel("Nome").fill("Elettronica");
     await page.getByRole("button", { name: "Crea materia" }).click();
-    await page.waitForURL(/\/admin\/courses\/\d+$/);
-    courseId = page.url().split("/").pop()!;
+    await page.waitForURL(/\/admin\/courses\/\d+(\/testo)?$/);
+    courseId = /\/admin\/courses\/(\d+)/.exec(page.url())![1];
 
     // New lesson with the slides.
     await page.goto(`/admin/lessons?course=${courseId}`);

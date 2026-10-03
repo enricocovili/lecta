@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { get } from "../lib/api";
 import { Icon } from "./icons";
+import { courseText } from "../lib/links";
 
 interface Result {
   files: { course_id: number; course_name: string; path: string; chapter_id: number | null; chapter_title: string | null; snippet: string; line: number | null }[];
@@ -18,14 +19,14 @@ function hits(r: Result): Hit[] {
   const out: Hit[] = [];
   for (const t of r.titles.slice(0, 5)) {
     out.push({
-      href: t.type === "course" ? `/admin/courses/${t.id}` : `/admin/courses/${t.course_id}?chapter=${t.id}`,
+      href: t.type === "course" ? `/admin/courses/${t.id}` : courseText(t.course_id!, { chapter: t.id }),
       title: t.title,
       meta: t.type === "course" ? "Materia" : `Capitolo · ${t.course_name ?? ""}`,
     });
   }
   for (const f of r.files.slice(0, 6)) {
     out.push({
-      href: `/admin/courses/${f.course_id}${f.chapter_id ? `?chapter=${f.chapter_id}` : ""}`,
+      href: courseText(f.course_id, { chapter: f.chapter_id }),
       title: f.chapter_title ?? f.path,
       meta: `${f.course_name} · ${f.path}${f.line ? `:${f.line}` : ""}`,
     });

@@ -37,7 +37,7 @@ test.describe.serial("workspace", () => {
     await page.getByLabel("Nome").fill("Algebra Lineare");
     await page.getByLabel(/^Capitoli/).fill("Spazi vettoriali\nMatrici");
     await page.getByRole("button", { name: "Crea materia" }).click();
-    await page.waitForURL(/\/admin\/courses\/\d+$/);
+    await page.waitForURL(/\/admin\/courses\/\d+(\/testo)?$/);
     await expect(page.getByRole("heading", { name: "Algebra Lineare" })).toBeVisible();
 
     // The outline on the left and the draft in the middle both know the chapters.
@@ -149,13 +149,17 @@ test.describe.serial("workspace", () => {
     con.assertClean(EXPECTED);
   });
 
-  test("old editor and chapter URLs land in the workspace", async ({ page }) => {
+  test("old editor and chapter URLs land in the text of the course", async ({ page }) => {
     await login(page);
     await page.goto("/admin/courses");
     const href = await page.locator("a.card-link").first().getAttribute("href");
     const id = href!.split("/").pop();
     await page.goto(`/admin/editor/${id}`);
-    await page.waitForURL(new RegExp(`/admin/courses/${id}$`));
+    await page.waitForURL(new RegExp(`/admin/courses/${id}/testo$`));
+    await expect(page.getByTestId("doc-preview")).toBeVisible();
+    const chapter = (await (await page.request.get(`/api/courses/${id}`)).json()).chapters[0].id;
+    await page.goto(`/admin/courses/${id}/chapters/${chapter}`);
+    await page.waitForURL(new RegExp(`/admin/courses/${id}/testo\\?chapter=${chapter}$`));
     await expect(page.getByTestId("doc-preview")).toBeVisible();
   });
 });

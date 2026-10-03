@@ -1,6 +1,6 @@
 ---
-// The LaTeX editor is gone: the course workspace replaces it.
+// The LaTeX editor is gone: the text of the course replaces it.
 const id = Number(Astro.params.courseId);
 const chat = Astro.url.searchParams.get("chat");
-return Astro.redirect(`/admin/courses/${id}${chat ? "?chat=1" : ""}`);
+return Astro.redirect(`/admin/courses/${id}/testo${chat ? "?chat=1" : ""}`);
 ---

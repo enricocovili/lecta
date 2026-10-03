@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { get } from "../lib/api";
 import { Icon } from "./icons";
 import { Empty, ErrorBox, Loading } from "./ui";
+import { courseText } from "../lib/links";
 
 interface Result {
   files: { course_id: number; course_name: string; path: string; chapter_id: number | null; chapter_title: string | null; snippet: string; line: number | null }[];
@@ -127,7 +128,7 @@ export default function AdminSearch() {
                   <a
                     key={`${t.type}${t.id}`}
                     className="sch-row"
-                    href={t.type === "course" ? `/admin/courses/${t.id}` : `/admin/courses/${t.course_id}?chapter=${t.id}`}
+                    href={t.type === "course" ? `/admin/courses/${t.id}` : courseText(t.course_id!, { chapter: t.id })}
                   >
                     <Icon name={t.type === "course" ? "folder" : "file-text"} />
                     <span className="grow sch-row-main">
@@ -154,7 +155,7 @@ export default function AdminSearch() {
                   <a
                     key={`${f.course_id}:${f.path}`}
                     className="sch-hit"
-                    href={`/admin/courses/${f.course_id}${f.chapter_id ? `?chapter=${f.chapter_id}` : ""}`}
+                    href={courseText(f.course_id, { chapter: f.chapter_id })}
                   >
                     <span className="sch-hit-head">
                       <span className="grow sch-row-main">

@@ -5,6 +5,7 @@ import { Icon } from "./icons";
 import { ItemCard, ItemModal, type ItemView } from "./IngestManifest";
 import { fmtUpdated } from "./pagekit";
 import { ErrorBox, Loading, useApi } from "./ui";
+import { courseText } from "../lib/links";
 
 interface Source {
   id: number;
@@ -88,7 +89,7 @@ export default function SourceView({ id }: { id: number }) {
               <a
                 key={i}
                 className="chip"
-                href={l.chapter_id ? `/admin/courses/${l.course_id}?chapter=${l.chapter_id}` : `/admin/courses/${l.course_id}`}
+                href={courseText(l.course_id, { chapter: l.chapter_id })}
               >
                 <Icon name="folder" />
                 {l.course_name}

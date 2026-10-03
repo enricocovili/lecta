@@ -9,8 +9,8 @@ test("a lesson's slides and notes are written into the course by themselves", as
   await page.goto("/admin/courses?new=1");
   await page.getByLabel("Nome").fill("Teoria dei Segnali");
   await page.getByRole("button", { name: "Crea materia" }).click();
-  await page.waitForURL(/\/admin\/courses\/\d+$/);
-  const courseId = page.url().split("/").pop();
+  await page.waitForURL(/\/admin\/courses\/\d+(\/testo)?$/);
+  const courseId = /\/admin\/courses\/(\d+)/.exec(page.url())![1];
 
   // The material comes from a lesson: the slides, and notes next to the first one.
   await page.goto(`/admin/lessons?new=1&course=${courseId}`);
@@ -35,7 +35,7 @@ test("a lesson's slides and notes are written into the course by themselves", as
 
   // "Apri" leads to the workspace, scrolled to the new chapter: the draft shows the text.
   await page.locator(".pg-manifest").getByRole("link", { name: "Apri" }).first().click();
-  await page.waitForURL(/\/admin\/courses\/\d+(\?chapter=\d+)?$/);
+  await page.waitForURL(/\/admin\/courses\/\d+\/testo(\?chapter=\d+)?$/);
   const doc = page.getByTestId("doc-preview");
   await expect(doc).toBeVisible();
   await expect(doc.locator(".doc-block img").first()).toBeVisible({ timeout: 60_000 });

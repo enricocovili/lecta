@@ -1,11 +1,4 @@
 ---
-import Workspace from "../../../../layouts/Workspace.astro";
-import CourseWorkspace from "../../../../components/workspace/CourseWorkspace";
-import { backendGet } from "../../../../lib/server";
-const id = Number(Astro.params.id);
-const r = await backendGet<{ name: string }>(Astro, `/api/courses/${id}`);
-if (!r.data) return Astro.rewrite("/404");
+// For now the course opens on its text (the workspace), keeping ?chapter, ?chat and ?ask.
+return Astro.redirect(`/admin/courses/${Number(Astro.params.id)}/testo${Astro.url.search}`);
 ---
-<Workspace title={r.data.name}>
-  <CourseWorkspace client:only="react" courseId={id} />
-</Workspace>

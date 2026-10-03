@@ -5,6 +5,7 @@ import { resultText, type ImportResult } from "./IngestManifest";
 import { jobStage, translateJobTitle, translateProgress } from "./jobtext";
 import { COURSE_LABEL, COURSE_TONE } from "./pagekit";
 import { Confirm, ErrorBox, fmtWhen, Loading, Progress, StatusPill, Switch, toast, toastError, useApi, usePoll, type Tone } from "./ui";
+import { courseText } from "../lib/links";
 
 interface FirstError {
   file: string | null;
@@ -155,7 +156,7 @@ function jobRow(j: ActivityJob, courses: Map<number, CourseState>): Row {
       tone: broken ? ("warn" as const) : done.tone,
       subtitle: results.map(resultText).join(" · ") + (broken ? " · da correggere" : ""),
       stage: { label: "Nel corso", value: 1 },
-      action: first.course_id ? { label: "Apri", href: `/admin/courses/${first.course_id}${first.chapter_id ? `?chapter=${first.chapter_id}` : ""}` } : null,
+      action: first.course_id ? { label: "Apri", href: courseText(first.course_id, { chapter: first.chapter_id }) } : null,
     };
   }
   return {
@@ -187,7 +188,7 @@ function buildRows(data: DashboardData): Row[] {
       when: fmtWhen(b.at),
       action: {
         label: "Correggi",
-        href: `/admin/courses/${c.id}?${fe?.chapter_id ? `chapter=${fe.chapter_id}&` : ""}chat=1&ask=${encodeURIComponent(`L'ultima compilazione è fallita${where ? ` ${where}` : ""}${fe?.message ? `: ${fe.message}` : ""}. Puoi correggere?`)}`,
+        href: courseText(c.id, { chapter: fe?.chapter_id, ask: `L'ultima compilazione è fallita${where ? ` ${where}` : ""}${fe?.message ? `: ${fe.message}` : ""}. Puoi correggere?` }),
       },
     });
   }
@@ -331,7 +332,7 @@ function AiFeed({ turns }: { turns: AiTurn[] }) {
         const files = count(t.files);
         const icon = t.running ? "loader" : t.undone ? "refresh" : t.status === "error" ? "alert-circle" : t.review_score != null ? "sparkles" : "check";
         return (
-          <a key={t.id} className="home-ai-row" href={`/admin/courses/${t.course_id}?chat=1`}>
+          <a key={t.id} className="home-ai-row" href={courseText(t.course_id, { chat: true })}>
             <span className={`status-ico ${t.running ? "warn" : t.status === "error" ? "danger" : t.undone ? "" : "ok"}`}>
               <Icon name={icon} className={t.running ? "spin" : ""} />
             </span>
@@ -358,7 +359,7 @@ function ReviewLine({ c }: { c: CourseState }) {
   const r = c.review;
   if (!r) {
     return (
-      <a className="home-review none" href={`/admin/courses/${c.id}?chat=1&ask=${encodeURIComponent("Fai una revisione completa del corso.")}`}>
+      <a className="home-review none" href={courseText(c.id, { ask: "Fai una revisione completa del corso." })}>
         <Icon name="sparkles" />
         Nessuna revisione: chiedi all'AI un giudizio sul corso
       </a>
@@ -366,7 +367,7 @@ function ReviewLine({ c }: { c: CourseState }) {
   }
   const tone = r.score >= 8 ? "ok" : r.score >= 6 ? "warn" : "danger";
   return (
-    <a className={`home-review ${r.stale ? "stale" : ""}`} href={`/admin/courses/${c.id}?chat=1`} title={r.verdict}>
+    <a className={`home-review ${r.stale ? "stale" : ""}`} href={courseText(c.id, { chat: true })} title={r.verdict}>
       <span className={`home-score ${tone}`}>{r.score}</span>
       <span className="home-review-text">
         <span className="home-review-verdict">{r.verdict}</span>

@@ -4,6 +4,7 @@ import { Icon } from "./icons";
 import { computeLayout, type MapConcept, type MapCourse, type MapData, type Occurrence } from "./map/layout";
 import { COURSE_TONE } from "./pagekit";
 import { Dot, Empty, ErrorBox, Loading, useApi, usePoll } from "./ui";
+import { courseText } from "../lib/links";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -27,7 +28,7 @@ function OccurrenceCard({ o, course }: { o: Occurrence; course: MapCourse | unde
       </div>
       <div className="map-occ-path">{occPath(o)}</div>
       <div className="map-occ-actions">
-        <a className="btn sm" href={`/admin/courses/${o.course_id}${o.chapter_id ? `?chapter=${o.chapter_id}` : ""}`}>
+        <a className="btn sm" href={courseText(o.course_id, { chapter: o.chapter_id })}>
           <Icon name="sparkles" />
           Apri
         </a>
