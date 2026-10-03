@@ -33,6 +33,37 @@ All endpoints below are admin-only (`/api`, cookie + CSRF like the rest) unless 
 
 `GET /api/courses/{cid}/preview` returns `{"chapters": [<the object above for every chapter>]}` (whole document).
 
+## Draft typeset by LaTeX (blocks as SVG)
+
+`GET /api/courses/{cid}/chapters/{chid}/draft` (`GET /api/courses/{cid}/draft`: `{"chapters": [...]}` for all)
+
+```json
+{
+  "chapter": {"id": 3, "title": "Campionamento", "path": "chapters/03-campionamento.tex", "position": 3},
+  "width": 455.24,
+  "blocks": [
+    {"start": 1, "end": 1, "heading": "chapter", "id": "ch3-l1", "error": null,
+     "pages": [{"url": "/api/courses/7/draft/svg/<variant>-0.svg", "w": 458.2, "h": 61.3, "x": -1.5}]},
+    {"start": 5, "end": 9, "error": "riga 7: Undefined control sequence.", "pages": [...], "src": "…"}
+  ],
+  "toc": [{"id": "ch3-l3", "title": "Il teorema", "level": 1, "line": 3}],
+  "warnings": [],
+  "typeset": 1,
+  "took_ms": 640
+}
+```
+
+* The chapter is split into **blocks** (`services/blocks.py`): paragraphs, headings, whole environments; `start`/`end`
+  are its source lines. A block is what gets selected and flashed.
+* Each block is typeset by the real LaTeX with the course's own preamble (`services/draft.py`), one page or more per
+  block, cropped to the ink: `pages` are SVG pictures, sizes in bp; `width` is the text width, `x` where the picture
+  starts relative to the text's left edge (negative when it reaches into the margin). Show a picture at
+  `w / width` of the column, shifted by `x / width`.
+* Typeset blocks are cached by their text, what they include and the counters they start from: only the blocks that
+  changed (and the numbered ones they renumber) are typeset again; `typeset` says how many. A block that failed has
+  `error` (with the source line) and its `src`; the other blocks are still shown.
+* `GET /api/courses/{cid}/draft/svg/{name}`: a picture (`image/svg+xml`, immutable, strict CSP).
+
 ## The assistant (chat sessions with tools)
 
 The assistant is an agent: it lists/reads/searches every file and source of the course, and writes, creates,

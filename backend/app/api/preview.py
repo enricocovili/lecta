@@ -1,17 +1,17 @@
-"""Draft preview (HTML) and downloads of a course's LaTeX project (admin)."""
+"""Draft preview (HTML, and the chapters typeset block by block as SVG) and downloads of a course's LaTeX project (admin)."""
 
 from __future__ import annotations
 
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..models import Chapter, Course
 from ..security.auth import require_admin
-from ..services import preview, projects
+from ..services import draft, latex, preview, projects
 from ..services.source_export import build_source_zip, project_files, zip_name
 from .courses import chapter_out, load_chapter, load_course
 
@@ -43,6 +43,46 @@ async def course_preview(course_id: int, db: AsyncSession = Depends(get_db)) -> 
     c = await load_course(db, course_id)
     files = set((await projects.manifest(db, c.id)).keys())
     return {"chapters": [await _render(db, c, ch, files) for ch in await projects.chapters_of(db, c.id)]}
+
+
+# --------------------------------------------------------------------------- draft typeset by LaTeX
+
+
+async def _draft(db: AsyncSession, course: Course, ch: Chapter, inputs: draft.Inputs) -> dict[str, Any]:
+    try:
+        return await draft.render_chapter(db, course, ch, inputs)
+    except latex.CompileServiceError as e:
+        info = {"id": ch.id, "title": ch.title, "path": ch.path, "position": ch.position}
+        return {"chapter": info, "width": 451.0, "blocks": [], "toc": [], "warnings": [], "typeset": 0, "took_ms": 0,
+                "error": f"Composizione LaTeX non disponibile: {e}"}
+
+
+@router.get("/courses/{course_id}/chapters/{chapter_id}/draft")
+async def chapter_draft(course_id: int, chapter_id: int, db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id)
+    ch = await load_chapter(db, c, chapter_id)
+    return await _draft(db, c, ch, await draft.inputs_for(db, c))
+
+
+@router.get("/courses/{course_id}/draft")
+async def course_draft(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id)
+    inputs = await draft.inputs_for(db, c)
+    return {"chapters": [await _draft(db, c, ch, inputs) for ch in await projects.chapters_of(db, c.id)]}
+
+
+@router.get("/courses/{course_id}/draft/svg/{name}")
+async def draft_svg(course_id: int, name: str, db: AsyncSession = Depends(get_db)) -> FileResponse:
+    await load_course(db, course_id)
+    path = draft.svg_path(course_id, name)
+    if path is None or not path.is_file():
+        raise HTTPException(status_code=404, detail="Not Found")
+    # The name is the content's address: it never changes. The picture is shown with <img>; opened directly, nothing runs.
+    return FileResponse(path, media_type="image/svg+xml", headers={
+        "Cache-Control": "private, max-age=31536000, immutable",
+        "Content-Security-Policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'",
+        "X-Content-Type-Options": "nosniff",
+    })
 
 
 # --------------------------------------------------------------------------- source download
