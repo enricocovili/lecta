@@ -419,6 +419,15 @@ latex/                 compile service (TeX Live, stdlib Python, unix socket)
 frontend/              Astro + React islands, server.mjs (proxy)
 db/                    Postgres + pgvector image (password generated on first boot)
 e2e/                   Playwright browser tests
-scripts/               test.sh, smoke.sh, e2e.sh, backup.sh, restore.sh
+scripts/               test.sh, smoke.sh, e2e.sh, backup.sh, restore.sh, board.sh (the planning board)
+.github/               issue forms (bug, enhancement, idea), workflow that places new issues on the board
 docs/                  PLAN.md, DECISIONS.md, STATUS.md, AI-WORKSPACE.md, LESSONS.md
 ```
+
+### Planning: issues and the board
+
+Open work lives on the [Features board](https://github.com/users/enricocovili/projects/1). An issue is one of three
+kinds, each with its form and label: **bug** (something broken) and **enhancement** (a change already decided) start in
+✅ Pronta, **idea** (to explore) starts in 💡 Idea; `.github/workflows/board.yml` places them (it needs the
+`PROJECT_TOKEN` secret, a classic token with the `project` scope). A commit that finishes an issue says `Closes #N`.
+`scripts/board.sh` does the same from the terminal (`new`, `status`, `area`, `prio`, `sub`, `list`).
