@@ -17,6 +17,21 @@ decisions and status.
   the area (`Lessons: …`, `PDF: …`, `Draft: …`, `Writing prompt: …`), stating the
   user-visible effect.
 
+## Issues and the board
+
+Plans and ideas live on the [Features board](https://github.com/users/enricocovili/projects/1) (`gh project … 1
+--owner enricocovili`), linked to this repo. Status: 💡 Idea (draft item) › 🔍 Da definire (issue) › ✅ Pronta (split
+into sub-issues) › 🚧 In corso › ✔️ Fatta › 🗑️ Scartata; fields **Area** (the commit prefixes) and **Priorità** (P0–P2).
+
+* **Starting from an issue** ("do #12"): read it and its sub-issues with `gh issue view`, set it to 🚧 In corso, and
+  use its sub-issues as the step list below (create them first if the issue has none and the work needs several
+  commits).
+* **Each commit that finishes an issue or sub-issue** says `Closes #N` in its body; pushed to `main`, it closes the
+  issue and the board moves it to ✔️ Fatta.
+* **Work that shows up along the way** and isn't done now becomes a new issue (or a draft item for a raw idea), not a
+  TODO comment or a note in `docs/STATUS.md`.
+* `docs/` keeps the *how* and *why* (contracts, `DECISIONS.md`); the board keeps the *what* and *when*.
+
 ## Big prompts: split into steps, one commit each
 
 When a prompt asks for several things at once (a multi-part feature, a list of
