@@ -260,3 +260,29 @@ def test_texlog_parser():
     h = next(x for x in d if "hyperref" in x["message"])
     assert "removing" in h["message"] and h["line"] == 3
     assert any(x["level"] == "badbox" and x["line"] == 20 for x in d)
+
+
+async def test_blocks_endpoint_typesets_once_and_returns_svg_pages():
+    """/blocks runs the engine once on a wrapper the backend wrote, then turns every page into SVG with its ink box."""
+    import shutil
+
+    from app.services import latex, projects
+
+    wd = projects.work_dir(990001, "blocks")
+    shutil.rmtree(wd, ignore_errors=True)
+    wd.mkdir(parents=True)
+    (wd / "_blk-7.tex").write_text(
+        "\\documentclass{article}\\pagestyle{empty}\\begin{document}\n"
+        "\\newwrite\\o\\immediate\\openout\\o=\\jobname.lecta\n"
+        "Primo blocco $x^2$.\\clearpage Secondo blocco.\\clearpage\n"
+        "\\immediate\\write\\o{D}\\end{document}\n"
+    )
+    res = await latex.blocks({"workdir": latex.rel(wd), "job": "_blk-7", "timeout": 60})
+    assert res["status"] == "ok", res["log"][-2000:]
+    assert res["pages"] == 2 and res["marks"].strip() == "D"
+    svgs = sorted((projects.config.latex_root / res["svg_dir"]).glob("*.svg"))
+    assert [p.name for p in svgs] == ["1.svg", "2.svg"] and svgs[0].read_text().startswith("<svg")
+    # A job name outside the protocol is refused.
+    with pytest.raises(latex.CompileServiceError):
+        await latex.blocks({"workdir": latex.rel(wd), "job": "../main", "timeout": 60})
+    shutil.rmtree(wd, ignore_errors=True)

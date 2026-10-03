@@ -8,6 +8,9 @@ Endpoints (POST, JSON body):
   /compile   build a project work dir (figures first, then latexmk)
   /figure    compile one standalone figure (diagram self-correction loop)
   /synctex   map a PDF position to a source file/line (best effort)
+  /blocks    typeset a draft chapter block by block: one engine run of the wrapper the
+             backend wrote (each typeset block on pages of its own), then every page to
+             SVG and its ink box (mutool)
   GET /health
 
 Queue: per project key at most one compile runs, plus at most one pending; a
@@ -45,6 +48,8 @@ MAX_LOG = 2 * 1024 * 1024
 RC_FILE = Path(__file__).with_name("latexmkrc")
 
 ENGINES = {"pdflatex": "-pdf", "xelatex": "-pdfxe", "lualatex": "-pdflua"}
+_BLOCK_JOB_RE = re.compile(r"^_blk-[0-9]{1,12}$")
+MAX_MARKS = 8 * 1024 * 1024
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,99}$")
 _REL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+/-]{0,250}$")
 
@@ -247,6 +252,17 @@ def _place(src: Path, dst: Path) -> None:
 # --------------------------------------------------------------------------- compile
 
 
+async def compile_figures(work: Path, cache: Path, engine: str, timeout: int, background: bool) -> list[dict]:
+    figures = []
+    fig_dir = work / "figures"
+    if fig_dir.is_dir():
+        for f in sorted(fig_dir.glob("*.tex")):
+            if f.is_symlink():
+                continue
+            figures.append(await compile_figure(work, cache, f.stem, engine, max(30, timeout // 2), background))
+    return figures
+
+
 async def do_compile(req: dict) -> dict:
     work = resolve_workdir(req["workdir"])
     cache = resolve_workdir(req.get("figure_cache") or f"{req['workdir']}-figcache")
@@ -258,13 +274,7 @@ async def do_compile(req: dict) -> dict:
     mode = req.get("mode", "draft")
     t0 = time.monotonic()
 
-    figures = []
-    fig_dir = work / "figures"
-    if req.get("figures", True) and fig_dir.is_dir():
-        for f in sorted(fig_dir.glob("*.tex")):
-            if f.is_symlink():
-                continue
-            figures.append(await compile_figure(work, cache, f.stem, engine, max(30, timeout // 2), background))
+    figures = await compile_figures(work, cache, engine, timeout, background) if req.get("figures", True) else []
 
     main = req.get("main", "main.tex")
     if not _NAME_RE.match(main) or not (work / main).is_file():
@@ -295,6 +305,69 @@ async def do_compile(req: dict) -> dict:
         "figures": [{k: v for k, v in f.items() if k != "log" or f["status"] in ("error", "timeout")} for f in figures],
         "seconds": round(time.monotonic() - t0, 2),
         "returncode": code,
+    }
+
+
+def _read_small(path: Path, limit: int) -> str:
+    if path.is_symlink() or not path.is_file():
+        return ""
+    with path.open("rb") as f:
+        return f.read(limit).decode("utf-8", "replace")
+
+
+async def do_blocks(req: dict) -> dict:
+    """Typeset `<job>.tex` (written by the backend) once, without latexmk: labels come from the aux the backend
+    put there, so one pass is enough. Every page then becomes `<job>-svg/<n>.svg`, and `<job>-svg/bbox.xml` holds the
+    ink box of each page. The wrapper reports what it did in `<job>.lecta` (which block went to which page)."""
+    work = resolve_workdir(req["workdir"])
+    cache = resolve_workdir(req.get("figure_cache") or f"{req['workdir']}-figcache")
+    engine = req.get("engine", "pdflatex")
+    if engine not in ENGINES:
+        raise BadRequest("bad engine")
+    job = req.get("job", "")
+    if not isinstance(job, str) or not _BLOCK_JOB_RE.match(job):
+        raise BadRequest("bad job")
+    timeout = int(req.get("timeout", 120))
+    background = req.get("priority") == "background"
+    t0 = time.monotonic()
+    if not (work / f"{job}.tex").is_file():
+        return {"status": "error", "log": f"{job}.tex not found"}
+    figures = await compile_figures(work, cache, engine, timeout, background)
+    for ext in ("pdf", "lecta"):
+        (work / f"{job}.{ext}").unlink(missing_ok=True)
+    out_dir = work / f"{job}-svg"
+    if out_dir.is_symlink():
+        out_dir.unlink()
+    shutil.rmtree(out_dir, ignore_errors=True)
+    out_dir.mkdir()
+    argv = [engine, "-interaction=nonstopmode", "-file-line-error", "-no-shell-escape", f"{job}.tex"]
+    code, out, timed_out = await run_sandboxed(argv, work, timeout, background)
+    log = read_log(work / f"{job}.log") or out
+    marks = _read_small(work / f"{job}.lecta", MAX_MARKS)
+    pdf = work / f"{job}.pdf"
+    pages = 0
+    bbox = ""
+    if not timed_out and pdf.is_file() and not pdf.is_symlink():
+        left = max(10, timeout - int(time.monotonic() - t0))
+        c1, o1, _ = await run_sandboxed(["mutool", "draw", "-q", "-F", "bbox", "-o", f"{out_dir.name}/bbox.xml", pdf.name], work, left, background)
+        c2, o2, _ = await run_sandboxed(
+            ["mutool", "draw", "-q", "-F", "svg", "-O", "text=path", "-o", f"{out_dir.name}/%d.svg", pdf.name], work, left, background
+        )
+        bbox = _read_small(out_dir / "bbox.xml", MAX_MARKS)
+        pages = bbox.count("<page ")
+        if c1 or c2:
+            log += "\n[mutool] " + (o1 + o2)[-4000:]
+    status = "timeout" if timed_out else ("ok" if marks.rstrip().endswith("D") else "error")
+    return {
+        "status": status,
+        "returncode": code,
+        "marks": marks,
+        "bbox": bbox,
+        "pages": pages,
+        "svg_dir": str(out_dir.relative_to(WORK_ROOT)),
+        "log": log[-400_000:],
+        "figures": [{k: v for k, v in f.items() if k != "log" or f["status"] in ("error", "timeout")} for f in figures],
+        "seconds": round(time.monotonic() - t0, 2),
     }
 
 
@@ -440,6 +513,9 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
         elif method == "POST" and path == "/figure":
             key = "fig:" + str(req.get("key") or req["workdir"]) + ":" + str(req.get("name"))
             body = await SCHED.submit(key, req, do_figure)
+        elif method == "POST" and path == "/blocks":
+            key = "blk:" + str(req.get("key") or req["workdir"]) + ":" + str(req.get("job"))
+            body = await SCHED.submit(key, req, do_blocks)
         elif method == "POST" and path == "/synctex":
             body = await do_synctex(req)
         else:

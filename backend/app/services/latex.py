@@ -40,6 +40,10 @@ async def figure(body: dict[str, Any]) -> dict[str, Any]:
     return await _post("/figure", body, float(body.get("timeout", 60)) + 30)
 
 
+async def blocks(body: dict[str, Any]) -> dict[str, Any]:
+    return await _post("/blocks", body, float(body.get("timeout", 120)) * 3 + 60)
+
+
 async def synctex(body: dict[str, Any]) -> dict[str, Any]:
     return await _post("/synctex", body, 30)
 

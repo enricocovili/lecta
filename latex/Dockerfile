@@ -1,6 +1,11 @@
 # Lecta compile service: full TeX Live, no network, unprivileged.
 FROM texlive/texlive:TL2025-historic
 
+# mutool: dvisvgm reads PDFs through it (the draft is typeset per block and shown as SVG).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends mupdf-tools \
+ && rm -rf /var/lib/apt/lists/*
+
 # Pre-build the LuaTeX font database into TEXMFSYSVAR so per-job (empty)
 # TEXMFVAR dirs don't rebuild it on every lualatex run.
 RUN luaotfload-tool --update --force >/dev/null 2>&1 || true \
