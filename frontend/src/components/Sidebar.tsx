@@ -60,7 +60,6 @@ export default function Sidebar({ currentPath }: { currentPath: string }) {
       <div className="nav">
         <NavItem href="/admin/courses" icon="folder" label="Materie" active={is("/admin/courses")} />
         <NavItem href="/admin/lessons" icon="notebook" label="Lezioni" active={is("/admin/lessons")} />
-        <NavItem href="/admin/upload" icon="upload" label="Carica" active={is("/admin/upload") || is("/admin/quick")} />
         <NavItem href="/admin/inbox" icon="inbox" label="Da smistare" active={is("/admin/inbox")} count={counts?.inbox_count ?? 0} hot />
         <NavItem href="/admin/map" icon="map" label="Mappa" active={is("/admin/map")} />
       </div>

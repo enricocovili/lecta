@@ -22,7 +22,7 @@ const initials =
     .map((w: string) => w[0]!.toUpperCase())
     .join("") || "A";
 const is = (p: string) => path === p || path.startsWith(p + "/");
-const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/admin/courses") ? "courses" : is("/admin/upload") || is("/admin/quick") ? "upload" : "";
+const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/admin/courses") ? "courses" : "";
 ---
 <Base title={`${title} · ${site.title}`}>
   <header class="topbar">
@@ -34,7 +34,6 @@ const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/a
         <Icon name="moon" className="i-moon" /><Icon name="sun" className="i-sun" />
       </button>
       <a class="btn ghost hide-mobile" href="/" target="_blank" rel="noreferrer"><Icon name="eye" />Vista pubblica</a>
-      <a class="btn primary hide-mobile" href="/admin/upload"><Icon name="upload" />Carica</a>
       <details class="dropdown" id="user-menu">
         <summary class="avatar" aria-label="Account" title={username}>{initials}</summary>
         <div class="menu-pop">
@@ -75,7 +74,6 @@ const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/a
   <nav class="bottom-nav" aria-label="Navigazione rapida">
     <a href="/admin/courses" class={tab === "courses" ? "active" : ""}><Icon name="folder" />Materie</a>
     <a href="/admin/lessons" class={tab === "lessons" ? "active" : ""}><Icon name="notebook" />Lezioni</a>
-    <a href="/admin/quick" class="cta"><span class="ico-wrap"><Icon name="upload" /></span>Carica</a>
     <a href="/admin/map" class={tab === "map" ? "active" : ""}><Icon name="map" />Mappa</a>
   </nav>
   <Toasts client:load />

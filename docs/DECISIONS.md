@@ -449,7 +449,12 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 
 ## A simpler interface (#17)
 
-95. **Every place is reached one way.** The sidebar lists only the places of work (Materie, Lezioni, Carica, Da smistare, Mappa) and the
+95. **Every place is reached one way.** The sidebar lists only the places of work (Materie, Lezioni, Da smistare, Mappa) and the
     subjects; the Home opens from the «Lecta» title like on most sites, search is the bar at the top (on a phone, the
     lens in the top bar), Attività and Impostazioni are in the user menu. The phone's bottom bar has no Home either.
     *Why:* the same link in two places made the sidebar long and the app harder to read.
+96. **Material comes in from the lessons only.** The upload page (`/admin/upload`), the phone page (`/admin/quick`) and
+    `POST /api/uploads…` are gone: almost always the material belonged to the subject already open, and a lesson always
+    has its subject, so the import never has to guess the course. The import keeps its `Upload` rows (a lesson makes one,
+    `via = "lesson"`), the source files and the manifest; the extraction still understands zips, photos and folders, which
+    only the tests feed it now. The phone's home-screen icon opens the lessons.

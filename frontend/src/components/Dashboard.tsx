@@ -438,7 +438,7 @@ export default function Dashboard() {
         <div className="empty">
           <Icon name="book" />
           <div>
-            Nessuna materia. <a href="/admin/courses?new=1">Creane una</a> oppure <a href="/admin/upload">carica del materiale</a>.
+            Nessuna materia. <a href="/admin/courses?new=1">Creane una</a> e prendi appunti a lezione.
           </div>
         </div>
       ) : (
@@ -538,7 +538,7 @@ export default function Dashboard() {
           <div>
             {rows.length === 0 ? (
               <>
-                Ancora nessun caricamento. <a href="/admin/upload">Carica slide, appunti o foto</a> e Lecta li trasformerà in un testo da studiare.
+                Ancora nessuna importazione. <a href="/admin/lessons?new=1">Prendi appunti a lezione</a> e Lecta li trasformerà in un testo da studiare.
               </>
             ) : (
               "Niente in questa categoria."

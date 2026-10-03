@@ -1,195 +1,24 @@
-"""Uploads: create, stream files (raw bodies, never buffered), finish → ingestion job.
+"""What an import read: source files (originals, pages), the items and figures it made, and its manifest.
 
-Also: source files (originals, pages) and ingestion manifests.
+Material comes in from the lessons only (api/lessons.py → pipeline/lesson.py); there is no upload of loose files.
 """
 
 from __future__ import annotations
 
-import os
 import re
-import zipfile
-from pathlib import Path, PurePosixPath
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, Response
-from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config import config
 from ..db import get_db
 from ..models import Chapter, Course, IngestFigure, IngestItem, InboxItem, Job, SourceFile, SourceLink, Upload
-from ..pipeline import compose
-from ..pipeline.unpack import classify, is_junk
 from ..security.auth import require_admin
 from ..services import blobs
-from ..services import jobs as jobs_svc
-from ..services import settings as settings_svc
 
 router = APIRouter(dependencies=[Depends(require_admin)])
-
-CHUNK = 1024 * 1024
-
-
-def upload_dir(upload_id: int) -> Path:
-    return config.data_dir / "uploads" / str(upload_id)
-
-
-class UploadIn(BaseModel):
-    course_id: int | None = None
-    chapter_id: int | None = None
-    note: str | None = Field(None, max_length=2000)
-    via: str = Field("web", pattern="^(web|quick)$")
-
-
-@router.post("/uploads", status_code=201)
-async def create_upload(body: UploadIn, db: AsyncSession = Depends(get_db)) -> dict:
-    if body.chapter_id:
-        ch = await db.get(Chapter, body.chapter_id)
-        if ch is None:
-            raise HTTPException(status_code=404, detail="Not Found")
-        body.course_id = ch.course_id
-    if body.course_id and await db.get(Course, body.course_id) is None:
-        raise HTTPException(status_code=404, detail="Not Found")
-    up = Upload(target_course_id=body.course_id, target_chapter_id=body.chapter_id, note=body.note, via=body.via)
-    db.add(up)
-    await db.commit()
-    upload_dir(up.id).mkdir(parents=True, exist_ok=True)
-    return {"id": up.id}
-
-
-def _clean_rel(path: str | None) -> tuple[str, str]:
-    """(folder, name) from a client-supplied relative path (untrusted, used only as a hint)."""
-    p = (path or "").replace("\\", "/")
-    parts = [x for x in PurePosixPath(p).parts if x not in ("", ".", "..", "/")]
-    parts = [re.sub(r"[\x00-\x1f]", "", x)[:200] for x in parts] or ["file"]
-    return "/".join(parts[:-1])[:500], parts[-1]
-
-
-@router.post("/uploads/{upload_id}/files")
-async def upload_file(
-    upload_id: int,
-    request: Request,
-    name: str = Query(max_length=1000),
-    db: AsyncSession = Depends(get_db),
-) -> dict:
-    """Body = the raw file. Streamed to disk with a size limit; type detected by magic bytes."""
-    up = await db.get(Upload, upload_id)
-    if up is None:
-        raise HTTPException(status_code=404, detail="Not Found")
-    if up.status != "receiving":
-        raise HTTPException(status_code=409, detail="caricamento già concluso")
-    limits = await settings_svc.get_section(db, "uploads")
-    max_bytes = limits.max_file_mb * 1024 * 1024
-    folder, base = _clean_rel(name)
-    d = upload_dir(upload_id) / "incoming"
-    d.mkdir(parents=True, exist_ok=True)
-    tmp = d / f"part-{os.urandom(6).hex()}"
-    size = 0
-    try:
-        with open(tmp, "wb") as f:
-            async for chunk in request.stream():
-                size += len(chunk)
-                if size > max_bytes:
-                    raise HTTPException(status_code=413, detail=f"file larger than {limits.max_file_mb} MB")
-                f.write(chunk)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
-    if size == 0:
-        tmp.unlink(missing_ok=True)
-        raise HTTPException(status_code=400, detail="file vuoto")
-    parts = tuple(x for x in (folder.split("/") if folder else [])) + (base,)
-    if is_junk(parts):
-        tmp.unlink(missing_ok=True)
-        return {"skipped": True, "reason": "system file"}
-    kind, mime = classify(tmp, base)
-    h = blobs.put_file(tmp, move=True)
-    sf = SourceFile(
-        upload_id=upload_id, name=base, folder=folder or None, kind=kind, mime=mime, size=size, blob=h,
-        status="ok" if kind != "unsupported" else "unsupported",
-        reason=None if kind != "unsupported" else "unsupported file type",
-    )
-    db.add(sf)
-    up.file_count += 1
-    up.total_size += size
-    await db.commit()
-    return {"id": sf.id, "kind": kind, "size": size, "name": base, "status": sf.status}
-
-
-class FinishIn(BaseModel):
-    title: str | None = Field(None, max_length=200)
-    # Go on even without a notes file (.md/.txt): the text is then a summary of the material alone.
-    without_notes: bool = False
-    # What the student wants from the text of the subject (only with a chosen subject): None = as saved for the course,
-    # "" = none (the AI decides). With save_guidelines the text is kept as the course's guidelines.
-    guidelines: str | None = Field(None, max_length=8000)
-    save_guidelines: bool = False
-
-
-def _zip_has_notes(path: Path) -> bool:
-    try:
-        with zipfile.ZipFile(path) as z:
-            for info in z.infolist()[:20000]:
-                parts = tuple(p for p in PurePosixPath(info.filename.replace("\\", "/")).parts if p not in ("", "."))
-                if not info.is_dir() and parts and not is_junk(parts) and compose.is_notes_name(parts[-1]) and "." in parts[-1]:
-                    return True
-    except (zipfile.BadZipFile, OSError, ValueError):
-        pass
-    return False
-
-
-async def has_notes(db: AsyncSession, upload_id: int) -> bool:
-    """Whether the upload holds at least one file of class notes (.md/.txt), also inside zips."""
-    files = (await db.execute(select(SourceFile).where(SourceFile.upload_id == upload_id, SourceFile.status == "ok"))).scalars().all()
-    if any(f.kind in ("markdown", "text") and compose.is_notes_name(f.name) for f in files):
-        return True
-    return any(f.kind == "zip" and f.blob and _zip_has_notes(blobs.path_for(f.blob)) for f in files)
-
-
-@router.post("/uploads/{upload_id}/finish")
-async def finish_upload(upload_id: int, body: FinishIn, db: AsyncSession = Depends(get_db)) -> dict:
-    up = await db.get(Upload, upload_id)
-    if up is None:
-        raise HTTPException(status_code=404, detail="Not Found")
-    if up.status != "receiving":
-        raise HTTPException(status_code=409, detail="caricamento già concluso")
-    if up.file_count == 0:
-        raise HTTPException(status_code=400, detail="nessun file caricato")
-    # Quick uploads are photos of handwritten notes: they are the notes.
-    if up.via != "quick" and not body.without_notes and not await has_notes(db, up.id):
-        raise HTTPException(status_code=409, detail={
-            "code": "no_notes",
-            "message": "Nel caricamento non c'è un file di appunti (.md o .txt): senza, il testo sarà un riassunto delle sole slide.",
-        })
-    names = (await db.execute(select(SourceFile.name).where(SourceFile.upload_id == up.id).limit(3))).scalars().all()
-    title = body.title or ("Caricamento: " + ", ".join(names) + ("…" if up.file_count > 3 else ""))
-    up.status = "queued"
-    payload: dict[str, Any] = {"upload_id": up.id}
-    if body.guidelines is not None:
-        text = body.guidelines.strip()
-        payload["guidelines"] = text
-        course = await db.get(Course, up.target_course_id) if up.target_course_id else None
-        if course is not None and body.save_guidelines:
-            course.guidelines = text or None
-    job = await jobs_svc.enqueue(
-        db, "ingest", payload, title=title[:200], priority="ingest", course_id=up.target_course_id, commit=False
-    )
-    up.job_id = job.id
-    await db.commit()
-    return {"job_id": job.id, "upload_id": up.id}
-
-
-@router.get("/uploads")
-async def list_uploads(db: AsyncSession = Depends(get_db)) -> list[dict]:
-    rows = (await db.execute(select(Upload).order_by(Upload.id.desc()).limit(100))).scalars()
-    return [
-        {"id": u.id, "status": u.status, "job_id": u.job_id, "file_count": u.file_count, "total_size": u.total_size,
-         "created_at": u.created_at, "target_course_id": u.target_course_id, "via": u.via}
-        for u in rows
-    ]
-
 
 # --------------------------------------------------------------------------- sources
 

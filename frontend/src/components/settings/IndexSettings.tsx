@@ -196,23 +196,9 @@ export function UploadSettings() {
   const s = useSection<Uploads>("uploads");
   if (!s.value) return null;
   return (
-    <SetCard title="Limiti di caricamento" actions={<SaveButton onClick={() => s.save()} busy={s.saving} />}>
+    <SetCard title="Limiti dei file" actions={<SaveButton onClick={() => s.save()} busy={s.saving} />}>
       <div className="form-grid">
-        <NumberField label="Dimensione massima del file (MB)" value={s.value.max_file_mb} min={1} onChange={(v) => s.set("max_file_mb", v)} />
-        <NumberField
-          label="Dimensione massima dello zip decompresso (MB)"
-          value={s.value.max_zip_uncompressed_mb}
-          min={1}
-          onChange={(v) => s.set("max_zip_uncompressed_mb", v)}
-        />
-        <NumberField label="File massimi per zip" value={s.value.max_zip_members} min={1} onChange={(v) => s.set("max_zip_members", v)} />
-        <NumberField
-          label="Rapporto di compressione massimo"
-          hint="protezione dalle zip bomb"
-          value={s.value.max_compression_ratio}
-          min={2}
-          onChange={(v) => s.set("max_compression_ratio", v)}
-        />
+        <NumberField label="Dimensione massima delle slide di una lezione (MB)" value={s.value.max_file_mb} min={1} onChange={(v) => s.set("max_file_mb", v)} />
       </div>
     </SetCard>
   );

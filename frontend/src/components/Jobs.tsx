@@ -199,7 +199,7 @@ export function JobsList() {
       {loading && !data ? (
         <Loading />
       ) : shown.length === 0 ? (
-        <Empty icon="activity">{filter ? "Nessuna attività con questo stato." : "Ancora nessuna attività. Carica del materiale per cominciare."}</Empty>
+        <Empty icon="activity">{filter ? "Nessuna attività con questo stato." : "Ancora nessuna attività. Prendi appunti a lezione e aggiungili al testo per cominciare."}</Empty>
       ) : (
         <div className="card flush">
           <div className="rows">

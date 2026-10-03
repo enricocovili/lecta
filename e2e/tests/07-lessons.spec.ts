@@ -205,7 +205,7 @@ test.describe.serial("Lezioni", () => {
     // The guidelines stay with the subject, and the lesson remembers what it produced.
     const settings = await page.request.get(`/api/courses/${courseId}`);
     expect((await settings.json()).guidelines).toContain("discorsivo");
-    await page.goto("/admin/lessons");
+    await page.goto(`/admin/lessons?course=${courseId}`);
     await expect(page.getByTestId("lesson-row")).toContainText("testo generato il");
 
     // The annotated PDF has the three slides plus the page added by hand.

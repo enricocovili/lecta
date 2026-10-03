@@ -82,9 +82,9 @@ export default function TopBar({
             <Icon name="notebook" />
             Lezioni di questa materia
           </a>
-          <a href={`/admin/upload?course=${course.id}`}>
-            <Icon name="upload" />
-            Importa materiale
+          <a href={`/admin/lessons?new=1&course=${course.id}`}>
+            <Icon name="plus" />
+            Nuova lezione
           </a>
           {course.published && (
             <a href={`/courses/${course.slug}`} target="_blank" rel="noreferrer">

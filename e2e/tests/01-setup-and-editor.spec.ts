@@ -48,7 +48,7 @@ test.describe.serial("workspace", () => {
     await expect(doc.getByRole("heading", { name: "Spazi vettoriali" })).toBeVisible();
     // A course with nothing written yet invites you to start.
     await expect(page.getByText("Questa materia è ancora vuota")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Carica materiale" })).toBeVisible();
+    await expect(page.locator(".doc-empty").getByRole("link", { name: "Nuova lezione" })).toBeVisible();
     // The assistant panel is there, ready.
     await expect(page.getByTestId("ai-panel")).toBeVisible();
     await expect(page.getByTestId("ai-composer")).toBeVisible();

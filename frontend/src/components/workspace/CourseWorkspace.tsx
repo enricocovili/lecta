@@ -341,11 +341,11 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
         <Icon name="book" />
       </span>
       <h2>Questa materia è ancora vuota</h2>
-      <p>Carica gli appunti e le slide: l’AI li trasforma in un testo da studiare. Oppure lascia fare a lei a partire dalle fonti che hai già.</p>
+      <p>Prendi appunti a lezione, sulle slide o su pagine bianche: Lecta li trasforma in un testo da studiare. Oppure lascia fare all’assistente a partire dalle fonti che hai già.</p>
       <div className="row" style={{ justifyContent: "center" }}>
-        <a className="btn primary" href={`/admin/upload?course=${courseId}`}>
-          <Icon name="upload" />
-          Carica materiale
+        <a className="btn primary" href={`/admin/lessons?new=1&course=${courseId}`}>
+          <Icon name="notebook" />
+          Nuova lezione
         </a>
         <button type="button" className="btn" onClick={() => void ask("Parti dalle fonti caricate: crea i capitoli e scrivi una prima bozza del corso.", { mode: "edit", noScope: true })}>
           <Icon name="sparkles" />

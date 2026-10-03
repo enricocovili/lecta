@@ -390,7 +390,7 @@ class Upload(Base):
     job_id: Mapped[int | None] = mapped_column(BigInteger)
     file_count: Mapped[int] = mapped_column(Integer, default=0)
     total_size: Mapped[int] = mapped_column(BigInteger, default=0)
-    via: Mapped[str] = mapped_column(String(20), default="web")  # web | quick
+    via: Mapped[str] = mapped_column(String(20), default="web")  # lesson; web | quick: older uploads of loose files
     created_at: Mapped[datetime] = _now()
 
 

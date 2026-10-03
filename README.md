@@ -2,8 +2,8 @@
 
 Self-hosted platform for university notes, worked on with an AI assistant.
 
-* A **private workspace** for one admin: courses → chapters, uploads that turn
-  into study notes by themselves, and an **AI assistant** that can read and change
+* A **private workspace** for one admin: courses → chapters, lessons whose notes
+  and slides turn into study notes by themselves, and an **AI assistant** that can read and change
   everything in a course. You read a **draft** typeset by the real LaTeX, block by
   block, pick blocks to ask about them, and the assistant's changes are applied at once (one click
   undoes a whole answer). There is no LaTeX editor: the LaTeX project is stored
@@ -143,41 +143,29 @@ none, a notice says the text will be generated automatically. Downloads: the sli
 write) or editable (the same editor, minus what is yours alone). Revoke or replace them whenever you want.
 Details: [docs/LESSONS.md](docs/LESSONS.md).
 
-## Uploading material (ingestion)
+## From a lesson to the study text (import)
 
-**Upload** (or the phone page `/admin/quick`) accepts zips with nested folders
-and loose files, freely mixed: **the class notes** (`.md`/`.txt`, the bullet
-points taken during the lecture), PDFs (slides, annotated slides, scans, typed
-pages), photos of handwritten notes (JPEG/PNG/HEIC). Choose a course and/or
-chapter, or leave both empty to let Lecta file the material. Files are
-streamed to disk (hundreds of MB are fine) and detected by magic bytes. File
-and folder names are only hints.
+Material comes in from the **lessons** only: there is no upload of loose files (no
+zips, no photos from the phone, no "choose a course later"). **Aggiungi al testo**
+on a lesson hands the import its slides (the PDF), the notes typed next to every
+slide and a picture of every slide you drew on. The lesson always belongs to a
+course, so the text always lands in that course. The class notes are the backbone
+of the text; a lesson with slides and no notes gets a summary of the slides.
 
-The class notes are the backbone of the text. When an upload has no `.md`/`.txt`
-file (zips are looked into), **Carica ed elabora** warns first: add the notes to
-the same upload, or go on and get a summary of the slides alone
-(`POST /api/uploads/{id}/finish` answers 409 `no_notes` unless `without_notes`
-is set). Quick uploads from the phone don't ask: their photos are the notes.
-
-Clicking **Carica ed elabora** starts a job that runs to the end by itself
+**Aggiungi al testo** starts a job that runs to the end by itself
 (Estrazione › Lettura › Stesura › Inserimento):
 
-1. **Extraction** (local, no AI): safe unpacking (zip-slip / zip-bomb protection,
-   junk skipped, unsupported files reported). PDFs: the text layer in reading
+1. **Extraction** (local, no AI). PDFs: the text layer in reading
    order with sub/superscripts rebuilt (`x^{2}`, `x_{i}`), headings and slide
    titles; repeated headers/footers, logos and theme graphics dropped; embedded
    images and vector drawings (plots, diagrams, found by clustering the drawing
    commands) become images with a `[[IMG id]]` marker where they sit; beamer
    overlay steps and blank pages are skipped. A page is read *with its picture*
    only when text isn't enough: scans, garbled text layers, handwritten ink,
-   display math, formulas stored as images. Photos are EXIF-rotated, cropped to the
-   page, deskewed and contrast-enhanced. Notes are kept as written, with their
-   images marked.
-2. **Grouping**: one chapter per folder (pictures in `img/`, `figures/`, … go with
-   their folder). At the root: with one notes file, everything together; with
-   several, each notes file with the PDFs whose names match it ("Lezione 4.pdf"
-   with "appunti lezione 4.md"); without notes, one chapter per PDF and one for
-   all loose photos.
+   display math, formulas stored as images. Notes are kept as written, a section per
+   slide. (The extraction still knows zips, photos and folders from the old upload
+   page; nothing feeds it those any more.)
+2. **Grouping**: a lesson is one group: its notes with its slides.
 3. **Reading**: the material in units of ~10 pages of one file (Settings → AI e
    costi), all in parallel, converted faithfully to LaTeX: math as LaTeX, every
    picture placed with `\lectaimage`, nothing left out (prompt `read.pages`).
@@ -191,7 +179,7 @@ Clicking **Carica ed elabora** starts a job that runs to the end by itself
    notes, each with the relevant material), and a reply cut off splits its part.
 5. **Placement** (see below) → **compile check** in a scratch project with at most
    one automatic AI fix (Settings → LaTeX) → **written into the course**: a new
-   chapter, or appended to the chosen/matching chapter. Only material Lecta
+   chapter, the lesson's own chapter, or appended to the chosen/matching chapter. Only material Lecta
    can't place confidently goes to **Da smistare**.
 
 Every step is memoised: a retried job never repeats finished work or re-sends
@@ -218,15 +206,9 @@ threshold, retrieval **falls back to lexical-only** automatically.
 The classification model gets the notes plus the top-k candidates' titles and
 section outlines, and returns the best placement with confidence and rationale:
 append to an existing chapter or a new chapter in a course. Below the threshold
-(and without a course chosen at upload) the notes go to **Da smistare**, where one
+the notes go to **Da smistare**, where one
 click assigns them to a course/chapter or creates a new course (language detected
 from the material); they are written right away.
-
-### Phone quick upload
-
-`/admin/quick` is a phone-friendly page with camera capture (several photos at
-once) that feeds the same pipeline. Add it to the home screen: the web manifest
-opens it directly.
 
 ## The AI assistant
 

@@ -176,9 +176,9 @@ function Sources({ courseId }: { courseId: number }) {
           ))}
         </ul>
       )}
-      <a className="btn sm rail-import" href={`/admin/upload?course=${courseId}`}>
-        <Icon name="upload" />
-        Importa materiale
+      <a className="btn sm rail-import" href={`/admin/lessons?new=1&course=${courseId}`}>
+        <Icon name="plus" />
+        Nuova lezione
       </a>
     </div>
   );

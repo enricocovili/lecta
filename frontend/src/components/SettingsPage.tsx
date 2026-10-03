@@ -20,7 +20,7 @@ const SECTIONS = [
   { key: "ai", label: "AI e costi", icon: "activity", sub: "Limiti delle richieste, costi e registro delle chiamate." },
   { key: "latex", label: "LaTeX", icon: "code", sub: "Compilazione e preambolo condiviso." },
   { key: "embeddings", label: "Indice ed embeddings", icon: "database", sub: "Ricerca semantica locale e smistamento del materiale." },
-  { key: "uploads", label: "Caricamenti", icon: "upload", sub: "Limiti dei file caricati." },
+  { key: "uploads", label: "File", icon: "upload", sub: "Limiti delle slide caricate nelle lezioni." },
   { key: "backup", label: "Backup", icon: "archive", sub: "Esportazione e backup completo." },
 ] as const;
 type Section = (typeof SECTIONS)[number]["key"];

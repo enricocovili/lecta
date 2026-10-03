@@ -640,20 +640,6 @@ details.dropdown > summary::-webkit-details-marker {
   .bottom-nav a:hover {
     text-decoration: none;
   }
-  .bottom-nav .cta .ico-wrap {
-    background: var(--primary);
-    color: var(--primary-fg);
-    border-radius: 10px;
-    width: 4.4rem;
-    height: 2.1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .bottom-nav .cta {
-    color: var(--fg);
-    font-weight: 600;
-  }
   .toasts {
     bottom: calc(var(--bottom-nav-h) + 0.75rem) !important;
   }
@@ -1626,26 +1612,6 @@ table.table {
   font-size: 2.2rem;
   line-height: 1;
   font-weight: 500;
-}
-
-.dropzone {
-  border: 1.5px dashed var(--border-strong);
-  border-radius: var(--radius-lg);
-  padding: 2.5rem 1rem;
-  text-align: center;
-  color: var(--fg-muted);
-  background: var(--bg-elev);
-  cursor: pointer;
-  transition:
-    border-color 0.12s,
-    background 0.12s;
-}
-.dropzone:hover {
-  border-color: var(--fg-faint);
-}
-.dropzone.over {
-  border-color: var(--accent);
-  background: var(--accent-soft);
 }
 
 .thumb {
