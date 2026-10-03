@@ -1,0 +1,22 @@
+name: 💡 Idea
+description: Una funzione o un cambiamento da esplorare, non ancora deciso. Entra in 💡 Idea.
+labels: [idea]
+projects: [enricocovili/1]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: L'idea
+      description: Anche una riga basta.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Perché
+      description: Che problema risolve, quando servirebbe.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Lessons, Draft, Assistant, Import, LaTeX, PDF, Publishing, Deploy, UI, Docs, Non so]

@@ -1,0 +1,40 @@
+name: 🐞 Bug o problema
+description: Qualcosa che non funziona o va corretto. Entra nel backlog (✅ Pronta).
+labels: [bug]
+projects: [enricocovili/1]
+body:
+  - type: textarea
+    id: actual
+    attributes:
+      label: Cosa succede
+      description: Il comportamento sbagliato, con il testo esatto dell'errore se c'è.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Cosa dovrebbe succedere
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Come riprodurlo
+      placeholder: |
+        1. Apri …
+        2. Clicca …
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Lessons, Draft, Assistant, Import, LaTeX, PDF, Publishing, Deploy, UI, Docs, Non so]
+  - type: input
+    id: where
+    attributes:
+      label: Dove
+      description: Browser e dispositivo, o il server.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log
+      render: shell
