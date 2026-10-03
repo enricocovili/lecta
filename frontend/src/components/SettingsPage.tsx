@@ -19,7 +19,7 @@ const SECTIONS = [
   { key: "prompts", label: "Prompt", icon: "message", sub: "Le istruzioni di sistema, modificabili e con cronologia delle versioni." },
   { key: "ai", label: "AI e costi", icon: "activity", sub: "Limiti delle richieste, costi e registro delle chiamate." },
   { key: "latex", label: "LaTeX", icon: "code", sub: "Compilazione e preambolo condiviso." },
-  { key: "embeddings", label: "Indice ed embeddings", icon: "database", sub: "Ricerca semantica locale e smistamento del materiale." },
+  { key: "embeddings", label: "Indice ed embeddings", icon: "database", sub: "Ricerca semantica locale e scelta del capitolo per il testo di una lezione." },
   { key: "uploads", label: "File", icon: "upload", sub: "Limiti delle slide caricate nelle lezioni." },
   { key: "backup", label: "Backup", icon: "archive", sub: "Esportazione e backup completo." },
 ] as const;

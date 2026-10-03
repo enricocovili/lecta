@@ -167,23 +167,6 @@ async def test_truncated_reply_splits_the_unit(admin, worker):
     assert "Secondo" in text and "Quarto" in text
 
 
-async def test_unplaceable_material_goes_to_da_smistare_and_one_click_writes_it(admin, worker, fx):
-    await setup_fake(admin)
-    md = "# Ricette\n\nGuanciale croccante, pecorino romano, tuorli d'uovo e pepe nero: la carbonara tradizionale.\n"
-    job_id = await upload(admin, [("ricetta.md", md.encode())])  # no course chosen, nothing similar in the library
-    j = await _done(admin, job_id)
-    res = j["result"]["groups"][0]
-    assert res["type"] == "inbox"
-    course = (await admin.post("/api/courses", json={"name": "Destinazione", "language": "it"})).json()
-    r = await admin.post(f"/api/inbox/{res['inbox_id']}/assign", json={"course_id": course["id"]})
-    assert r.status_code == 200, r.text
-    await _done(admin, r.json()["job_id"])
-    detail = (await admin.get(f"/api/courses/{course['id']}")).json()
-    assert len(detail["chapters"]) == 1
-    item = (await admin.get(f"/api/inbox/{res['inbox_id']}")).json()
-    assert item["status"] == "assigned"
-
-
 async def test_retries_dont_write_twice_or_resend(admin, worker):
     await setup_fake(admin)
     course = (await admin.post("/api/courses", json={"name": "Ripetizioni", "language": "it"})).json()

@@ -205,7 +205,7 @@ export default function CoursesBrowser() {
         <Loading />
       ) : courses.length === 0 ? (
         <Empty icon="folder">
-          {filter ? "Nessuna materia corrisponde al filtro." : "Nessuna materia. Creane una, oppure carica del materiale e lascia che Lecta lo smisti."}
+          {filter ? "Nessuna materia corrisponde al filtro." : "Nessuna materia. Creane una e prendi appunti nelle sue lezioni."}
         </Empty>
       ) : view === "grid" ? (
         <div className="pg-course-grid">

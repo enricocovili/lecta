@@ -13,7 +13,6 @@ interface Emb {
 }
 
 interface Cat {
-  threshold: number;
   top_k: number;
   [k: string]: unknown;
 }
@@ -173,17 +172,8 @@ export function EmbeddingsSettings() {
         </div>
       </SetCard>
       {c.value && (
-        <SetCard title="Smistamento" actions={<SaveButton onClick={() => c.save()} busy={c.saving} />}>
+        <SetCard title="Scelta del capitolo" actions={<SaveButton onClick={() => c.save()} busy={c.saving} />}>
           <div className="form-grid">
-            <NumberField
-              label="Soglia di confidenza"
-              hint="sotto questa soglia il materiale va in Da smistare"
-              value={c.value.threshold}
-              min={0}
-              max={1}
-              step={0.05}
-              onChange={(v) => c.set("threshold", v)}
-            />
             <NumberField label="Capitoli candidati (top-k)" value={c.value.top_k} min={1} max={50} onChange={(v) => c.set("top_k", v)} />
           </div>
         </SetCard>

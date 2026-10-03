@@ -125,6 +125,8 @@ The app was called Appunti until 2026-10-02 (DECISIONS 91–92). What changed an
   «con l'AI».
 * **No upload page** (DECISIONS 96): the study text of a subject is made from its lessons; `/admin/upload`, `/admin/quick`
   and the upload API are gone.
+* **No «Da smistare»** (DECISIONS 97): placement picks a chapter of the lesson's course or starts a new one; the inbox and
+  its table are gone (migration `0019`; the inbox on this server was empty).
 
 ## Definition of done: how each point is verified
 

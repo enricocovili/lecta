@@ -70,7 +70,6 @@ interface DashboardData {
   activity: ActivityJob[];
   ai_activity?: AiTurn[];
   courses: CourseState[];
-  inbox_count: number;
 }
 
 interface Concepts {
@@ -147,8 +146,7 @@ function jobRow(j: ActivityJob, courses: Map<number, CourseState>): Row {
     };
   }
   const results = j.results ?? [];
-  const written = results.filter((r) => r.type && r.type !== "inbox");
-  const inbox = results.filter((r) => r.type === "inbox");
+  const written = results.filter((r) => r.course_id);
   const broken = written.some((r) => r.compile === "error");
   if (written.length) {
     const first = written[0];
@@ -156,12 +154,9 @@ function jobRow(j: ActivityJob, courses: Map<number, CourseState>): Row {
       ...done,
       tone: broken ? ("warn" as const) : done.tone,
       subtitle: results.map(resultText).join(" · ") + (broken ? " · da correggere" : ""),
-      stage: { label: inbox.length ? "Scritto, in parte da smistare" : "Nel corso", value: 1 },
+      stage: { label: "Nel corso", value: 1 },
       action: first.course_id ? { label: "Apri", href: `/admin/courses/${first.course_id}${first.chapter_id ? `?chapter=${first.chapter_id}` : ""}` } : null,
     };
-  }
-  if (inbox.length) {
-    return { ...done, subtitle: results.map(resultText).join(" · "), stage: { label: "Da smistare", value: 1 }, action: { label: "Smista", href: "/admin/inbox" } };
   }
   return {
     ...done,
@@ -415,18 +410,6 @@ export default function Dashboard() {
 
   return (
     <div className="home">
-      {data.inbox_count > 0 && (
-        <div className="home-notices">
-          <a className="alert" href="/admin/inbox">
-            <Icon name="inbox" />
-            <span className="grow">
-              {data.inbox_count === 1 ? "1 caricamento da smistare" : `${data.inbox_count} caricamenti da smistare`}: scegli in quale materia vanno.
-            </span>
-            <Icon name="chevron-right" />
-          </a>
-        </div>
-      )}
-
       <div className="section-label" style={{ marginTop: 0 }}>
         <span>Materie</span>
         <a href="/admin/map" className="hide-mobile">

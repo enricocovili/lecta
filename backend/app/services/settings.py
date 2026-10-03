@@ -50,7 +50,6 @@ class EmbeddingSettings(BaseModel):
 
 
 class CategorizationSettings(BaseModel):
-    threshold: float = Field(0.55, ge=0, le=1)
     top_k: int = Field(8, ge=1, le=50)
 
 

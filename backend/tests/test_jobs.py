@@ -101,7 +101,7 @@ async def test_active_job_cannot_be_deleted(admin):
 
 
 async def test_bulk_delete_with_purge_removes_test_outputs(admin):
-    from app.models import Course, IngestItem, InboxItem, SourceFile, Upload
+    from app.models import Course, IngestItem, SourceFile, Upload
 
     async with SessionLocal() as db:
         course = Course(name="Purge test", slug="purge-test")
@@ -117,17 +117,13 @@ async def test_bulk_delete_with_purge_removes_test_outputs(admin):
         db.add(sf)
         await db.flush()
         db.add(IngestItem(job_id=jobs[0].id, upload_id=up.id, source_file_id=sf.id, key="i1", kind="slide", label="x.pdf · p. 1", position=1))
-        db.add(InboxItem(title="test", job_id=jobs[0].id, bundle={}, status="open"))
-        db.add(InboxItem(title="kept", job_id=jobs[1].id, bundle={}, status="assigned"))
         await db.commit()
         ids = [j.id for j in jobs]
         up_id = up.id
     r = await admin.post("/api/jobs/delete", json={"status": "cancelled", "purge": True})
     assert r.status_code == 200, r.text
     body = r.json()
-    assert set(ids) <= set(body["deleted"]) and body["inbox_items"] == 1 and body["uploads"] == 1
+    assert set(ids) <= set(body["deleted"]) and body["uploads"] == 1
     async with SessionLocal() as db:
         assert await db.get(Upload, up_id) is None
         assert not (await db.execute(select(IngestItem).where(IngestItem.job_id == ids[0]))).first()
-        titles = (await db.execute(select(InboxItem.title).where(InboxItem.job_id.in_(ids)))).scalars().all()
-        assert titles == ["kept"]  # assigned items are never removed

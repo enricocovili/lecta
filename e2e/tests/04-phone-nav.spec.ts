@@ -9,15 +9,14 @@ test("on a phone the navigation is the bottom bar and the account menu", async (
   await expect(page.locator(".bottom-nav").getByText("Materie")).toBeVisible();
   await expect(page.locator(".bottom-nav").getByText("Carica")).toHaveCount(0);
   await page.locator("#user-menu summary").click();
-  await expect(page.locator("#user-menu").getByText("Da smistare")).toBeVisible();
+  await expect(page.locator("#user-menu").getByText("Lezioni")).toBeVisible();
+  await expect(page.locator("#user-menu").getByText("Da smistare")).toHaveCount(0);
   con.assertClean([/status of 404/]);
 });
 
-test("inbox and embeddings settings render", async ({ page }) => {
+test("embeddings settings render", async ({ page }) => {
   const con = watchConsole(page);
   await login(page);
-  await page.goto("/admin/inbox");
-  await expect(page.getByRole("heading", { name: "Da smistare" })).toBeVisible();
   await page.goto("/admin/settings#embeddings");
   await expect(page.getByText("Embeddings locali (ricerca semantica)")).toBeVisible();
   await expect(page.getByText(/Modalità di ricerca:/)).toBeVisible();

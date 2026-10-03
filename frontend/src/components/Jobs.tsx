@@ -10,11 +10,10 @@ import { Confirm, Empty, ErrorBox, fmtWhen, Loading, Progress, toast, toastError
 const FINISHED = ["succeeded", "failed", "cancelled"];
 const ACTIVE = ["queued", "running"];
 
-type DeleteResult = { deleted: number[]; inbox_items: number; uploads: number };
+type DeleteResult = { deleted: number[]; uploads: number };
 
 function deletedText(r: DeleteResult): string {
   const extra = [
-    r.inbox_items && `${r.inbox_items} ${r.inbox_items === 1 ? "elemento da smistare" : "elementi da smistare"}`,
     r.uploads && `${r.uploads} ${r.uploads === 1 ? "caricamento" : "caricamenti"}`,
   ].filter(Boolean);
   const n = r.deleted.length;
@@ -46,8 +45,7 @@ function DeleteJobs({
           <p style={{ margin: 0 }}>Il log e i progressi salvati vengono cancellati: non sarà più possibile riprovare.</p>
           <label className="check">
             <input type="checkbox" checked={purge} onChange={(e) => setPurge(e.target.checked)} />
-            Elimina anche le proposte non ancora decise e gli elementi da smistare che ha prodotto, e i file caricati (a meno che qualcosa sia già in una
-            materia)
+            Elimina anche i file letti (a meno che qualcosa sia già in una materia)
           </label>
         </div>
       }
@@ -74,15 +72,13 @@ function jobSubtitle(j: Job): { text: string; tone: Tone } {
   if (j.kind === "publish") {
     parts.push("Compilato e pubblicato");
     if (typeof r.chapters === "number") parts.push(`${r.chapters} capitoli`);
-  } else if (j.kind === "ingest" || j.kind === "inbox.assign") {
+  } else if (j.kind === "ingest") {
     const summary = r.summary as { items?: number } | undefined;
     const groups = (Array.isArray(r.groups) ? r.groups : []) as { type?: string }[];
-    const written = groups.filter((g) => g.type && g.type !== "inbox").length;
-    const inbox = groups.filter((g) => g.type === "inbox").length;
+    const written = groups.filter((g) => g.type === "new_chapter" || g.type === "append").length;
     parts.push(jobKindLabel(j.kind));
     if (summary?.items) parts.push(`${summary.items} ${summary.items === 1 ? "elemento analizzato" : "elementi analizzati"}`);
     if (written) parts.push(`${written} ${written === 1 ? "capitolo scritto" : "capitoli scritti"}`);
-    if (inbox) parts.push(`${inbox} da smistare`);
   } else parts.push(jobKindLabel(j.kind));
   return { text: parts.join(" · "), tone: "" };
 }
@@ -174,7 +170,7 @@ export function JobsList() {
       <div className="page-head">
         <div>
           <h1>Attività</h1>
-          <div className="sub">Importazioni, pubblicazioni e smistamenti: cosa sta facendo Lecta e cosa è andato storto.</div>
+          <div className="sub">Importazioni e pubblicazioni: cosa sta facendo Lecta e cosa è andato storto.</div>
         </div>
       </div>
       <div className="pg-toolbar">

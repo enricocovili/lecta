@@ -82,4 +82,4 @@ def test_path_validation():
 
 async def test_dashboard(admin):
     d = (await admin.get("/api/dashboard")).json()
-    assert {"recent_documents", "recent_courses", "jobs", "inbox_count"} <= set(d)
+    assert {"recent_documents", "recent_courses", "jobs"} <= set(d) and "inbox_count" not in d

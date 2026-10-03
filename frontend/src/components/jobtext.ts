@@ -20,7 +20,6 @@ export interface JobStage {
 const KIND_LABEL: Record<string, string> = {
   ingest: "Importazione",
   publish: "Pubblicazione",
-  "inbox.assign": "Smistamento",
   "index.rebuild": "Indicizzazione",
   "embeddings.benchmark": "Benchmark embeddings",
   "demo.sleep": "Job di prova",
@@ -82,10 +81,9 @@ function publishStage(text: string): [string, number] {
  */
 export function jobStage(job: JobLike): JobStage {
   const text = job.progress_text ?? "";
-  const multi = job.kind === "ingest" || job.kind === "inbox.assign" || job.kind === "publish";
-  const steps = job.kind === "ingest" || job.kind === "inbox.assign" ? 4 : multi ? 3 : 1;
+  const multi = job.kind === "ingest" || job.kind === "publish";
+  const steps = job.kind === "ingest" ? 4 : multi ? 3 : 1;
   let [label, step] = job.kind === "publish" ? publishStage(text) : multi ? ingestStage(text) : ["", 0];
-  if (job.kind === "inbox.assign" && !label) [label, step] = ["Inserimento", 4];
   if (!step) {
     // Unknown text: estimate the step from the progress fraction.
     step = Math.min(steps, Math.max(1, Math.ceil((job.progress || 0) * steps)));
@@ -107,7 +105,7 @@ export function jobStage(job: JobLike): JobStage {
 
 /** Names of the visible steps of a job kind (what `jobStage().step` counts), e.g. for a stepper. */
 export function jobSteps(kind: string): string[] {
-  if (kind === "ingest" || kind === "inbox.assign") return ["Estrazione", "Lettura", "Stesura", "Inserimento"];
+  if (kind === "ingest") return ["Estrazione", "Lettura", "Stesura", "Inserimento"];
   if (kind === "publish") return ["Preparazione", "Compilazione PDF", "Divisione capitoli"];
   return [jobKindLabel(kind)];
 }

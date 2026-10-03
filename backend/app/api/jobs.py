@@ -280,7 +280,7 @@ async def retry(job_id: int, body: RetryIn, db: AsyncSession = Depends(get_db)) 
 
 @router.delete("/jobs/{job_id}")
 async def delete_job(job_id: int, purge: bool = False, db: AsyncSession = Depends(get_db)) -> dict:
-    """Delete a finished job. `purge` also removes its open inbox items and its upload."""
+    """Delete a finished job. `purge` also removes its upload."""
     j = await _job(db, job_id)
     if j.status not in jobs_svc.FINISHED:
         raise HTTPException(status_code=409, detail="Annulla l'attività prima di eliminarla")
@@ -297,7 +297,7 @@ async def delete_jobs(body: BulkDeleteIn, db: AsyncSession = Depends(get_db)) ->
     """Delete every job with the given finished status."""
     rows = list((await db.execute(select(Job).where(Job.status == body.status).order_by(Job.id))).scalars())
     ids = [j.id for j in rows]
-    totals = {"inbox_items": 0, "uploads": 0}
+    totals = {"uploads": 0}
     for j in rows:
         for k, v in (await jobs_svc.delete_job(db, j, purge=body.purge)).items():
             totals[k] += v

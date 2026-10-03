@@ -10,7 +10,7 @@ from app.models import IndexChunk, Job
 from app.pipeline import indexer, placement
 from app.services import retrieval, semantic
 from app.services import settings as settings_svc
-from app.worker.context import JobContext
+from app.worker.context import JobContext, JobFailed
 
 from .test_ingest_e2e import setup_fake
 
@@ -48,6 +48,7 @@ async def _library(admin):
     for ch, src in zip(c1["chapters"] + c2["chapters"], [LTI, FOURIER, THERMO], strict=True):
         await admin.put(f"/api/courses/{ch['course_id']}/files/content", json={"path": ch["path"], "content": src})
         ids[ch["title"]] = ch["id"]
+    ids["Teoria dei Segnali"], ids["Fisica Tecnica"] = c1["id"], c2["id"]
     return ids
 
 
@@ -95,13 +96,16 @@ async def test_placement_in_both_modes(admin, embeddings_mode):
         assert mode == ("hybrid" if embeddings_mode else "lexical")
         assert cands[0]["chapter_id"] == ids["Sistemi LTI"], cands[:3]
 
+    # The material always comes with its course (a lesson's): placement picks a chapter of it, or a new one.
     ctx = await _ctx()
-    out = await placement.decide(ctx, _bundle("Convoluzione", Q_CONV, "conv"), target_course_id=None, target_chapter_id=None)
+    out = await placement.decide(ctx, _bundle("Convoluzione", Q_CONV, "conv"), target_course_id=ids["Teoria dei Segnali"], target_chapter_id=None)
     assert out["type"] == "merge" and out["chapter_id"] == ids["Sistemi LTI"], out
-    out = await placement.decide(ctx, _bundle("Entropia", Q_ENTROPY, "entr"), target_course_id=None, target_chapter_id=None)
+    out = await placement.decide(ctx, _bundle("Entropia", Q_ENTROPY, "entr"), target_course_id=ids["Fisica Tecnica"], target_chapter_id=None)
     assert out["type"] == "merge" and out["chapter_id"] == ids["Termodinamica"], out
-    out = await placement.decide(ctx, _bundle("Rinascimento", Q_ART, "art"), target_course_id=None, target_chapter_id=None)
-    assert out["type"] == "inbox", out
+    out = await placement.decide(ctx, _bundle("Rinascimento", Q_ART, "art"), target_course_id=ids["Fisica Tecnica"], target_chapter_id=None)
+    assert out["type"] == "new_chapter" and out["course_id"] == ids["Fisica Tecnica"], out
+    with pytest.raises(JobFailed):
+        await placement.decide(ctx, _bundle("Senza materia", Q_ART, "none"), target_course_id=None, target_chapter_id=None)
 
 
 @pytest.mark.parametrize("embeddings_mode", [True], ids=["embeddings-on"], indirect=True)
@@ -136,37 +140,3 @@ async def test_slow_embeddings_fall_back_to_lexical(admin, embeddings_mode):
         assert mode == "lexical"
     r = await admin.get("/api/index/status")
     assert r.json()["mode"] == "lexical"
-
-
-async def test_inbox_actions(admin, worker):
-    """Unplaceable material lands in the inbox; assign / new course / discard."""
-    from .test_ingest_e2e import upload
-
-    await setup_fake(admin)
-    md = ("# Il Rinascimento\n\n" + Q_ART + "\n\nLa prospettiva di Brunelleschi.\n").encode()
-    job_id = await upload(admin, [("rinascimento.md", md)])
-    from .conftest import wait_job
-
-    j = await wait_job(admin, job_id, timeout=240)
-    assert j["status"] == "succeeded", j["error"]
-    items = (await admin.get("/api/inbox")).json()
-    item = next(i for i in items if i["job_id"] == job_id)
-    detail = (await admin.get(f"/api/inbox/{item['id']}")).json()
-    assert detail["body"] and detail["source_items"] and "guesses" in detail
-    assert (await admin.get("/api/dashboard")).json()["inbox_count"] >= 1
-
-    r = await admin.post(f"/api/inbox/{item['id']}/new-course", json={"name": "Storia dell'Arte"})
-    assert r.status_code == 200 and r.json()["language"] == "it"
-    j = await wait_job(admin, r.json()["job_id"], timeout=240)
-    assert j["status"] == "succeeded", j["error"]
-    chapters = (await admin.get(f"/api/courses/{r.json()['course_id']}")).json()["chapters"]
-    assert len(chapters) == 1 and j["result"]["groups"][0]["compile"] == "ok"
-    assert (await admin.get(f"/api/inbox/{item['id']}")).json()["status"] == "assigned"
-
-    # Another one: discard.
-    cooking = "# Carbonara\n\nGuanciale croccante, pecorino romano, tuorli d'uovo e pepe nero: la ricetta tradizionale romana.\n"
-    job2 = await upload(admin, [("ricetta.md", cooking.encode())])
-    await wait_job(admin, job2, timeout=240)
-    item2 = next(i for i in (await admin.get("/api/inbox")).json() if i["job_id"] == job2)
-    assert (await admin.post(f"/api/inbox/{item2['id']}/discard")).status_code == 200
-    assert all(i["id"] != item2["id"] for i in (await admin.get("/api/inbox")).json())

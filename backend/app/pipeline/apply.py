@@ -223,8 +223,8 @@ async def _allocate_image_paths(db: AsyncSession, course_id: int, base: str, ext
 async def write_group(ctx: JobContext, key: str, target: dict[str, Any], bundle: dict[str, Any]) -> dict[str, Any]:
     """Write one group's notes into a course, exactly once per (job, key).
 
-    target: {"type": "new_chapter", course_id, title} | {"type": "append", course_id, chapter_id}
-            | {"type": "new_course", name, language}; plus "lesson": {id, title} when the text comes from a lesson
+    target: {"type": "new_chapter", course_id, title} | {"type": "append", course_id, chapter_id};
+            plus "lesson": {id, title} when the text comes from a lesson
             (it is written between that lesson's markers, and an append replaces the lesson's earlier section)
     bundle: {title, body (images as images/KEY.ext), images: {KEY: {blob, ext}}, source_file_ids, label}
     """
@@ -232,11 +232,7 @@ async def write_group(ctx: JobContext, key: str, target: dict[str, Any], bundle:
     if done:
         return result
     async with SessionLocal() as db:
-        if target["type"] == "new_course":
-            course = await projects.create_course(db, name=target["name"][:200], language=target.get("language") or "it")
-            await db.flush()
-        else:
-            course = (await db.execute(select(Course).where(Course.id == int(target["course_id"])).with_for_update())).scalar_one()
+        course = (await db.execute(select(Course).where(Course.id == int(target["course_id"])).with_for_update())).scalar_one()
         chapter = None
         if target["type"] == "append":
             chapter = await db.get(Chapter, int(target["chapter_id"]))
@@ -271,7 +267,7 @@ async def write_group(ctx: JobContext, key: str, target: dict[str, Any], bundle:
             # add_chapter may pick a different slug when taken: keep the \label in sync.
             if chapter.slug != ch_slug:
                 await projects.write_file(db, course, chapter.path, assemble_chapter(title, chapter.slug, body).encode(), validated=True)
-            kind = "new_course" if target["type"] == "new_course" else "new_chapter"
+            kind = "new_chapter"
         await db.flush()
         for sid in bundle.get("source_file_ids") or []:
             exists = (await db.execute(select(SourceLink.id).where(

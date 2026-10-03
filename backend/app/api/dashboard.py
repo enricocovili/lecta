@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import models
 from ..db import get_db
 from ..models import Chapter, ChatMessage, ChatSession, Course, Job, ProjectFile
 from ..security.auth import require_admin
@@ -16,16 +15,6 @@ from ..services import overview
 from .jobs import job_out
 
 router = APIRouter(dependencies=[Depends(require_admin)])
-
-
-async def _count(db: AsyncSession, model_name: str, **filters) -> int:
-    model = getattr(models, model_name, None)
-    if model is None:
-        return 0
-    q = select(func.count()).select_from(model)
-    for k, v in filters.items():
-        q = q.where(getattr(model, k) == v)
-    return (await db.execute(q)).scalar_one()
 
 
 async def _latest_reviews(db: AsyncSession) -> dict[int, dict]:
@@ -124,7 +113,6 @@ async def dashboard(db: AsyncSession = Depends(get_db)) -> dict:
         "activity": await overview.activity(db),
         "ai_activity": await _ai_activity(db),
         "courses": await _courses(db),
-        "inbox_count": await _count(db, "InboxItem", status="open"),
     }
 
 
@@ -132,6 +120,5 @@ async def dashboard(db: AsyncSession = Depends(get_db)) -> dict:
 async def dashboard_counts(db: AsyncSession = Depends(get_db)) -> dict:
     """The small numbers next to the navigation entries (polled by every workspace page)."""
     return {
-        "inbox_count": await _count(db, "InboxItem", status="open"),
         "jobs_active": (await db.execute(select(func.count()).select_from(Job).where(Job.status.in_(jobs_svc.ACTIVE)))).scalar_one(),
     }

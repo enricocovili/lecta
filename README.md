@@ -179,13 +179,13 @@ of the text; a lesson with slides and no notes gets a summary of the slides.
    notes, each with the relevant material), and a reply cut off splits its part.
 5. **Placement** (see below) → **compile check** in a scratch project with at most
    one automatic AI fix (Settings → LaTeX) → **written into the course**: a new
-   chapter, the lesson's own chapter, or appended to the chosen/matching chapter. Only material Lecta
-   can't place confidently goes to **Da smistare**.
+   chapter, the lesson's own chapter, or appended to the chosen/matching chapter of
+   the lesson's course. Nothing is ever left waiting for you to file it.
 
 Every step is memoised: a retried job never repeats finished work or re-sends
 anything, and writing into a course happens exactly once.
 
-### Where material goes (categorisation)
+### Which chapter (placement)
 
 Candidates come from **hybrid retrieval** over chapter content:
 
@@ -204,11 +204,10 @@ Embeddings). If embeddings are off, unavailable or slower than the configured
 threshold, retrieval **falls back to lexical-only** automatically.
 
 The classification model gets the notes plus the top-k candidates' titles and
-section outlines, and returns the best placement with confidence and rationale:
-append to an existing chapter or a new chapter in a course. Below the threshold
-the notes go to **Da smistare**, where one
-click assigns them to a course/chapter or creates a new course (language detected
-from the material); they are written right away.
+section outlines (only chapters of the lesson's course), and returns the best
+placement with confidence and rationale: append to one of those chapters or start
+a new one. When nothing fits, or the lesson asked for it («Un capitolo nuovo»), the
+text becomes a new chapter of the course.
 
 ## The AI assistant
 

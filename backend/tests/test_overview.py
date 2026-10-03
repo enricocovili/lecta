@@ -43,7 +43,7 @@ async def test_course_states_and_activity(admin, db):
     assert "sources" in tree[ok["id"]]
 
     counts = (await admin.get("/api/dashboard/counts")).json()
-    assert set(counts) == {"inbox_count", "jobs_active"}
+    assert set(counts) == {"jobs_active"}
     assert counts["jobs_active"] >= 2
 
 

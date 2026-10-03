@@ -35,7 +35,7 @@ export interface FigureView {
 
 /** Where an import wrote one group of material (job.result.groups). */
 export interface ImportResult {
-  type: "new_chapter" | "append" | "new_course" | "inbox" | null;
+  type: "new_chapter" | "append" | null;
   title: string | null;
   group?: string | null;
   course_id: number | null;
@@ -43,7 +43,6 @@ export interface ImportResult {
   chapter_id: number | null;
   chapter_title: string | null;
   path: string | null;
-  inbox_id: number | null;
   compile: string | null;
   /** The class notes the text follows (empty: a summary of the material alone). */
   notes?: string[];
@@ -55,7 +54,6 @@ interface Manifest {
   items: ItemView[];
   figures: FigureView[];
   results: ImportResult[];
-  inbox: { id: number; title: string; status: string }[];
 }
 
 /** Italian names of the item kinds the extraction assigns. */
@@ -102,13 +100,10 @@ export function figureStatus(status: string): { tone: Tone | "accent"; label: st
 export function resultText(r: ImportResult): string {
   if (r.type === "new_chapter") return `Nuovo capitolo «${r.chapter_title ?? r.title}» in «${r.course_name}»`;
   if (r.type === "append") return `Aggiunto a «${r.chapter_title}»${r.course_name ? ` (${r.course_name})` : ""}`;
-  if (r.type === "new_course") return `Nuova materia «${r.course_name}»`;
-  if (r.type === "inbox") return `«${r.title}» in Da smistare: Lecta non era abbastanza sicuro della materia`;
   return r.title ?? "";
 }
 
 export function resultHref(r: ImportResult): string | null {
-  if (r.type === "inbox") return r.inbox_id ? `/admin/inbox?id=${r.inbox_id}` : "/admin/inbox";
   if (r.course_id) return `/admin/courses/${r.course_id}${r.chapter_id ? `?chapter=${r.chapter_id}` : ""}`;
   return null;
 }
@@ -193,8 +188,8 @@ export default function IngestManifest({ jobId, active }: { jobId: number; activ
                 const href = resultHref(r);
                 return (
                   <div key={n} className="pg-row">
-                    <span className={`status-ico pg-kind-ico ${r.type === "inbox" ? "warn" : "accent-ico"}`}>
-                      <Icon name={r.type === "inbox" ? "inbox" : "file-text"} />
+                    <span className="status-ico pg-kind-ico accent-ico">
+                      <Icon name="file-text" />
                     </span>
                     <div className="grow">
                       <div className="pg-row-title">{resultText(r)}</div>
@@ -206,7 +201,7 @@ export default function IngestManifest({ jobId, active }: { jobId: number; activ
                         ) : (
                           "senza appunti: riassunto del materiale"
                         )}
-                        {r.type !== "inbox" && r.compile && (
+                        {r.compile && (
                           <>
                             {" · "}
                             {r.compile === "ok" ? <span className="text-ok">compila</span> : <span className="text-danger">ha errori di compilazione: chiedi all’AI di correggerli</span>}
@@ -216,7 +211,7 @@ export default function IngestManifest({ jobId, active }: { jobId: number; activ
                     </div>
                     {href && (
                       <a className="btn sm" href={href}>
-                        {r.type === "inbox" ? "Smista" : "Apri"}
+                        Apri
                       </a>
                     )}
                   </div>

@@ -1,4 +1,4 @@
-// Small helpers shared by the workspace pages (courses, jobs, upload, inbox).
+// Small helpers shared by the workspace pages (courses, jobs, lessons).
 import { useEffect, useRef, type ReactNode } from "react";
 import { get } from "../lib/api";
 import { Icon } from "./icons";

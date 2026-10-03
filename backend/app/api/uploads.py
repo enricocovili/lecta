@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..models import Chapter, Course, IngestFigure, IngestItem, InboxItem, Job, SourceFile, SourceLink, Upload
+from ..models import Chapter, Course, IngestFigure, IngestItem, Job, SourceFile, SourceLink, Upload
 from ..security.auth import require_admin
 from ..services import blobs
 
@@ -126,7 +126,6 @@ def figure_out(f: IngestFigure) -> dict[str, Any]:
 @router.get("/jobs/{job_id}/ingest")
 async def ingest_manifest(job_id: int, db: AsyncSession = Depends(get_db)) -> dict:
     up = (await db.execute(select(Upload).where(Upload.job_id == job_id))).scalar_one_or_none()
-    inbox_for = (await db.execute(select(InboxItem).where(InboxItem.assigned_job_id == job_id))).scalar_one_or_none()
     files = []
     if up:
         files = [source_out(s) for s in (await db.execute(select(SourceFile).where(SourceFile.upload_id == up.id).order_by(SourceFile.id))).scalars()]
@@ -134,14 +133,9 @@ async def ingest_manifest(job_id: int, db: AsyncSession = Depends(get_db)) -> di
     figures = [figure_out(f) for f in (await db.execute(select(IngestFigure).where(IngestFigure.job_id == job_id).order_by(IngestFigure.id))).scalars()]
     job = await db.get(Job, job_id)
     results = [g for g in ((job.result or {}).get("groups") or [])] if job is not None else []
-    inbox = [
-        {"id": i.id, "title": i.title, "status": i.status}
-        for i in (await db.execute(select(InboxItem).where(InboxItem.job_id == job_id))).scalars()
-    ]
     return {
         "upload": {"id": up.id, "target_course_id": up.target_course_id, "target_chapter_id": up.target_chapter_id, "note": up.note} if up else None,
-        "inbox_source": {"id": inbox_for.id, "title": inbox_for.title} if inbox_for else None,
-        "files": files, "items": items, "figures": figures, "results": results, "inbox": inbox,
+        "files": files, "items": items, "figures": figures, "results": results,
     }
 
 

@@ -488,25 +488,6 @@ class IngestFigure(Base):
     path: Mapped[str | None] = mapped_column(Text)  # images/… in the course, once written
 
 
-class InboxItem(Base):
-    """Material that couldn't be placed confidently (the Uncategorized inbox)."""
-
-    __tablename__ = "inbox_items"
-    __table_args__ = (Index("ix_inbox_status", "status", "id"),)
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    status: Mapped[str] = mapped_column(String(20), default="open")  # open | assigned | discarded
-    title: Mapped[str] = mapped_column(Text)
-    language: Mapped[str | None] = mapped_column(String(8))
-    job_id: Mapped[int | None] = mapped_column(BigInteger)
-    bundle: Mapped[dict[str, Any]] = mapped_column(JSONB)  # generated notes + files + sources
-    guesses: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default="[]")
-    source_file_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default="[]")
-    assigned_job_id: Mapped[int | None] = mapped_column(BigInteger)
-    created_at: Mapped[datetime] = _now()
-    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
 # --------------------------------------------------------------------------- retrieval index
 
 from pgvector.sqlalchemy import Vector  # noqa: E402

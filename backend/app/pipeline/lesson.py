@@ -127,14 +127,14 @@ async def finish(lesson_id: int, job_id: int, results: list[dict[str, Any]]) -> 
             "job_id": job_id, "at": now.isoformat(),
             "chapters": [
                 {"type": r.get("type"), "course_id": r.get("course_id"), "chapter_id": r.get("chapter_id"), "title": r.get("chapter_title") or r.get("group")}
-                for r in results if r.get("type") in ("new_chapter", "append", "new_course", "inbox")
+                for r in results if r.get("type") in ("new_chapter", "append")
             ],
         }
         # The lesson now lives in the chapter it was written into: generating it again updates the text there.
-        written = [r for r in results if r.get("type") in ("new_chapter", "append", "new_course") and r.get("chapter_id")]
+        written = [r for r in results if r.get("type") in ("new_chapter", "append") and r.get("chapter_id")]
         if written and lesson.course_id == written[0].get("course_id"):
             lesson.chapter_id = int(written[0]["chapter_id"])
-        # Merged into the notes: the lesson is done (material left in the inbox is not merged yet).
+        # Merged into the notes: the lesson is done.
         if written:
             lesson.status = "completed"
         await db.commit()

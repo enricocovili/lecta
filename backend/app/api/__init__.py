@@ -6,10 +6,10 @@ from fastapi import APIRouter
 
 
 def extra_routers() -> list[APIRouter]:
-    from . import chat, concepts, costs, editor, inbox, lessons, passkeys, preview, providers, publish, search, settings, shared, uploads
+    from . import chat, concepts, costs, editor, lessons, passkeys, preview, providers, publish, search, settings, shared, uploads
 
     return [
         editor.router, publish.router, settings.router, providers.router, costs.router,
-        uploads.router, inbox.router, chat.router, search.router,
+        uploads.router, chat.router, search.router,
         concepts.router, preview.router, lessons.router, shared.router, passkeys.router,
     ]

@@ -9,7 +9,7 @@
 4. Writing             per group, the study text in prose: the class notes are its backbone, the
                        material fills it in (without notes the material is summarised)
 5. Per group           placement → compile check (≤ 1 AI fix) → written into the course
-                       (a new chapter, appended to a chapter, or "Da smistare" when unsure)
+                       (a new chapter of the lesson's course, or appended to one of its chapters)
 
 Every step is memoised (job_steps) and every AI call by its request key, so a retried
 or restarted job never repeats finished work; writing into a course happens exactly once.
@@ -27,7 +27,7 @@ from sqlalchemy import delete, select
 
 from ..config import config
 from ..db import SessionLocal
-from ..models import Chapter, Course, IngestFigure, IngestItem, InboxItem, JobStep, SourceFile, Upload
+from ..models import Chapter, Course, IngestFigure, IngestItem, JobStep, SourceFile, Upload
 from ..services import blobs, latexmacros, projects, templates
 from ..services import settings as settings_svc
 from ..services.texttools import slugify, strip_nul
@@ -477,16 +477,13 @@ async def ingest_job(ctx: JobContext) -> dict[str, Any]:
     cleanup_job_dirs(ctx.job_id)
     if ctx.payload.get("lesson_id"):
         await lesson_pipeline.finish(int(ctx.payload["lesson_id"]), ctx.job_id, results)
-    n_written = sum(1 for r in results if r.get("type") in ("new_chapter", "append", "new_course"))
-    n_inbox = sum(1 for r in results if r.get("type") == "inbox")
-    await ctx.log(f"done: {len(groups)} group(s), {n_written} written into courses, {n_inbox} to “Da smistare”", stage="placement")
+    n_written = sum(1 for r in results if r.get("type") in ("new_chapter", "append"))
+    await ctx.log(f"done: {len(groups)} group(s), {n_written} written into the course", stage="placement")
     return {"groups": results, "summary": summary}
 
 
 async def place_bundle(ctx: JobContext, gkey: str, bundle: dict[str, Any], outcome: dict[str, Any]) -> dict[str, Any]:
-    """Check and write one bundle where placement decided (or into the inbox). Shared with inbox.assign."""
-    if outcome["type"] == "inbox":
-        return await _to_inbox(ctx, f"x2:apply:{gkey}", bundle, outcome)
+    """Check and write one bundle where placement decided."""
     async with SessionLocal() as db:
         c = await db.get(Course, outcome["course_id"]) if outcome.get("course_id") else None
         preamble = await projects.preamble_for(db, c) if c else ((await settings_svc.get_section(db, "template")).preamble or templates.DEFAULT_PREAMBLE)
@@ -508,7 +505,7 @@ async def place_bundle(ctx: JobContext, gkey: str, bundle: dict[str, Any], outco
         await ctx.log(f"“{bundle['title']}” still has compile errors: it is written anyway, fix them in the editor", "warn",
                       stage="compile", item=bundle["title"], kind="compile_error")
     await ctx.progress(None, f"writing “{bundle['title']}”")
-    target = {k: outcome[k] for k in ("type", "course_id", "chapter_id", "title", "name", "language") if k in outcome}
+    target = {k: outcome[k] for k in ("type", "course_id", "chapter_id", "title") if k in outcome}
     if target["type"] == "merge":
         target["type"] = "append"
     if ctx.payload.get("lesson_id"):
@@ -516,24 +513,6 @@ async def place_bundle(ctx: JobContext, gkey: str, bundle: dict[str, Any], outco
     result = await apply.write_group(ctx, f"x2:apply:{gkey}", target, {**bundle, "body": check["body"]})
     await _mark_figures(ctx.job_id, bundle, result)
     return {**result, "compile": check["status"], "confidence": outcome.get("confidence"), "rationale": outcome.get("rationale")}
-
-
-async def _to_inbox(ctx: JobContext, key: str, bundle: dict[str, Any], outcome: dict[str, Any]) -> dict[str, Any]:
-    done, result = await ctx.get_step(key)
-    if done:
-        return result
-    from sqlalchemy.dialects.postgresql import insert
-
-    async with SessionLocal() as db:
-        item = InboxItem(title=bundle["title"], language=bundle.get("language"), job_id=ctx.job_id, bundle=bundle,
-                         guesses=outcome.get("guesses") or [], source_file_ids=bundle.get("source_file_ids") or [])
-        db.add(item)
-        await db.flush()
-        result = {"type": "inbox", "inbox_id": item.id, "title": bundle["title"], "rationale": outcome.get("rationale")}
-        await db.execute(insert(JobStep).values(job_id=ctx.job_id, key=key, result=result).on_conflict_do_nothing())
-        await db.commit()
-    await ctx.log(f"“{bundle['title']}” → Da smistare ({outcome.get('rationale')})", stage="placement")
-    return result
 
 
 async def _mark_figures(job_id: int, bundle: dict[str, Any], result: dict[str, Any]) -> None:

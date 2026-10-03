@@ -6,7 +6,7 @@ export default function JobPage({ jobId }: { jobId: number }) {
     <JobDetail jobId={jobId}>
       {(job) => {
         const active = ["queued", "running"].includes(job.status);
-        return <>{(job.kind === "ingest" || job.kind === "inbox.assign") && <IngestManifest jobId={jobId} active={active} />}</>;
+        return <>{job.kind === "ingest" && <IngestManifest jobId={jobId} active={active} />}</>;
       }}
     </JobDetail>
   );

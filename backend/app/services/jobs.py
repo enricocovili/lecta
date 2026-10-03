@@ -13,7 +13,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import notify
-from ..models import IngestFigure, IngestItem, InboxItem, Job, JobLog, JobStep, SourceFile, SourceLink, Upload
+from ..models import IngestFigure, IngestItem, Job, JobLog, JobStep, SourceFile, SourceLink, Upload
 
 CHANNEL = "lecta_jobs"
 ACTIVE = ("queued", "running")
@@ -83,27 +83,18 @@ async def active_count(db: AsyncSession) -> int:
 async def delete_job(db: AsyncSession, job: Job, *, purge: bool = False) -> dict[str, int]:
     """Delete a finished job with its logs, steps and scratch data.
 
-    Inbox items the job produced are kept unless `purge` is set; then open ones
-    are removed too, and so is the job's upload (with its source files) when
-    nothing written into a course came from it. Ingest items/figures are only
-    dropped once nothing refers to them.
+    With `purge` the job's upload (with its source files) goes too, when nothing
+    written into a course came from it.
     """
     from ..pipeline.common import cleanup_job_dirs
 
     job_id = job.id
-    out = {"inbox_items": 0, "uploads": 0}
-    if purge:
-        out["inbox_items"] = (
-            await db.execute(delete(InboxItem).where(InboxItem.job_id == job_id, InboxItem.status.in_(("open", "discarded"))))
-        ).rowcount
-    kept = (await db.execute(select(InboxItem.id).where(InboxItem.job_id == job_id).limit(1))).first()
-    if not kept:
-        await db.execute(delete(IngestFigure).where(IngestFigure.job_id == job_id))
-        await db.execute(delete(IngestItem).where(IngestItem.job_id == job_id))
-    await db.execute(update(InboxItem).where(InboxItem.assigned_job_id == job_id).values(assigned_job_id=None))
+    out = {"uploads": 0}
+    await db.execute(delete(IngestFigure).where(IngestFigure.job_id == job_id))
+    await db.execute(delete(IngestItem).where(IngestItem.job_id == job_id))
     upload_ids = list((await db.execute(select(Upload.id).where(Upload.job_id == job_id))).scalars())
     removed: list[int] = []
-    if purge and not kept:
+    if purge:
         for uid in upload_ids:
             linked = (
                 await db.execute(

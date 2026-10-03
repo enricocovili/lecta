@@ -169,5 +169,5 @@ async def activity(db: AsyncSession, limit: int = 30) -> list[dict[str, Any]]:
 
 def _result_out(g: dict[str, Any]) -> dict[str, Any]:
     """Where an import put one group of material (for the Home and the job page)."""
-    keys = ("type", "title", "group", "course_id", "course_name", "chapter_id", "chapter_title", "path", "inbox_id", "compile")
+    keys = ("type", "title", "group", "course_id", "course_name", "chapter_id", "chapter_title", "path", "compile")
     return {k: g.get(k) for k in keys}
