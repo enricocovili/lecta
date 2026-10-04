@@ -5,8 +5,6 @@
   appunti.heic      the same photo as HEIC (if the encoder is available)
   note.md           Markdown with inline/display math, a Mermaid block, an ASCII diagram and a relative image
   img/schema.png    the image referenced by note.md
-  mixed.zip         all of the above in nested folders + junk (__MACOSX, .DS_Store) + an unsupported file
-  zipslip.zip, zipbomb.zip   malicious archives
 """
 
 from __future__ import annotations
@@ -14,7 +12,6 @@ from __future__ import annotations
 import io
 import math
 import random
-import zipfile
 from pathlib import Path
 
 import fitz
@@ -158,31 +155,6 @@ def make_all(dest: Path) -> dict[str, Path]:
     write("note.md", MD.encode())
     write("img/schema.png", schema_png())
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("Lezione 3 - Sistemi LTI/slides.pdf", out["slides.pdf"].read_bytes())
-        z.writestr("Lezione 3 - Sistemi LTI/appunti.jpg", out["appunti.jpg"].read_bytes())
-        z.writestr("Lezione 3 - Sistemi LTI/note.md", MD.encode())
-        z.writestr("Lezione 3 - Sistemi LTI/img/schema.png", out["img/schema.png"].read_bytes())
-        z.writestr("__MACOSX/Lezione 3 - Sistemi LTI/._slides.pdf", b"\x00\x05\x16\x07junk")
-        z.writestr("Lezione 3 - Sistemi LTI/.DS_Store", b"\x00\x00\x00\x01Bud1")
-        z.writestr("Lezione 3 - Sistemi LTI/setup.exe", b"MZ\x90\x00" + b"\x00" * 100)
-    write("mixed.zip", buf.getvalue())
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as z:
-        z.writestr("../../evil.txt", b"escape")
-        z.writestr("/abs/evil2.txt", b"escape")
-        z.writestr("ok/fine.md", b"# ok\n")
-    write("zipslip.zip", buf.getvalue())
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
-        with z.open("bomb.txt", "w", force_zip64=True) as f:
-            chunk = b"\x00" * (1024 * 1024)
-            for _ in range(64):
-                f.write(chunk)
-    write("zipbomb.zip", buf.getvalue())
     return out
 
 

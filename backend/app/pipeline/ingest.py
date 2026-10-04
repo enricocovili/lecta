@@ -25,7 +25,6 @@ from typing import Any
 
 from sqlalchemy import delete, select
 
-from ..config import config
 from ..db import SessionLocal
 from ..models import Chapter, Course, IngestFigure, IngestItem, JobStep, SourceFile, Upload
 from ..services import blobs, latexmacros, projects, templates
@@ -36,7 +35,6 @@ from ..worker.registry import handler
 from . import analyze, apply, compose, pdfextract, placement, read
 from . import lesson as lesson_pipeline
 from .common import cleanup_job_dirs
-from .unpack import UnpackError, unpack_zip
 
 GENERIC_TITLES = re.compile(r"^(presentazione|presentation|untitled|senza titolo|microsoft (word|powerpoint)|slide ?\d*|diapositiva)", re.I)
 
@@ -54,43 +52,8 @@ async def extract(ctx: JobContext, upload_id: int) -> dict[str, Any]:
     async with SessionLocal() as db:
         await db.execute(delete(IngestFigure).where(IngestFigure.job_id == ctx.job_id))
         await db.execute(delete(IngestItem).where(IngestItem.job_id == ctx.job_id))
-        await db.execute(delete(SourceFile).where(SourceFile.upload_id == upload_id, SourceFile.parent_id.is_not(None)))
         await db.commit()
-        limits = await settings_svc.get_section(db, "uploads")
-        top = list((await db.execute(select(SourceFile).where(SourceFile.upload_id == upload_id).order_by(SourceFile.id))).scalars())
-
-    files: list[SourceFile] = []
-    for sf in top:
-        if sf.kind != "zip":
-            files.append(sf)
-            continue
-        await ctx.progress(0.02, f"unpacking {sf.name}")
-        dest = config.data_dir / "uploads" / str(upload_id) / f"zip-{sf.id}"
-        try:
-            members = await run_cpu(
-                unpack_zip, blobs.path_for(sf.blob), dest,
-                max_members=limits.max_zip_members,
-                max_total_bytes=limits.max_zip_uncompressed_mb * 1024 * 1024,
-                max_ratio=limits.max_compression_ratio,
-            )
-        except UnpackError as e:
-            await _mark(sf.id, "error", str(e))
-            await ctx.log(f"{sf.name}: {e}", "error", stage="analyze", item=sf.name, kind="unpack_error")
-            continue
-        async with SessionLocal() as db:
-            for m in members:
-                h = await run_cpu(blobs.put_file, m.path, move=True) if m.path else None
-                child = SourceFile(
-                    upload_id=upload_id, parent_id=sf.id, name=m.name[:500], folder=m.folder or None, kind=m.kind,
-                    size=m.size, blob=h, status=m.status, reason=m.reason,
-                    mime={"pdf": "application/pdf", "markdown": "text/markdown", "text": "text/plain"}.get(m.kind),
-                )
-                db.add(child)
-                await db.flush()
-                files.append(child)
-            await db.commit()
-        skipped = [m for m in members if m.status != "ok"]
-        await ctx.log(f"{sf.name}: {len(members)} entries, {len(skipped)} skipped/unsupported", stage="analyze", item=sf.name)
+        files = list((await db.execute(select(SourceFile).where(SourceFile.upload_id == upload_id).order_by(SourceFile.id))).scalars())
 
     usable = [f for f in files if f.status == "ok" and f.kind in ("pdf", "image", "markdown", "text")]
     usable.sort(key=lambda f: ({"pdf": 0, "markdown": 1, "text": 1, "image": 2}[f.kind], _natural(f.folder or ""), _natural(f.name)))

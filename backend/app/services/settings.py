@@ -37,9 +37,6 @@ class TemplateSettings(BaseModel):
 
 class UploadSettings(BaseModel):
     max_file_mb: int = Field(1024, ge=1, le=20480)
-    max_zip_uncompressed_mb: int = Field(4096, ge=1, le=102400)
-    max_zip_members: int = Field(5000, ge=1, le=100000)
-    max_compression_ratio: int = Field(200, ge=2, le=10000)
 
 
 class EmbeddingSettings(BaseModel):

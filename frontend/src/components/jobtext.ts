@@ -34,7 +34,6 @@ type Rule = [RegExp, (m: RegExpMatchArray) => string];
 // Every text passed to ctx.progress(...) in backend/app (pipeline/*, worker/*).
 const RULES: Rule[] = [
   [/^extracting$/i, () => "Estrazione"],
-  [/^unpacking (.+)$/i, (m) => `Estrazione di ${m[1]}`],
   [/^extracting (.+)$/i, (m) => `Estrazione di ${m[1]}`],
   [/^reading \((\d+)\/(\d+)\)$/i, (m) => `Lettura (${m[1]}/${m[2]})`],
   [/^composing \((\d+)\/(\d+)\)$/i, (m) => `Stesura del testo (${m[1]}/${m[2]})`],
@@ -61,7 +60,7 @@ export function translateProgress(text: string): string {
 /** Stage name + visible step for the import pipeline (4 visible steps). */
 function ingestStage(text: string): [string, number] {
   const t = text.toLowerCase();
-  if (t.startsWith("extracting") || t.startsWith("unpacking")) return ["Estrazione", 1];
+  if (t.startsWith("extracting")) return ["Estrazione", 1];
   if (t.startsWith("reading")) return ["Lettura", 2];
   if (t.startsWith("composing")) return ["Stesura", 3];
   if (t.startsWith("placing") || t.startsWith("checking") || t.startsWith("writing")) return ["Inserimento", 4];

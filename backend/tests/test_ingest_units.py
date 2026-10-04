@@ -1,4 +1,4 @@
-"""Extraction building blocks: unpacking safety, photos, Markdown (PDFs: test_pdfextract.py)."""
+"""Extraction building blocks: photos, Markdown (PDFs: test_pdfextract.py)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import pytest
 from PIL import Image
 
 from app.pipeline import analyze
-from app.pipeline.unpack import UnpackError, unpack_zip
 from app.services import blobs
 
 from .fixtures import make_all
@@ -20,35 +19,6 @@ from .fixtures import make_all
 def fx():
     d = Path(tempfile.mkdtemp(prefix="lecta-fx-"))
     return make_all(d)
-
-
-def test_zip_members_are_sniffed_and_junk_skipped(fx, tmp_path):
-    members = unpack_zip(fx["mixed.zip"], tmp_path / "out", max_members=100, max_total_bytes=10**9, max_ratio=200)
-    by_name = {m.name: m for m in members}
-    assert by_name["slides.pdf"].kind == "pdf" and by_name["slides.pdf"].folder == "Lezione 3 - Sistemi LTI"
-    assert by_name["appunti.jpg"].kind == "image"
-    assert by_name["note.md"].kind == "markdown"
-    assert by_name["schema.png"].folder == "Lezione 3 - Sistemi LTI/img"
-    assert by_name["._slides.pdf"].kind == "junk" and by_name[".DS_Store"].kind == "junk"
-    assert by_name["setup.exe"].status == "unsupported"
-    # Extracted files never escape the destination.
-    for m in members:
-        if m.path:
-            assert str(m.path.resolve()).startswith(str((tmp_path / "out").resolve()))
-
-
-def test_zip_slip_is_blocked(fx, tmp_path):
-    members = unpack_zip(fx["zipslip.zip"], tmp_path / "o", max_members=100, max_total_bytes=10**9, max_ratio=200)
-    assert all(m.path is None for m in members if "evil" in m.name)
-    assert not (tmp_path / "evil.txt").exists() and not Path("/abs/evil2.txt").exists()
-    assert any(m.name == "fine.md" and m.path for m in members)
-
-
-def test_zip_bomb_is_refused(fx, tmp_path):
-    with pytest.raises(UnpackError):
-        unpack_zip(fx["zipbomb.zip"], tmp_path / "b", max_members=100, max_total_bytes=32 * 1024 * 1024, max_ratio=200)
-    with pytest.raises(UnpackError):
-        unpack_zip(fx["zipbomb.zip"], tmp_path / "c", max_members=100, max_total_bytes=10**10, max_ratio=100)
 
 
 def test_photo_preprocessing(fx):

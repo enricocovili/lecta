@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 
 def sniff_bytes(head: bytes) -> str | None:
     if head.startswith(b"%PDF-"):
@@ -30,26 +28,3 @@ def sniff_bytes(head: bytes) -> str | None:
         return "archive"
     return None
 
-
-def looks_like_text(data: bytes) -> bool:
-    if not data:
-        return True
-    if b"\x00" in data[:8192]:
-        return False
-    try:
-        data[:65536].decode("utf-8")
-        return True
-    except UnicodeDecodeError as e:
-        # A multi-byte char cut at the sample boundary is fine.
-        return e.start > len(data[:65536]) - 4
-
-
-def sniff_file(path: Path) -> str:
-    with open(path, "rb") as f:
-        head = f.read(65536)
-    kind = sniff_bytes(head)
-    if kind:
-        return kind
-    if looks_like_text(head):
-        return "text"
-    return "unknown"

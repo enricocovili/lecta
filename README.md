@@ -173,7 +173,7 @@ of the text; a lesson with slides and no notes gets a summary of the slides.
    overlay steps and blank pages are skipped. A page is read *with its picture*
    only when text isn't enough: scans, garbled text layers, handwritten ink,
    display math, formulas stored as images. Notes are kept as written, a section per
-   slide. (The extraction still knows zips, photos and folders from the old upload
+   slide. (The extraction still knows photos and folders from the old upload
    page; nothing feeds it those any more.)
 2. **Grouping**: a lesson is one group: its notes with its slides.
 3. **Reading**: the material in units of ~10 pages of one file (Settings → AI e

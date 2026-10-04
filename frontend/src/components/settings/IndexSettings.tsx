@@ -19,9 +19,6 @@ interface Cat {
 
 interface Uploads {
   max_file_mb: number;
-  max_zip_uncompressed_mb: number;
-  max_zip_members: number;
-  max_compression_ratio: number;
   [k: string]: unknown;
 }
 
