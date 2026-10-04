@@ -17,7 +17,7 @@ const SECTIONS = [
   { key: "providers", label: "Provider", icon: "cpu", sub: "I servizi AI che leggono il materiale caricato e rispondono in chat." },
   { key: "models", label: "Modelli", icon: "layers", sub: "Quale provider e modello usare per ogni ruolo." },
   { key: "prompts", label: "Prompt", icon: "message", sub: "Le istruzioni di sistema, modificabili e con cronologia delle versioni." },
-  { key: "ai", label: "AI e costi", icon: "activity", sub: "Limiti delle richieste, costi e registro delle chiamate." },
+  { key: "ai", label: "AI e costi", icon: "coins", sub: "Limiti delle richieste, costi e registro delle chiamate." },
   { key: "latex", label: "LaTeX", icon: "code", sub: "Compilazione e preambolo condiviso." },
   { key: "embeddings", label: "Indice ed embeddings", icon: "database", sub: "Ricerca semantica locale e scelta del capitolo per il testo di una lezione." },
   { key: "uploads", label: "File", icon: "upload", sub: "Limiti delle slide caricate nelle lezioni." },

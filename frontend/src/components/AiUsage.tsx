@@ -264,7 +264,7 @@ export default function AiUsage() {
               <section>
                 <div className="section-label">Per job</div>
                 {costs.data.jobs.length === 0 ? (
-                  <Empty icon="activity">Nessun job con costi.</Empty>
+                  <Empty icon="coins">Nessun job con costi.</Empty>
                 ) : (
                   <div className="card flush rows">
                     {costs.data.jobs.map((j) => (
