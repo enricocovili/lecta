@@ -19,7 +19,8 @@ side (automatic single column under ~860 px), notes below the slide, or slides o
 "has notes" / "has ink", previous/next page.
 
 Everything is **saved once a minute and on Ctrl+S** (which replaces the browser's "save page", also while typing in a note; the
-status next to the title reads "Da salvare" until then and can be clicked to save), and at once when the tab is hidden or a
+state next to the title is one icon (da salvare, in salvataggio, salvata, or a warning while it keeps retrying), with its
+words in the tooltip, and can be clicked to save; «Scarica» is a download icon too), and at once when the tab is hidden or a
 page is added. Edits are mirrored in `localStorage` as they are made. Work that could not be sent stays in memory and in `localStorage`, is retried with a growing delay
 and comes back on the next visit if the server has not changed that page meanwhile.
 

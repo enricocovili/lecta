@@ -44,17 +44,9 @@ body.ws-page .les {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The save state is one icon (da salvare, in salvataggio, salvata, non salvata); its words are in the tooltip. */
 .les-save {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.82rem;
   color: var(--fg-muted);
-  padding: 0 0.4rem;
-  white-space: nowrap;
-  background: none;
-  border: 0;
-  cursor: pointer;
 }
 .les-save.pending {
   color: var(--fg);
@@ -64,7 +56,6 @@ body.ws-page .les {
 }
 .les-save.offline {
   color: var(--danger-fg);
-  font-weight: 600;
 }
 .les-save .icon {
   width: 1rem;

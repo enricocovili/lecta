@@ -319,9 +319,9 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
         {owner && <LessonStatusPill id={lesson.id} status={status} editable onChange={setStatus} />}
         <div className="wsb-actions">
           {!readOnly && (
-          <button type="button" className={`les-save ${store.saveState}`} data-testid="save-state" role="status" aria-live="polite" onClick={() => void save()} title="Salva ora (Ctrl+S). Il salvataggio automatico avviene ogni minuto.">
+          <button type="button" className={`btn ghost icon les-save ${store.saveState}`} data-testid="save-state" role="status" aria-live="polite" onClick={() => void save()} title={`${SAVE_LABEL[store.saveState]}. Salva ora (Ctrl+S); il salvataggio automatico avviene ogni minuto.`}>
             <Icon name={store.saveState === "saved" ? "check" : store.saveState === "saving" ? "loader" : store.saveState === "pending" ? "save" : "alert-triangle"} className={store.saveState === "saving" ? "spin" : ""} />
-            <span className="wsb-lbl">{SAVE_LABEL[store.saveState]}</span>
+            <span className="sr-only">{SAVE_LABEL[store.saveState]}</span>
           </button>
           )}
           {owner && lesson.generated_at && lesson.last_result?.chapters?.length ? (
@@ -332,14 +332,8 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
           ) : null}
           <Pop
             label="Scarica"
-            className="wsb-dl les-wide"
-            summary={
-              <>
-                <Icon name="download" />
-                <span className="wsb-lbl">Scarica</span>
-                <Icon name="chevron-down" className="wsb-caret" />
-              </>
-            }
+            className="ghost icon les-wide"
+            summary={<Icon name="download" />}
           >
             <a href={`${source.base}/annotated.pdf`} download data-testid="download-annotated">
               <Icon name="file-text" />
