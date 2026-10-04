@@ -378,6 +378,16 @@ test.describe.serial("Lezioni", () => {
       await expect(page.getByTestId("generate-open")).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(overflow, "horizontal overflow in the lesson editor").toBeLessThanOrEqual(2);
+      // The top bar fits too, with a readable title; what has no room in it is in the «…» menu.
+      const bar = page.getByTestId("lesson-editor").locator("header.wsb");
+      expect(await bar.evaluate((el) => el.scrollWidth - el.clientWidth), "the top bar scrolls sideways").toBeLessThanOrEqual(0);
+      expect((await page.getByLabel("Titolo della lezione").boundingBox())!.width).toBeGreaterThan(250);
+      await expect(page.getByTestId("share-open")).toBeHidden();
+      await bar.getByRole("button", { name: "Altre azioni" }).click();
+      const menu = bar.getByRole("menu");
+      await expect(menu.getByRole("link", { name: "Scarica il PDF con le tue scritte" })).toBeVisible();
+      await expect(menu.getByRole("button", { name: "Condividi" })).toBeVisible();
+      await expect(menu.getByRole("button", { name: "Tema chiaro / scuro" })).toBeVisible();
       // Slide above, notes below (a single column).
       const slide = (await page.getByTestId("lesson-page").first().locator(".les-slide").boundingBox())!;
       const notes = (await page.getByTestId("lesson-page").first().locator("textarea").boundingBox())!;

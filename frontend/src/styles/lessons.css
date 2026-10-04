@@ -16,7 +16,8 @@ body.ws-page .les {
 
 /* ------------------------------------------------------------------ top bar */
 
-.les-title {
+/* `.les` outranks the global text-field rule, which would otherwise give the title a box and a small font. */
+.les .les-title {
   flex: 1;
   min-width: 0;
   margin: 0 0 0 0.35rem;
@@ -30,10 +31,10 @@ body.ws-page .les {
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
 }
-.les-title:hover {
+.les .les-title:hover {
   border-color: var(--border);
 }
-.les-title:focus {
+.les .les-title:focus {
   background: var(--bg-elev);
 }
 .les-course {
@@ -380,12 +381,43 @@ body.ws-page .les {
   .les-scroll {
     padding: 0.5rem;
   }
-  .les-title {
+  .les .les-title {
     font-size: 1.1rem;
   }
   .les-tools {
     padding: 0.35rem 0.5rem;
     gap: 0.3rem 0.5rem;
+  }
+}
+
+/* The actions that leave the top bar for the «…» menu on a phone. */
+.les-narrow {
+  display: none !important;
+}
+@media (max-width: 600px) {
+  .les-wide {
+    display: none !important;
+  }
+  .les-narrow {
+    display: flex !important;
+  }
+  /* Two rows: the arrow and the whole title, then the state and the actions. */
+  .les .wsb {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 0.25rem 0.4rem;
+    row-gap: 0.15rem;
+  }
+  .les .les-title {
+    flex: 1 1 calc(100% - 48px);
+    margin-left: 0;
+    padding: 0 0.3rem;
+  }
+  .les .les-status-switch {
+    margin-left: 0.4rem;
+  }
+  .les .wsb-actions {
+    margin-left: auto;
   }
 }
 

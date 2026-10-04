@@ -302,7 +302,7 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
             <Icon name="arrow-left" />
           </a>
         )}
-        <button type="button" className={`btn ghost icon ${rail ? "active" : ""}`} onClick={() => setRail(!rail)} aria-pressed={rail} aria-label="Elenco pagine" title="Elenco delle pagine">
+        <button type="button" className={`btn ghost icon hide-mobile ${rail ? "active" : ""}`} onClick={() => setRail(!rail)} aria-pressed={rail} aria-label="Elenco pagine" title="Elenco delle pagine">
           <Icon name="list" />
         </button>
         <input
@@ -332,7 +332,7 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
           ) : null}
           <Pop
             label="Scarica"
-            className="wsb-dl"
+            className="wsb-dl les-wide"
             summary={
               <>
                 <Icon name="download" />
@@ -351,7 +351,7 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
             </a>
           </Pop>
           {owner && (
-            <button type="button" className="btn" onClick={() => setShowShare(true)} data-testid="share-open" title="Condividi la lezione con un link, in sola lettura o modificabile">
+            <button type="button" className="btn les-wide" onClick={() => setShowShare(true)} data-testid="share-open" title="Condividi la lezione con un link, in sola lettura o modificabile">
               <Icon name="link" />
               <span className="wsb-lbl">Condividi</span>
             </button>
@@ -370,11 +370,31 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
               Aggiungi al testo
             </button>
           )}
-          <button type="button" className="btn ghost icon" data-theme-toggle aria-label="Cambia tema" title="Tema chiaro / scuro">
+          <button type="button" className="btn ghost icon les-wide" data-theme-toggle aria-label="Cambia tema" title="Tema chiaro / scuro">
             <Icon name="moon" className="i-moon" />
             <Icon name="sun" className="i-sun" />
           </button>
           <Pop label="Altre azioni" className="ghost icon" summary={<Icon name="more" />}>
+            {/* On a phone the bar has no room for these: they move here. */}
+            <a href={`${source.base}/annotated.pdf`} download className="les-narrow">
+              <Icon name="file-text" />
+              Scarica il PDF con le tue scritte
+            </a>
+            <a href={`${source.base}/notes.md`} download className="les-narrow">
+              <Icon name="file" />
+              Scarica gli appunti (.md)
+            </a>
+            {owner && (
+              <button type="button" onClick={() => setShowShare(true)} className="les-narrow">
+                <Icon name="link" />
+                Condividi
+              </button>
+            )}
+            <button type="button" data-theme-toggle className="les-narrow">
+              <Icon name="moon" className="i-moon" />
+              <Icon name="sun" className="i-sun" />
+              Tema chiaro / scuro
+            </button>
             <button type="button" onClick={() => setAwake(!awake)}>
               <Icon name={awake ? "check" : "monitor"} />
               Tieni lo schermo acceso{awake ? " (attivo)" : ""}
