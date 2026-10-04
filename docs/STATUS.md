@@ -139,7 +139,7 @@ The app was called Appunti until 2026-10-02 (DECISIONS 91–92). What changed an
 | no published ports, nothing else on `webnet` | `scripts/smoke.sh` (`docker inspect` of every container; the compile container has `network_mode: none`) |
 | everything configured from the browser after the wizard | Settings covers account/2FA, providers, models, prompts, privacy, LaTeX, embeddings, categorisation, uploads, publishing, backup; `e2e/tests/02-providers.spec.ts` configures a provider and every role from the UI |
 | anonymous users reach only published listings/PDFs | `tests/test_boundary.py`: every route × every method (with and without bodies, forged cookies) → 404; public endpoints only expose published snapshots; admin pages 404 in the browser (`e2e 01`) |
-| mixed fixture zip → whole pipeline → compiling chapter | `tests/test_ingest_e2e.py::test_mixed_zip_into_new_course_writes_a_compiling_chapter` (extraction, parallel reading, 3 pictures as images, compile check, written directly, sources linked, full build ok), and the same flow in the browser (`e2e 03`) |
+| a lesson → whole pipeline → compiling chapter | `tests/test_ingest_e2e.py::test_a_lesson_into_a_new_course_writes_a_compiling_chapter` (slides, notes with math and code, an annotated slide, a page written by hand: parallel reading, compile check, written directly, sources linked, full build ok), and the same flow in the browser (`e2e 03`) |
 | categorisation with embeddings on and off | `tests/test_categorization.py::test_placement_in_both_modes[embeddings-on / embeddings-off]`, plus the cross-lingual, incremental re-embedding and slow-model fallback tests |
 | README: running, service name + port, backup/restore, adding a provider, architecture | `README.md` |
 
