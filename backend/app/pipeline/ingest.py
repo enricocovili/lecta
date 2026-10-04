@@ -1,11 +1,10 @@
-"""The import job: one pipeline for everything I upload, start to finish without questions.
+"""The import job: a lesson's material through one pipeline, start to finish without questions.
 
-1. Extraction (local)  unzip; PDFs → text with math hints + pictures + page routing
-                       (pdfextract); photos → cleaned-up page images; notes (.md/.txt) as they are
-2. Groups              one per folder; at the root the notes files with the PDFs they go with
-                       (all of it when there is one notes file), else one per PDF, loose photos together
-3. Reading             every unit (≈10 pages of one file, or one photo) → LaTeX, all in parallel:
-                       a faithful conversion of the material, formulas and pictures included
+1. Extraction (local)  PDFs → text with math hints + pictures + page routing (pdfextract);
+                       the lesson's notes as they are; its pages written by hand as pictures
+2. Groups              the lesson is one group: its notes with its slides
+3. Reading             every unit (≈10 pages of one file, or one handwritten page) → LaTeX, all in
+                       parallel: a faithful conversion of the material, formulas and pictures included
 4. Writing             per group, the study text in prose: the class notes are its backbone, the
                        material fills it in (without notes the material is summarised)
 5. Per group           placement → compile check (≤ 1 AI fix) → written into the course
@@ -20,7 +19,6 @@ from __future__ import annotations
 import asyncio
 import re
 from collections import Counter
-from pathlib import PurePosixPath
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -214,74 +212,14 @@ async def load_figures(job_id: int) -> list[IngestFigure]:
 # --------------------------------------------------------------------------- 2. groups
 
 
-ASSET_DIRS = {"img", "imgs", "image", "images", "immagini", "figure", "figures", "fig", "figs", "assets", "attachments", "allegati", "media"}
-
-
-def group_folder(folder: str | None) -> str:
-    """The folder a file belongs to for grouping: pictures in img/, figures/, … go with their parent folder."""
-    parts = [p for p in PurePosixPath(folder or "").parts if p not in ("", ".")]
-    while parts and parts[-1].lower() in ASSET_DIRS:
-        parts.pop()
-    return "/".join(parts)
-
-
-def _name_tokens(name: str) -> set[str]:
-    stem = PurePosixPath(name).stem.lower()
-    return {t.lstrip("0") or "0" if t.isdigit() else t for t in re.findall(r"[^\W_]+", stem) if len(t) >= 3 or t.isdigit()}
-
-
 def make_groups(items: list[IngestItem]) -> list[dict[str, Any]]:
-    """One group per folder. At the root: with one notes file, everything together; with several, each notes
-    file with the PDFs whose names match it best; without notes, one group per PDF and one for loose photos."""
+    """A lesson is one group: its notes with its slides and the pages written by hand, one piece of text."""
     live = [it for it in items if it.kind != "skipped"]
-    root_notes = [it for it in live if not group_folder((it.meta or {}).get("folder")) and compose.is_notes(it)]
-    note_file = {it.source_file_id: it for it in root_notes}
-    groups: dict[str, dict[str, Any]] = {}
-    for it in live:
-        meta = it.meta or {}
-        folder = group_folder(meta.get("folder"))
-        if meta.get("lesson"):
-            # Everything of one lesson (slides, notes, handwritten pages) is one piece of text.
-            gid, hint = "lesson", meta.get("lesson_title") or "Lezione"
-        elif folder:
-            gid, hint = f"d:{folder}", PurePosixPath(folder).name
-        elif len(note_file) == 1:
-            only = next(iter(note_file.values()))
-            gid, hint = "root", PurePosixPath((only.meta or {}).get("file") or "notes").stem
-        elif it.source_file_id in note_file:
-            gid, hint = f"f:{it.source_file_id}", PurePosixPath(meta.get("file") or "notes").stem
-        else:
-            match = _best_notes(meta.get("file") or "", list(note_file.values()))
-            if match is not None:
-                gid, hint = f"f:{match.source_file_id}", PurePosixPath((match.meta or {}).get("file") or "notes").stem
-            elif it.kind in ("photo", "handwritten"):
-                gid, hint = "photos", "Appunti a mano"
-            else:
-                gid, hint = f"f:{it.source_file_id}", PurePosixPath(meta.get("file") or "notes").stem
-        g = groups.setdefault(gid, {"item_keys": [], "notes": [], "hint": hint, "first": it.position})
-        g["item_keys"].append(it.key)
-        g["first"] = min(g["first"], it.position)
-        if compose.is_notes(it):
-            g["notes"].append(it.key)
-    out = sorted(groups.values(), key=lambda g: g["first"])
-    for n, g in enumerate(out, start=1):
-        g["key"] = f"g{n}"
-    return out
-
-
-def _best_notes(name: str, notes: list[IngestItem]) -> IngestItem | None:
-    """The notes file whose name shares the most with this file's name (a lecture number counts double)."""
-    mine = _name_tokens(name)
-    best, score = None, 0.0
-    for it in notes:
-        theirs = _name_tokens((it.meta or {}).get("file") or "")
-        s = sum(2.0 if t.isdigit() else 1.0 for t in mine & theirs)
-        # Different lecture numbers: not the same lecture.
-        if {t for t in mine if t.isdigit()} and {t for t in theirs if t.isdigit()} and not {t for t in mine & theirs if t.isdigit()}:
-            s = 0.0
-        if s > score:
-            best, score = it, s
-    return best
+    if not live:
+        return []
+    hint = next(((it.meta or {}).get("lesson_title") for it in live if (it.meta or {}).get("lesson_title")), None) or "Lezione"
+    return [{"key": "g1", "item_keys": [it.key for it in live], "notes": [it.key for it in live if compose.is_notes(it)], "hint": hint,
+             "first": min(it.position for it in live)}]
 
 
 def group_title(g: dict[str, Any], items: list[IngestItem], parts: list[dict[str, Any]]) -> str:

@@ -395,7 +395,7 @@ class Upload(Base):
 
 
 class SourceFile(Base):
-    """An uploaded file (or a member of an uploaded zip). Originals are kept privately."""
+    """A file handed to the import by a lesson (before lessons: an upload, or a member of an uploaded zip). Kept privately."""
 
     __tablename__ = "source_files"
 

@@ -1,4 +1,4 @@
-"""Writing the study text: how notes and material are split into parts, and how files are grouped."""
+"""Writing the study text: how notes and material are split into parts, and a lesson is one group."""
 
 from __future__ import annotations
 
@@ -38,38 +38,19 @@ def test_only_the_relevant_material_goes_with_a_slice_of_notes():
 
 
 class It:
-    def __init__(self, key, file, kind, folder=None, position=0):
+    def __init__(self, key, file, kind, position=0, lesson="Lezione 4"):
         self.key, self.kind, self.position, self.source_file_id = key, kind, position, hash(file)
-        self.meta = {"file": file, "folder": folder, "notes": compose.is_notes_name(file) if kind in ("markdown", "text") else False}
+        self.meta = {"file": file, "lesson": True, "lesson_title": lesson,
+                     "notes": compose.is_notes_name(file) if kind in ("markdown", "text") else False}
 
 
-def _groups(items):
-    return [sorted(g["item_keys"]) for g in ingest.make_groups(items)]
-
-
-def test_one_notes_file_at_the_root_takes_everything():
-    items = [It("a", "slide.pdf", "page", position=1), It("b", "altre.pdf", "page", position=2), It("c", "appunti.md", "markdown", position=3)]
+def test_a_lesson_is_one_group_with_its_notes():
+    items = [It("p", "slide.pdf", "page", position=1), It("n", "lezione-4-appunti.md", "markdown", position=2),
+             It("h", "pagina-004.jpg", "handwritten", position=3), It("s", "slide.pdf", "skipped", position=4)]
     groups = ingest.make_groups(items)
-    assert len(groups) == 1 and groups[0]["notes"] == ["c"]
-
-
-def test_several_notes_files_take_the_pdfs_with_matching_names():
-    items = [
-        It("p3", "Lezione 3.pdf", "page", position=1), It("p4", "Lezione 4 - Bode.pdf", "page", position=2),
-        It("n3", "appunti lezione 3.md", "markdown", position=3), It("n4", "lezione 4.txt", "text", position=4),
-        It("x", "esercizi.pdf", "page", position=5), It("t", "formule.tex", "text", position=6),
-    ]
-    assert _groups(items) == [["n3", "p3"], ["n4", "p4"], ["x"], ["t"]]
-
-
-def test_without_notes_each_pdf_is_its_own_group_and_images_in_img_join_their_folder():
-    items = [It("a", "uno.pdf", "page", position=1), It("b", "due.pdf", "page", position=2), It("f1", "IMG_1.jpg", "photo", position=3),
-             It("f2", "IMG_2.jpg", "photo", position=4)]
-    assert _groups(items) == [["a"], ["b"], ["f1", "f2"]]
-    items = [It("s", "slide.pdf", "page", folder="L1", position=1), It("i", "x.png", "photo", folder="L1/img", position=2),
-             It("n", "note.md", "markdown", folder="L1", position=3)]
-    groups = ingest.make_groups(items)
-    assert len(groups) == 1 and groups[0]["notes"] == ["n"]
+    assert len(groups) == 1 and groups[0]["item_keys"] == ["p", "n", "h"] and groups[0]["notes"] == ["n"]
+    assert groups[0]["hint"] == "Lezione 4"
+    assert ingest.make_groups([]) == []
 
 
 def test_what_counts_as_notes():
