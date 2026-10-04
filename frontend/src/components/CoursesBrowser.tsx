@@ -179,7 +179,6 @@ export default function CoursesBrowser() {
       <div className="page-head">
         <div>
           <h1>Materie</h1>
-          <div className="sub">Ogni materia è un progetto LaTeX: i capitoli sono i file inclusi in <span className="mono">main.tex</span>.</div>
         </div>
         <button className="btn primary" onClick={() => setShowNew(true)}>
           <Icon name="plus" />

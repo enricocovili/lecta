@@ -170,7 +170,6 @@ export function JobsList() {
       <div className="page-head">
         <div>
           <h1>Attività</h1>
-          <div className="sub">Importazioni e pubblicazioni: cosa sta facendo Lecta e cosa è andato storto.</div>
         </div>
       </div>
       <div className="pg-toolbar">
