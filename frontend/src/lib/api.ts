@@ -144,6 +144,12 @@ export function fmtDate(value: string | null | undefined, withTime = false): str
     : d.toLocaleDateString("it-IT", { year: "numeric", month: "short", day: "numeric" });
 }
 
+/** "04/10/2026": the day only, as the lessons show it. */
+export function fmtDay(value: string | Date | null | undefined): string {
+  if (!value) return "";
+  return new Date(value).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 export function fmtSize(bytes: number | null | undefined): string {
   if (!bytes) return "0 B";
   const units = ["B", "KB", "MB", "GB"];

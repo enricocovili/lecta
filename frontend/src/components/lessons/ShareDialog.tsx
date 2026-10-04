@@ -1,6 +1,6 @@
 // «Condividi»: the links that open the lesson without signing in, one to look (notes, slides, strokes) and one to write too.
 import { useEffect, useState } from "react";
-import { del, fmtDate, get, post } from "../../lib/api";
+import { del, fmtDay, get, post } from "../../lib/api";
 import { Icon } from "../icons";
 import { Modal, toast, toastError } from "../ui";
 
@@ -89,7 +89,7 @@ export default function ShareDialog({ lessonId, onChange, onClose }: { lessonId:
                   <Icon name={m.icon} />
                   <strong>{m.title}</strong>
                   {sh ? (
-                    <span className="muted small grow">{sh.last_used_at ? `ultimo uso ${fmtDate(sh.last_used_at, true)}` : "mai usato"}</span>
+                    <span className="muted small grow">{sh.last_used_at ? `ultimo uso ${fmtDay(sh.last_used_at)}` : "mai usato"}</span>
                   ) : (
                     <span className="grow" />
                   )}

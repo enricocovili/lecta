@@ -1,6 +1,6 @@
 // The list of lessons, and the dialog that starts a new one (a subject, a title and, if there are any, the slides).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { del, fmtSize, get, post, uploadRaw } from "../../lib/api";
+import { del, fmtDay, fmtSize, get, post, uploadRaw } from "../../lib/api";
 import { Icon } from "../icons";
 import type { TreeCourse } from "../types";
 import { Confirm, Empty, Loading, Modal, Progress, toastError } from "../ui";
@@ -15,9 +15,6 @@ interface Row {
   status: LessonStatus;
 }
 
-function today(): string {
-  return new Date().toLocaleDateString("it-IT", { day: "numeric", month: "long" });
-}
 
 export default function LessonsPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -113,7 +110,7 @@ export default function LessonsPage() {
 
 function NewLesson({ courses, initialCourse, onClose }: { courses: TreeCourse[]; initialCourse: string; onClose: () => void }) {
   const [courseId, setCourseId] = useState(initialCourse || (courses.length === 1 ? String(courses[0].id) : ""));
-  const [title, setTitle] = useState(`Lezione del ${today()}`);
+  const [title, setTitle] = useState(`Lezione del ${fmtDay(new Date())}`);
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);

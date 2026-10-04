@@ -1,7 +1,7 @@
 // The lesson workspace, for taking notes during the lecture: every slide with room to draw on it (pen, highlighter, eraser;
 // mouse, stylus or finger) and Markdown notes next to it, saved as you write. Made to work on a tablet or a foldable laptop.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, fmtDate, get, patch } from "../../lib/api";
+import { api, fmtDay, get, patch } from "../../lib/api";
 import { courseText } from "../../lib/links";
 import { Icon } from "../icons";
 import Pop from "../workspace/Pop";
@@ -327,7 +327,7 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
           {owner && lesson.generated_at && lesson.last_result?.chapters?.length ? (
             <a className="btn ghost hide-mobile" href={courseText(lesson.course_id, { chapter: lesson.last_result.chapters[0].chapter_id })} title="Apri il testo generato da questa lezione">
               <Icon name="book" />
-              <span className="wsb-lbl">Testo del {fmtDate(lesson.generated_at)}</span>
+              <span className="wsb-lbl">Testo del {fmtDay(lesson.generated_at)}</span>
             </a>
           ) : null}
           <Pop
