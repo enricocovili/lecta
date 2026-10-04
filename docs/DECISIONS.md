@@ -473,3 +473,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
     files are gone, with their settings and dependencies, and `source_files` loses `parent_id` and `folder` (migration
     `0020`); the import tests start from a lesson. *Why:* since 96 nothing
     fed those paths, and the zips were the most delicate code to keep safe.
+
+## A simpler public site (#38)
+
+100. **The public reader shows the document only** (narrows 56). The presentation mode (one page at a time, keyboard,
+     fullscreen) and its «Presentazione» buttons are gone; an old `?mode=slides` link opens the document and loses the
+     parameter. *Why:* the published text is read, not projected, and fewer buttons confuse the reader less.

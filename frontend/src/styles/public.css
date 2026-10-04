@@ -242,7 +242,7 @@ body.pub-app {
   flex: none;
   height: var(--pub-rbar-h);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 1rem;
   padding: 0 1rem 0 1.4rem;
@@ -300,13 +300,6 @@ body.pub-app {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.pub-modes {
-  justify-self: center;
-}
-.pub-modes > button {
-  height: 34px;
-  padding: 0 0.95rem;
 }
 .pub-rbar-right {
   display: flex;
@@ -560,89 +553,24 @@ body.pub-app {
   user-select: none;
 }
 
-/* stage: presentation */
-.pub-present {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-sunken);
-}
-.pub-slide-wrap {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem 1rem 0;
-  touch-action: pan-y pinch-zoom;
-}
-.pub-slide-bar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  padding: 1rem 1rem 1.25rem;
-}
-.pub-slide-count {
-  min-width: 5.5rem;
-  text-align: center;
-  font-family: var(--mono);
-  font-size: 0.9rem;
-  color: var(--fg-muted);
-}
-.pub-slide-sep {
-  width: 1px;
-  height: 24px;
-  background: var(--border-strong);
-  margin: 0 0.3rem;
-}
-.pub-present:fullscreen {
-  width: 100vw;
-  height: 100vh;
-}
-.pub-present:fullscreen .pub-slide-bar {
-  opacity: 0.25;
-  transition: opacity 0.2s;
-}
-.pub-present:fullscreen .pub-slide-bar:hover,
-.pub-present:fullscreen .pub-slide-bar:focus-within {
-  opacity: 1;
-}
-
 .pub-index-backdrop {
   display: none;
 }
 
-/* reader on phones: compact bar with the mode switch on a second row, index as a drawer */
+/* reader on phones: compact bar, index as a drawer */
 @media (max-width: 860px) {
   .pub-reader {
     --pub-rbar-h: auto;
   }
   .pub-rbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "left right"
-      "modes modes";
     gap: 0.4rem 0.5rem;
     padding: 0.45rem 0.5rem 0.55rem 0.5rem;
   }
   .pub-rbar-left {
-    grid-area: left;
     gap: 0.35rem;
   }
   .pub-rbar-right {
-    grid-area: right;
     gap: 0.15rem;
-  }
-  .pub-modes {
-    grid-area: modes;
-    justify-self: stretch;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-  .pub-modes > button {
-    justify-content: center;
   }
   .pub-back {
     padding: 0.5rem;
@@ -693,12 +621,6 @@ body.pub-app {
   }
   .pub-index-static + .pub-stage {
     display: none;
-  }
-  .pub-slide-wrap {
-    padding: 0.75rem 0.5rem 0;
-  }
-  .pub-slide-bar {
-    padding: 0.6rem 0.5rem calc(0.75rem + env(safe-area-inset-bottom));
   }
 }
 

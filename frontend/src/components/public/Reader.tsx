@@ -1,16 +1,15 @@
 // Public course reader: the published PDF as a document (continuous pages, zoom, index with
-// page numbers) or as a presentation (one page at a time, keyboard, fullscreen).
+// page numbers).
 // Deep links: #p=7 (page), #ch-<chapter-slug> (chapter start, the old public URL scheme).
 import * as pdfjs from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../icons";
 import { sizeIt, type PubChapter, type PubCourse } from "./format";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 type Doc = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
-type Mode = "doc" | "slides";
 type Size = { w: number; h: number };
 type Section = { title: string; page: number | null };
 type RenderTask = { cancel: () => void; promise: Promise<unknown> };
@@ -21,7 +20,6 @@ const DPR = () => Math.min(2, window.devicePixelRatio || 1);
 
 interface Props {
   course: PubCourse & { chapters: PubChapter[] };
-  initialMode?: Mode;
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -111,7 +109,7 @@ function unload(div: HTMLElement) {
 }
 
 /** Render one page into a fresh canvas (+ selectable text layer) and swap it in when done. */
-async function paint(doc: Doc, div: HTMLElement, n: number, scale: number, withText: boolean, tasks: Set<RenderTask>) {
+async function paint(doc: Doc, div: HTMLElement, n: number, scale: number, tasks: Set<RenderTask>) {
   const key = `${n}@${scale.toFixed(4)}`;
   if (div.dataset.key === key) return;
   const gen = (gens.get(div) ?? 0) + 1;
@@ -137,26 +135,23 @@ async function paint(doc: Doc, div: HTMLElement, n: number, scale: number, withT
   }
   if (stale()) return;
   const layers: HTMLElement[] = [canvas];
-  if (withText) {
-    const tl = document.createElement("div");
-    tl.className = "textLayer";
-    try {
-      await new pdfjs.TextLayer({ textContentSource: page.streamTextContent(), container: tl, viewport: vp }).render();
-      layers.push(tl);
-    } catch {
-      /* text selection is a nicety */
-    }
-    if (stale()) return;
+  const tl = document.createElement("div");
+  tl.className = "textLayer";
+  try {
+    await new pdfjs.TextLayer({ textContentSource: page.streamTextContent(), container: tl, viewport: vp }).render();
+    layers.push(tl);
+  } catch {
+    /* text selection is a nicety */
   }
+  if (stale()) return;
   div.style.setProperty("--total-scale-factor", String(scale));
   div.replaceChildren(...layers);
 }
 
 /* ------------------------------------------------------------------ component */
 
-export default function Reader({ course, initialMode = "doc" }: Props) {
+export default function Reader({ course }: Props) {
   const chapters = course.chapters;
-  const [mode, setMode] = useState<Mode>(initialMode);
   const [doc, setDoc] = useState<Doc | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sizes, setSizes] = useState<Size[]>([]);
@@ -204,8 +199,6 @@ export default function Reader({ course, initialMode = "doc" }: Props) {
   }, [outline, current]);
   const chapter = chapterIdx >= 0 ? chapters[chapterIdx] : undefined;
 
-  /* ---------------- document mode */
-
   const [stageRef, stage] = useElementSize<HTMLDivElement>();
   const scroller = useRef<HTMLDivElement>(null);
   const pageEls = useRef<(HTMLDivElement | null)[]>([]);
@@ -237,10 +230,10 @@ export default function Reader({ course, initialMode = "doc" }: Props) {
       const p = Math.max(1, Math.min(numPages, n));
       setCurrent(p);
       anchor.current = { page: p, frac: 0 };
-      if (mode === "doc") scrollToPage(p, smooth);
+      scrollToPage(p, smooth);
       setIndexOpen(false);
     },
-    [numPages, mode, scrollToPage],
+    [numPages, scrollToPage],
   );
 
   // Initial position (and later hash changes) from the URL.
@@ -270,18 +263,17 @@ export default function Reader({ course, initialMode = "doc" }: Props) {
     return () => window.removeEventListener("hashchange", on);
   }, [fromHash, goTo]);
 
-  // Reflect page and mode in the URL (shareable, no history spam).
+  // Reflect the page in the URL (shareable, no history spam); an old ?mode=slides link loses it.
   useEffect(() => {
     if (!doc) return;
     const t = setTimeout(() => {
       const u = new URL(location.href);
-      if (mode === "slides") u.searchParams.set("mode", "slides");
-      else u.searchParams.delete("mode");
+      u.searchParams.delete("mode");
       u.hash = current > 1 ? `p=${current}` : "";
       history.replaceState(null, "", u);
     }, 250);
     return () => clearTimeout(t);
-  }, [doc, current, mode]);
+  }, [doc, current]);
 
   // Track the page in view.
   const onScroll = useCallback(() => {
@@ -299,24 +291,24 @@ export default function Reader({ course, initialMode = "doc" }: Props) {
     setCurrent(p);
   }, []);
 
-  // Keep the reading position when the scale changes (zoom, resize, mode switch).
+  // Keep the reading position when the scale changes (zoom, resize).
   useLayoutEffect(() => {
-    if (mode !== "doc" || !doc) return;
+    if (!doc) return;
     const el = scroller.current;
     const d = pageEls.current[anchor.current.page - 1];
     if (el && d && started.current) el.scrollTop = d.offsetTop + anchor.current.frac * d.offsetHeight;
-  }, [scale, mode, doc]);
+  }, [scale, doc]);
 
   // Lazily render the pages near the viewport; drop the far ones to bound memory.
   useEffect(() => {
     const el = scroller.current;
-    if (!doc || !el || mode !== "doc" || stage.w === 0) return;
+    if (!doc || !el || stage.w === 0) return;
     const tasks = new Set<RenderTask>();
     const near = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
           const div = e.target as HTMLElement;
-          if (e.isIntersecting) void paint(doc, div, Number(div.dataset.page), scale, true, tasks);
+          if (e.isIntersecting) void paint(doc, div, Number(div.dataset.page), scale, tasks);
         }
       },
       { root: el, rootMargin: "800px 0px" },
@@ -341,83 +333,8 @@ export default function Reader({ course, initialMode = "doc" }: Props) {
       far.disconnect();
       tasks.forEach((t) => t.cancel());
     };
-  }, [doc, mode, scale, stage.w, sizes]);
+  }, [doc, scale, stage.w, sizes]);
 
-  /* ---------------- presentation mode */
-
-  const slideRef = useRef<HTMLDivElement>(null);
-  const presenter = useRef<HTMLDivElement>(null);
-  const [fullscreen, setFullscreen] = useState(false);
-  const slideSize = sizes[current - 1] ?? sizes[0];
-  const slideScale = slideSize
-    ? Math.max(0.1, Math.min((stage.w - (phone ? 16 : 64)) / slideSize.w, (stage.h - (phone ? 88 : 112)) / slideSize.h))
-    : 1;
-
-  useEffect(() => {
-    const div = slideRef.current;
-    if (!doc || mode !== "slides" || !div || stage.w === 0) return;
-    const tasks = new Set<RenderTask>();
-    void paint(doc, div, current, slideScale, false, tasks);
-    if (current < doc.numPages) void doc.getPage(current + 1); // warm up the next slide
-    return () => tasks.forEach((t) => t.cancel());
-  }, [doc, mode, current, slideScale, stage.w]);
-
-  // Swipe left/right on touch screens.
-  const swipe = useRef<{ x: number; y: number } | null>(null);
-  const onPointerDown = (e: ReactPointerEvent) => {
-    if (e.pointerType !== "mouse") swipe.current = { x: e.clientX, y: e.clientY };
-  };
-  const onPointerUp = (e: ReactPointerEvent) => {
-    const s = swipe.current;
-    swipe.current = null;
-    if (!s) return;
-    const dx = e.clientX - s.x;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(e.clientY - s.y)) {
-      setCurrent((c) => Math.max(1, Math.min(numPages || 1, c + (dx < 0 ? 1 : -1))));
-    }
-  };
-
-  const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void presenter.current?.requestFullscreen?.().catch(() => undefined);
-  }, []);
-  useEffect(() => {
-    const on = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", on);
-    return () => document.removeEventListener("fullscreenchange", on);
-  }, []);
-
-  useEffect(() => {
-    if (mode !== "slides") return;
-    const on = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      // Space on a focused button/link activates it instead.
-      const space = e.key === " " && !(t && /^(A|BUTTON)$/.test(t.tagName));
-      const next = ["ArrowRight", "ArrowDown", "PageDown"].includes(e.key) || (space && !e.shiftKey);
-      const prev = ["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key) || (space && e.shiftKey);
-      if (next || prev) {
-        e.preventDefault();
-        setCurrent((c) => Math.max(1, Math.min(numPages || 1, c + (next ? 1 : -1))));
-      } else if (e.key === "Home" || e.key === "End") {
-        e.preventDefault();
-        setCurrent(e.key === "Home" ? 1 : numPages || 1);
-      } else if (e.key === "f" || e.key === "F") {
-        e.preventDefault();
-        toggleFullscreen();
-      }
-    };
-    window.addEventListener("keydown", on);
-    return () => window.removeEventListener("keydown", on);
-  }, [mode, numPages, toggleFullscreen]);
-
-  const switchMode = (m: Mode) => {
-    if (m === mode) return;
-    anchor.current = { page: current, frac: 0 };
-    if (document.fullscreenElement) void document.exitFullscreen();
-    setMode(m);
-  };
   const zoomStep = (dir: 1 | -1) =>
     setZoom(
       dir > 0
@@ -443,7 +360,7 @@ export default function Reader({ course, initialMode = "doc" }: Props) {
   ) : null;
 
   return (
-    <div className={`pub-reader mode-${mode}${indexOpen ? " index-open" : ""}`}>
+    <div className={`pub-reader${indexOpen ? " index-open" : ""}`}>
       <header className="pub-rbar">
         <div className="pub-rbar-left">
           <a className="pub-back" href="/" aria-label="Torna alle materie">
@@ -456,37 +373,25 @@ export default function Reader({ course, initialMode = "doc" }: Props) {
             <div className="pub-rchap">{chapterLabel}</div>
           </div>
         </div>
-        <div className="seg pub-modes" role="tablist" aria-label="Modalità di lettura">
-          <button type="button" role="tab" aria-selected={mode === "doc"} onClick={() => switchMode("doc")}>
-            <Icon name="file" />
-            Documento
-          </button>
-          <button type="button" role="tab" aria-selected={mode === "slides"} onClick={() => switchMode("slides")}>
-            <Icon name="monitor" />
-            Presentazione
-          </button>
-        </div>
         <div className="pub-rbar-right">
           <span className="hide-mobile">{counter}</span>
-          {mode === "doc" && (
-            <div className="pub-zoom hide-mobile" role="group" aria-label="Zoom">
-              <button type="button" className="btn icon sm" onClick={() => zoomStep(-1)} disabled={zoom <= ZOOMS[0]!} aria-label="Riduci">
-                <Icon name="minus" />
-              </button>
-              <button type="button" className="pub-zoom-val" onClick={() => setZoom(1)} title="Adatta alla larghezza">
-                {Math.round(zoom * 100)}%
-              </button>
-              <button
-                type="button"
-                className="btn icon sm"
-                onClick={() => zoomStep(1)}
-                disabled={zoom >= ZOOMS[ZOOMS.length - 1]!}
-                aria-label="Ingrandisci"
-              >
-                <Icon name="plus" />
-              </button>
-            </div>
-          )}
+          <div className="pub-zoom hide-mobile" role="group" aria-label="Zoom">
+            <button type="button" className="btn icon sm" onClick={() => zoomStep(-1)} disabled={zoom <= ZOOMS[0]!} aria-label="Riduci">
+              <Icon name="minus" />
+            </button>
+            <button type="button" className="pub-zoom-val" onClick={() => setZoom(1)} title="Adatta alla larghezza">
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              type="button"
+              className="btn icon sm"
+              onClick={() => zoomStep(1)}
+              disabled={zoom >= ZOOMS[ZOOMS.length - 1]!}
+              aria-label="Ingrandisci"
+            >
+              <Icon name="plus" />
+            </button>
+          </div>
           <button
             type="button"
             className="btn ghost icon show-mobile pub-index-btn"
@@ -594,7 +499,7 @@ export default function Reader({ course, initialMode = "doc" }: Props) {
                 Apri il PDF
               </a>
             </div>
-          ) : mode === "doc" ? (
+          ) : (
             <div className="pub-pages" ref={scroller} onScroll={onScroll} style={{ padding: `${phone ? 12 : 32}px ${pad}px` }}>
               {sizes.length === 0 ? (
                 <div className="pub-page skeleton" style={{ width: Math.max(0, room), aspectRatio: "210 / 297" }} />
@@ -612,42 +517,6 @@ export default function Reader({ course, initialMode = "doc" }: Props) {
                   />
                 ))
               )}
-            </div>
-          ) : (
-            <div className={`pub-present${fullscreen ? " is-fs" : ""}`} ref={presenter}>
-              <div className="pub-slide-wrap" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
-                {slideSize ? (
-                  <div
-                    ref={slideRef}
-                    className="pub-page pub-slide"
-                    style={{ width: slideSize.w * slideScale, height: slideSize.h * slideScale }}
-                    aria-label={`Pagina ${current}`}
-                  />
-                ) : (
-                  <div className="pub-page skeleton" style={{ width: "min(60vw, 900px)", aspectRatio: "210 / 297", maxHeight: "70vh" }} />
-                )}
-              </div>
-              <div className="pub-slide-bar">
-                <button type="button" className="btn icon" onClick={() => setCurrent((c) => Math.max(1, c - 1))} disabled={current <= 1} aria-label="Pagina precedente">
-                  <Icon name="chevron-left" />
-                </button>
-                <span className="pub-slide-count">
-                  {current} / {numPages || "…"}
-                </span>
-                <button
-                  type="button"
-                  className="btn icon"
-                  onClick={() => setCurrent((c) => Math.min(numPages || 1, c + 1))}
-                  disabled={current >= numPages}
-                  aria-label="Pagina successiva"
-                >
-                  <Icon name="chevron-right" />
-                </button>
-                <span className="pub-slide-sep" />
-                <button type="button" className="btn ghost icon" onClick={toggleFullscreen} aria-label={fullscreen ? "Esci da schermo intero" : "Schermo intero"} title="Schermo intero (F)">
-                  <Icon name={fullscreen ? "x" : "maximize"} />
-                </button>
-              </div>
             </div>
           )}
         </main>

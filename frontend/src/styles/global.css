@@ -963,7 +963,7 @@ details.dropdown > summary::-webkit-details-marker {
   text-decoration: underline;
 }
 
-/* segmented control (Affiancata | In linea, Documento | Presentazione) */
+/* segmented control (Affiancata | In linea) */
 .seg {
   display: inline-flex;
   align-items: center;

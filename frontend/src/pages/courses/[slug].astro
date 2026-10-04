@@ -9,10 +9,9 @@ const r = await backendGet<PubCourse & { chapters: PubChapter[] }>(Astro, `/api/
 if (!r.data) return Astro.rewrite("/404");
 const c = r.data;
 // The fallback slot renders without JavaScript (and while the reader loads): same frame, plain links to the PDFs.
-const mode = Astro.url.searchParams.get("mode") === "slides" ? "slides" : "doc";
 ---
 <Public title={c.name} app>
-  <Reader client:only="react" course={c} initialMode={mode}>
+  <Reader client:only="react" course={c}>
     <div slot="fallback" class="pub-reader">
       <header class="pub-rbar">
         <div class="pub-rbar-left">
@@ -23,7 +22,6 @@ const mode = Astro.url.searchParams.get("mode") === "slides" ? "slides" : "doc";
             <div class="pub-rchap">{c.chapters.length} capitoli</div>
           </div>
         </div>
-        <span></span>
         <div class="pub-rbar-right">
           <button class="btn ghost icon" data-theme-toggle type="button" aria-label="Cambia tema" title="Tema chiaro / scuro">
             <Icon name="moon" className="i-moon" /><Icon name="sun" className="i-sun" />

@@ -48,7 +48,6 @@ const meta = (c: PubCourse) =>
             </div>
             <div class="pub-course-actions">
               <a class="btn primary" href={`/courses/${c.slug}`}><Icon name="file" />Leggi</a>
-              <a class="btn" href={`/courses/${c.slug}?mode=slides`}><Icon name="monitor" />Presentazione</a>
               <a class="btn" href={c.pdf_url} download={`${c.slug}.pdf`}>
                 <Icon name="download" />PDF<span class="pub-size">· {sizeIt(c.pdf_size)}</span>
               </a>
