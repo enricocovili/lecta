@@ -160,7 +160,7 @@ test.describe.serial("Lezioni", () => {
     await login(page);
     await page.goto(`/admin/lessons?course=${courseId}`);
     const row = page.getByTestId("lesson-row");
-    const href = (await row.getByRole("link", { name: "Apri" }).getAttribute("href"))!;
+    const href = (await row.locator("a.pg-row-title").getAttribute("href"))!;
     const toggle = row.getByRole("switch", { name: "Completata" });
     await expect(toggle).toBeVisible();
     await expect(toggle).not.toBeChecked();
@@ -205,11 +205,11 @@ test.describe.serial("Lezioni", () => {
     // The guidelines stay with the subject, and the lesson remembers what it produced.
     const settings = await page.request.get(`/api/courses/${courseId}`);
     expect((await settings.json()).guidelines).toContain("discorsivo");
-    await page.goto(`/admin/lessons?course=${courseId}`);
-    await expect(page.getByTestId("lesson-row")).toContainText("testo generato il");
+    await page.goto(`/admin/courses/${courseId}`);
+    await expect(page.getByTestId("overview-lesson")).toContainText("nel testo dal");
 
     // The annotated PDF has the three slides plus the page added by hand.
-    const href = (await page.getByTestId("lesson-row").getByRole("link", { name: "Apri" }).getAttribute("href"))!;
+    const href = (await page.getByTestId("overview-lesson").locator("a.pg-row-title").getAttribute("href"))!;
     expect(href).toBe(`/admin/courses/${courseId}/lessons/1`);
     const pdf = await page.request.get(`/api/lessons/${(await stored(page, href)).id}/annotated.pdf`);
     expect(pdf.status()).toBe(200);
@@ -248,7 +248,7 @@ test.describe.serial("Lezioni", () => {
     const con = watchConsole(page);
     await login(page);
     await page.goto(`/admin/lessons?course=${courseId}`);
-    await page.getByTestId("lesson-row").getByRole("link", { name: "Apri" }).click();
+    await page.getByTestId("lesson-row").locator("a.pg-row-title").click();
     await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
     const pages = page.getByTestId("lesson-page");
     const before = await stored(page);
@@ -299,7 +299,7 @@ test.describe.serial("Lezioni", () => {
     const con = watchConsole(page);
     await login(page);
     await page.goto(`/admin/lessons?course=${courseId}`);
-    await page.getByTestId("lesson-row").getByRole("link", { name: "Apri" }).click();
+    await page.getByTestId("lesson-row").locator("a.pg-row-title").click();
     await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
     const pages = page.getByTestId("lesson-page");
     const count = (await stored(page)).pages.length;
@@ -371,7 +371,7 @@ test.describe.serial("Lezioni", () => {
       const con = watchConsole(page);
       await login(page);
       await page.goto(`/admin/lessons?course=${courseId}`);
-      await page.getByTestId("lesson-row").getByRole("link", { name: "Apri" }).click();
+      await page.getByTestId("lesson-row").locator("a.pg-row-title").click();
       await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
       await expect(page.getByTestId("lesson-page").first().locator("canvas.les-slide-canvas")).toBeVisible();
       await expect(page.getByTestId("tool-pen")).toBeVisible();

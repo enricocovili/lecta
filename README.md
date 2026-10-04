@@ -141,7 +141,8 @@ you get blank pages) and write while the lecturer talks: **Markdown notes next t
 (pen, highlighter, eraser, undo of everything: strokes, text and removed slides), with mouse, stylus or finger, on a tablet or a foldable laptop. A finger scrolls unless you
 turn on *Dito scrive*; a resting palm is ignored while a stylus is around. Add blank pages where a slide has no room left,
 switch between slide + notes side by side, notes below, or slides only. Everything is saved once a minute and on Ctrl+S (it keeps trying
-when the connection drops) and the screen stays on.
+when the connection drops) and the screen stays on. The list of lessons shows each one with its subject and the
+«Completata» switch; the title opens it.
 
 **Aggiungi al testo** turns the lesson into the study text of the subject: your notes are the backbone (a section per slide),
 the slides complete them, and what you drew or wrote on a slide is read from a picture of the annotated slide. A lesson is **In corso** until its text is merged into the

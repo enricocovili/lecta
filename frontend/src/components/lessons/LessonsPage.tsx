@@ -1,10 +1,9 @@
 // The list of lessons, and the dialog that starts a new one (a subject, a title and, if there are any, the slides).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { del, fmtDate, fmtSize, get, post, uploadRaw } from "../../lib/api";
+import { del, fmtSize, get, post, uploadRaw } from "../../lib/api";
 import { Icon } from "../icons";
 import type { TreeCourse } from "../types";
 import { Confirm, Empty, Loading, Modal, Progress, toastError } from "../ui";
-import GenerateDialog, { type LessonSummary } from "./GenerateDialog";
 import LessonStatusPill, { type LessonStatus } from "./LessonStatus";
 
 interface Row {
@@ -14,14 +13,6 @@ interface Row {
   course_name: string;
   title: string;
   status: LessonStatus;
-  has_pdf: boolean;
-  pdf_pages: number;
-  page_count: number;
-  notes_pages: number;
-  ink_pages: number;
-  generated_at: string | null;
-  chapter_id: number | null;
-  updated_at: string;
 }
 
 function today(): string {
@@ -34,7 +25,6 @@ export default function LessonsPage() {
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState(false);
   const [toDelete, setToDelete] = useState<Row | null>(null);
-  const [toGenerate, setToGenerate] = useState<LessonSummary | null>(null);
 
   const load = () =>
     get<Row[]>("/api/lessons")
@@ -91,27 +81,9 @@ export default function LessonsPage() {
                   <a className="pg-row-title" href={`/admin/courses/${r.course_id}/lessons/${r.number}`}>
                     {r.title}
                   </a>
-                  <div className="pg-row-sub">
-                    {r.course_name} · {r.has_pdf ? `${r.pdf_pages} slide` : `${r.page_count} pagine`} · appunti su {r.notes_pages} · scritte su {r.ink_pages}
-                    {r.generated_at ? ` · testo generato il ${fmtDate(r.generated_at)}` : ""}
-                  </div>
+                  <div className="pg-row-sub">{r.course_name}</div>
                 </div>
                 <LessonStatusPill id={r.id} status={r.status} editable onChange={(status) => setRows((all) => all && all.map((x) => (x.id === r.id ? { ...x, status } : x)))} />
-                <span className="pg-time small muted hide-mobile">{fmtDate(r.updated_at)}</span>
-                <a className="btn sm" href={`/admin/courses/${r.course_id}/lessons/${r.number}`}>
-                  <Icon name="pencil" />
-                  Apri
-                </a>
-                <button
-                  className="btn sm"
-                  onClick={async () => {
-                    const d = await get<{ course_guidelines: string }>(`/api/lessons/${r.id}`);
-                    setToGenerate({ ...r, slides: r.has_pdf ? r.pdf_pages : 0, course_guidelines: d.course_guidelines });
-                  }}
-                  title="Aggiungi appunti e slide al testo da studiare della materia"
-                >
-                  Aggiungi al testo
-                </button>
                 <button className="btn ghost icon sm" onClick={() => setToDelete(r)} aria-label={`Elimina ${r.title}`} title="Elimina">
                   <Icon name="trash" />
                 </button>
@@ -122,7 +94,6 @@ export default function LessonsPage() {
       )}
 
       {creating && <NewLesson courses={courses} initialCourse={filter} onClose={() => setCreating(false)} />}
-      {toGenerate && <GenerateDialog lesson={toGenerate} onClose={() => setToGenerate(null)} />}
       {toDelete && (
         <Confirm
           title="Elimina la lezione"

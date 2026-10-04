@@ -121,7 +121,7 @@ The app was called Appunti until 2026-10-02 (DECISIONS 91–92). What changed an
 ## A simpler interface (#17)
 
 * **Navigation** (DECISIONS 95): the sidebar keeps the places of work and the subjects; Home from the title, search from the
-  top bar, Attività and Impostazioni from the user menu. Buttons say what they do («Apri», «Aggiungi al testo»), without
+  top bar, Attività and Impostazioni from the user menu. Buttons say what they do («Aggiungi al testo»), without
   «con l'AI».
 * **No upload page** (DECISIONS 96): the study text of a subject is made from its lessons; `/admin/upload`, `/admin/quick`
   and the upload API are gone.
