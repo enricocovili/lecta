@@ -479,3 +479,7 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 100. **The public reader shows the document only** (narrows 56). The presentation mode (one page at a time, keyboard,
      fullscreen) and its «Presentazione» buttons are gone; an old `?mode=slides` link opens the document and loses the
      parameter. *Why:* the published text is read, not projected, and fewer buttons confuse the reader less.
+101. **One «Scarica» menu for the downloads.** On the public Home a course has only «Leggi» and «Scarica ▾»; in the
+     reader the same menu (PDF, LaTeX source, and the PDF of the chapter being read) replaces the two download buttons
+     and the «Download» list under the index. It is a `<details>` (`DownloadMenu.tsx`), so it works without
+     JavaScript; `Public.astro` closes it on an outside click, Escape and a pick.

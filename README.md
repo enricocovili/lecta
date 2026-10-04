@@ -102,8 +102,8 @@ to the course page.
   compiles the whole document on demand; publishing always uses the full build.
 * **Downloads**: *Sorgente LaTeX* (`GET /api/courses/{id}/source.zip`: `main.tex`,
   `preamble.tex`, chapters, images, figures, a README on how to compile) and *PDF*
-  (compiled now). The public reader offers the PDF and the LaTeX source of the
-  published version (`/api/public/courses/{slug}/source.zip`, built with every publish).
+  (compiled now). The public pages offer the PDF and the LaTeX source of the
+  published version from one «Scarica» menu (`/api/public/courses/{slug}/source.zip`, built with every publish).
 * **Publishing is ON/OFF** (top bar of the course, or the switch on the Home).
   While ON, the public site shows the latest version: every change (imports,
   assistant) is rebuilt automatically about 2 minutes after the course stops

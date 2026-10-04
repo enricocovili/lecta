@@ -128,10 +128,13 @@ test.describe.serial("workspace", () => {
     await expect(pub.getByRole("link", { name: "Algebra Lineare" })).toBeVisible();
     await pub.getByRole("link", { name: "Algebra Lineare" }).click();
     await expect(pub.locator(".pub-toc").getByText("Spazi vettoriali")).toBeVisible();
-    const pdf = await pub.request.get((await pub.getByRole("link", { name: "Scarica PDF" }).first().getAttribute("href")) as string);
+    // PDF and LaTeX are in the one «Scarica» menu of the reader.
+    await pub.locator(".pub-rbar .pub-dlmenu > summary").click();
+    const menu = pub.locator(".pub-rbar .pub-dlmenu .menu-pop");
+    const pdf = await pub.request.get((await menu.getByRole("menuitem", { name: /^PDF/ }).getAttribute("href")) as string);
     expect(pdf.status()).toBe(200);
     expect(pdf.headers()["content-type"]).toBe("application/pdf");
-    const srcLink = pub.getByRole("link", { name: "Scarica sorgente LaTeX" }).first();
+    const srcLink = menu.getByRole("menuitem", { name: /^Sorgente LaTeX/ });
     await expect(srcLink).toBeVisible();
     const zip = await pub.request.get((await srcLink.getAttribute("href")) as string);
     expect(zip.status()).toBe(200);

@@ -1,9 +1,10 @@
 ---
 import Public from "../../layouts/Public.astro";
 import Reader from "../../components/public/Reader";
+import DownloadMenu from "../../components/public/DownloadMenu";
 import { Icon } from "../../components/icons";
 import { backendGet } from "../../lib/server";
-import { pagesIt, sizeIt, type PubChapter, type PubCourse } from "../../components/public/format";
+import { pagesIt, type PubChapter, type PubCourse } from "../../components/public/format";
 const { slug } = Astro.params;
 const r = await backendGet<PubCourse & { chapters: PubChapter[] }>(Astro, `/api/public/courses/${encodeURIComponent(slug ?? "")}`);
 if (!r.data) return Astro.rewrite("/404");
@@ -26,14 +27,7 @@ const c = r.data;
           <button class="btn ghost icon" data-theme-toggle type="button" aria-label="Cambia tema" title="Tema chiaro / scuro">
             <Icon name="moon" className="i-moon" /><Icon name="sun" className="i-sun" />
           </button>
-          {c.source_url && (
-            <a class="btn pub-dl" href={c.source_url} download={`${c.slug}-latex.zip`} aria-label="Scarica sorgente LaTeX" title="Sorgente LaTeX (.zip)">
-              <Icon name="code" /><span class="hide-mobile">Scarica sorgente LaTeX</span>
-            </a>
-          )}
-          <a class="btn primary pub-dl" href={c.pdf_url} download={`${c.slug}.pdf`} aria-label="Scarica PDF">
-            <Icon name="download" /><span class="hide-mobile">Scarica PDF</span>
-          </a>
+          <DownloadMenu course={c} primary compact />
         </div>
       </header>
       <div class="pub-rbody">
@@ -52,23 +46,11 @@ const c = r.data;
               ))}
             </ol>
           </div>
-          <div class="pub-downloads">
-            <div class="pub-side-label">Download</div>
-            <a href={c.pdf_url} download={`${c.slug}.pdf`}>
-              <Icon name="download" /><span class="t">Corso completo</span><span class="p">PDF · {sizeIt(c.pdf_size)}</span>
-            </a>
-            {c.source_url && (
-              <a href={c.source_url} download={`${c.slug}-latex.zip`}>
-                <Icon name="code" /><span class="t">Sorgente LaTeX</span><span class="p">ZIP{c.source_size ? ` · ${sizeIt(c.source_size)}` : ""}</span>
-              </a>
-            )}
-          </div>
         </aside>
         <main class="pub-stage">
           <div class="pub-stage-msg">
             <p class="muted">Caricamento del documento…</p>
             <a class="btn" href={c.pdf_url}><Icon name="external" />Apri il PDF</a>
-            {c.source_url && <a class="btn" href={c.source_url} download={`${c.slug}-latex.zip`}><Icon name="code" />Scarica sorgente LaTeX</a>}
             <ul class="pub-fallback-list">
               {c.chapters.map((ch) => (
                 <li>

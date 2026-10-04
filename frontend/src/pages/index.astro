@@ -1,6 +1,7 @@
 ---
 import Public from "../layouts/Public.astro";
 import { Icon } from "../components/icons";
+import DownloadMenu from "../components/public/DownloadMenu";
 import { backendGet, getSite } from "../lib/server";
 import { dateIt, pagesIt, plural, sizeIt, type PubCourse } from "../components/public/format";
 const site = await getSite(Astro);
@@ -48,14 +49,7 @@ const meta = (c: PubCourse) =>
             </div>
             <div class="pub-course-actions">
               <a class="btn primary" href={`/courses/${c.slug}`}><Icon name="file" />Leggi</a>
-              <a class="btn" href={c.pdf_url} download={`${c.slug}.pdf`}>
-                <Icon name="download" />PDF<span class="pub-size">· {sizeIt(c.pdf_size)}</span>
-              </a>
-              {c.source_url && (
-                <a class="btn" href={c.source_url} download={`${c.slug}-latex.zip`} title="Sorgente LaTeX (.zip)">
-                  <Icon name="code" />LaTeX<span class="pub-size">{c.source_size ? `· ${sizeIt(c.source_size)}` : ""}</span>
-                </a>
-              )}
+              <DownloadMenu course={c} />
             </div>
           </div>
           {c.chapters && c.chapters.length > 0 && (

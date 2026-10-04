@@ -105,9 +105,6 @@
 .pub-course-actions .btn {
   height: 38px;
 }
-.pub-size {
-  margin-left: -0.15rem;
-}
 
 .pub-chapters {
   border-top: 1px solid var(--border);
@@ -209,9 +206,16 @@
   .pub-course-actions {
     width: 100%;
   }
+  .pub-course-actions > .btn,
+  .pub-course-actions > .pub-dlmenu {
+    flex: 1 1 0;
+  }
   .pub-course-actions .btn {
-    flex: 1 1 auto;
     padding: 0 0.7rem;
+  }
+  .pub-course-actions .pub-dlmenu > summary {
+    width: 100%;
+    justify-content: center;
   }
   .pub-chapters > summary {
     padding: 0.85rem 1rem 0.4rem;
@@ -343,8 +347,27 @@ body.pub-app {
 .pub-zoom-val:hover {
   background: var(--bg-hover);
 }
-.pub-dl {
-  margin-left: 0.25rem;
+/* «Scarica ▾»: PDF and LaTeX in one menu (DownloadMenu.tsx) */
+.pub-dlmenu > summary {
+  cursor: pointer;
+}
+.pub-dl-caret {
+  transition: transform 0.15s;
+}
+.pub-dlmenu[open] .pub-dl-caret {
+  transform: rotate(180deg);
+}
+.pub-dlmenu .menu-pop {
+  min-width: 240px;
+}
+.pub-dlmenu .menu-pop .t {
+  flex: 1;
+}
+.pub-dlmenu .menu-pop .p {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .pub-rbody {
@@ -384,8 +407,7 @@ body.pub-app {
   padding: 0;
 }
 .pub-toc > li > a,
-.pub-toc-sub a,
-.pub-downloads a {
+.pub-toc-sub a {
   display: flex;
   align-items: baseline;
   gap: 0.75rem;
@@ -398,8 +420,7 @@ body.pub-app {
 .pub-toc > li > a {
   margin-bottom: 0.1rem;
 }
-.pub-toc a:hover,
-.pub-downloads a:hover {
+.pub-toc a:hover {
   background: var(--bg-hover);
   text-decoration: none;
 }
@@ -415,13 +436,11 @@ body.pub-app {
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
-.pub-toc .t,
-.pub-downloads .t {
+.pub-toc .t {
   flex: 1;
   min-width: 0;
 }
-.pub-toc .p,
-.pub-downloads .p {
+.pub-toc .p {
   flex: none;
   font-size: 0.85rem;
   color: var(--fg-muted);
@@ -438,21 +457,6 @@ body.pub-app {
 }
 .pub-toc-sub a:hover {
   color: var(--fg);
-}
-.pub-downloads {
-  flex: none;
-  margin: 0 0.75rem;
-  padding: 1.1rem 0 0.9rem;
-  border-top: 1px solid var(--border);
-}
-.pub-downloads a {
-  align-items: center;
-}
-.pub-downloads .icon {
-  color: var(--fg-muted);
-}
-.pub-downloads .p {
-  white-space: nowrap;
 }
 
 /* stage: document pages */
@@ -581,10 +585,15 @@ body.pub-app {
   .pub-rchap {
     font-size: 0.8rem;
   }
-  .pub-dl {
+  .pub-dlmenu.compact > summary {
     width: 40px;
     padding: 0;
     margin-left: 0.2rem;
+    justify-content: center;
+  }
+  .pub-dlmenu.compact .pub-dl-lbl,
+  .pub-dlmenu.compact .pub-dl-caret {
+    display: none;
   }
   .pub-rbody {
     grid-template-columns: minmax(0, 1fr);

@@ -5,7 +5,8 @@ import * as pdfjs from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../icons";
-import { sizeIt, type PubChapter, type PubCourse } from "./format";
+import DownloadMenu from "./DownloadMenu";
+import type { PubChapter, PubCourse } from "./format";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -405,16 +406,7 @@ export default function Reader({ course }: Props) {
             <Icon name="moon" className="i-moon" />
             <Icon name="sun" className="i-sun" />
           </button>
-          {course.source_url && (
-            <a className="btn pub-dl" href={course.source_url} download={`${course.slug}-latex.zip`} aria-label="Scarica sorgente LaTeX" title="Sorgente LaTeX (.zip)">
-              <Icon name="code" />
-              <span className="hide-mobile">Scarica sorgente LaTeX</span>
-            </a>
-          )}
-          <a className="btn primary pub-dl" href={course.pdf_url} download={`${course.slug}.pdf`} aria-label="Scarica PDF">
-            <Icon name="download" />
-            <span className="hide-mobile">Scarica PDF</span>
-          </a>
+          <DownloadMenu course={course} chapter={chapter} primary compact />
         </div>
       </header>
 
@@ -464,28 +456,6 @@ export default function Reader({ course }: Props) {
                 );
               })}
             </ol>
-          </div>
-          <div className="pub-downloads">
-            <div className="pub-side-label">Download</div>
-            <a href={course.pdf_url} download={`${course.slug}.pdf`}>
-              <Icon name="download" />
-              <span className="t">Corso completo</span>
-              <span className="p">PDF · {sizeIt(course.pdf_size)}</span>
-            </a>
-            {course.source_url && (
-              <a href={course.source_url} download={`${course.slug}-latex.zip`}>
-                <Icon name="code" />
-                <span className="t">Sorgente LaTeX</span>
-                <span className="p">ZIP{course.source_size ? ` · ${sizeIt(course.source_size)}` : ""}</span>
-              </a>
-            )}
-            {chapter?.pdf_url && (
-              <a href={chapter.pdf_url} download={`${course.slug}-${chapter.slug}.pdf`}>
-                <Icon name="download" />
-                <span className="t">Solo capitolo {chapter.position}</span>
-                <span className="p">PDF · {sizeIt(chapter.pdf_size)}</span>
-              </a>
-            )}
           </div>
         </aside>
         {indexOpen && <div className="pub-index-backdrop" onClick={() => setIndexOpen(false)} />}

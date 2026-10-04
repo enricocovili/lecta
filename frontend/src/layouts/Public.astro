@@ -51,3 +51,16 @@ const q = Astro.url.pathname === "/search" ? (Astro.url.searchParams.get("q")?.s
     </>
   )}
 </Base>
+
+<script>
+  // The «Scarica ▾» menus (DownloadMenu.tsx) close on an outside click, on Escape and once a download is picked.
+  const close = (keep?: Element | null) =>
+    document.querySelectorAll<HTMLDetailsElement>("details.pub-dlmenu[open]").forEach((d) => {
+      if (!keep || !d.contains(keep)) d.open = false;
+    });
+  document.addEventListener("click", (e) => {
+    const t = e.target instanceof Element ? e.target : null;
+    close(t?.closest(".pub-dlmenu .menu-pop a") ? null : t);
+  });
+  document.addEventListener("keydown", (e) => e.key === "Escape" && close());
+</script>
