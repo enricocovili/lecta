@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 from app.security.auth import login_global_limiter, login_limiter
 
-from .conftest import ensure_admin, login, make_client
+from .conftest import make_client
 
 ORIGIN = "http://testserver"
 RP_ID = "testserver"

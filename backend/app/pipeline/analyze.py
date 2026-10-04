@@ -1,7 +1,6 @@
 """Stage 1: local analysis (no cloud calls). CPU-bound; called via run_cpu().
 
-* PDFs: text layer, embedded images, page classification heuristics,
-  page renders at ~150 DPI for the models, higher-DPI crops for figures.
+* Pictures: which embedded images of a PDF are decoration (pdfextract does the rest), crops, thumbnails.
 * Markdown: diagram code blocks and relative images extracted, then
   `pandoc --sandbox` to LaTeX (math preserved).
 """
@@ -11,10 +10,8 @@ from __future__ import annotations
 import io
 import re
 import subprocess
-from dataclasses import dataclass, field
 from typing import Any
 
-import fitz  # PyMuPDF
 from PIL import Image
 
 from ..services import blobs
@@ -58,69 +55,6 @@ def _limit(im: Image.Image, side: int = MAX_MODEL_SIDE) -> Image.Image:
     return im
 
 
-@dataclass
-class PageInfo:
-    page: int
-    kind: str
-    text: str
-    width: int
-    height: int
-    image_blob: str
-    preview_blob: str
-    language: str
-    heuristics: dict[str, Any]
-    embedded: list[dict[str, Any]] = field(default_factory=list)  # [{bbox (0..1), area, digest}]
-    skipped: list[dict[str, Any]] = field(default_factory=list)  # decoration/duplicates: [{bbox, area, digest, reason}]
-
-
-# --------------------------------------------------------------------------- PDF
-
-
-def classify_pdf_page(page: fitz.Page) -> tuple[str, dict[str, Any], list[dict[str, Any]]]:
-    rect = page.rect
-    area = max(1.0, rect.width * rect.height)
-    text = page.get_text("text") or ""
-    chars = len(text.strip())
-    landscape = rect.width > rect.height * 1.1
-    images = []
-    cov = 0.0
-    try:
-        for info in page.get_image_info(hashes=True, xrefs=True):
-            b = fitz.Rect(info["bbox"]) & rect
-            if b.is_empty:
-                continue
-            frac = (b.width * b.height) / area
-            cov += frac
-            digest = info.get("digest")
-            images.append({"bbox": [b.x0 / rect.width, b.y0 / rect.height, b.x1 / rect.width, b.y1 / rect.height], "area": round(frac, 4),
-                           "digest": digest.hex() if isinstance(digest, bytes | bytearray) else None})
-    except Exception:
-        pass
-    ink = 0
-    for a in page.annots() or []:
-        if a.type[1] in ("Ink", "FreeText", "Line", "Square", "Circle", "Polygon", "PolyLine", "Highlight", "Underline", "StrikeOut"):
-            ink += 1
-    try:
-        drawings = len(page.get_drawings())
-    except Exception:
-        drawings = 0
-    h = {"chars": chars, "landscape": landscape, "image_coverage": round(min(cov, 1.0), 3), "ink_annotations": ink, "drawings": drawings}
-    if chars < 40 and cov > 0.6:
-        kind = "unknown"  # a scan: handwritten or typed → the vision model decides
-    elif ink > 0 or (drawings > 150 and chars > 0):
-        kind = "annotated_slide"
-    elif landscape and chars > 0:
-        kind = "slide"
-    elif chars > 600:
-        kind = "typed"
-    elif chars > 0:
-        kind = "slide" if landscape else "typed"
-    else:
-        kind = "unknown"
-    figures = [i for i in images if FIGURE_MIN_AREA <= i["area"] <= FIGURE_MAX_AREA]
-    return kind, h, figures
-
-
 def in_margin(bbox: list[float], area: float) -> bool:
     """A small image entirely inside the header or footer band of a page."""
     return area <= MARGIN_MAX_AREA and (bbox[3] <= HEADER_BAND or bbox[1] >= FOOTER_BAND)
@@ -162,59 +96,6 @@ def split_decoration(pages: list[list[dict[str, Any]]]) -> tuple[list[list[dict[
     return keep, skip
 
 
-def analyze_pdf(data: bytes, label: str) -> list[PageInfo]:
-    doc = fitz.open(stream=data, filetype="pdf")
-    out = []
-    try:
-        if doc.needs_pass:
-            raise ValueError("encrypted PDF")
-        for i, page in enumerate(doc):
-            kind, h, embedded = classify_pdf_page(page)
-            pix = page.get_pixmap(dpi=MODEL_DPI, alpha=False)
-            im = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-            im = _limit(im)
-            text = (page.get_text("text") or "").strip()
-            out.append(
-                PageInfo(
-                    page=i + 1,
-                    kind=kind,
-                    text=text,
-                    width=im.width,
-                    height=im.height,
-                    image_blob=blobs.put_bytes(_png(im)),
-                    preview_blob=_thumb(im),
-                    language=detect_language(text),
-                    heuristics=h,
-                    embedded=embedded,
-                )
-            )
-    finally:
-        doc.close()
-    keep, skip = split_decoration([p.embedded for p in out])
-    for p, k, sk in zip(out, keep, skip, strict=True):
-        p.embedded, p.skipped = k, sk
-    return out
-
-
-def crop_pdf(data: bytes, page: int, bbox: list[float], dpi: int = CROP_DPI) -> tuple[str, int, int]:
-    """Crop a region (fractions 0..1) of a PDF page at higher DPI."""
-    doc = fitz.open(stream=data, filetype="pdf")
-    try:
-        p = doc[page - 1]
-        r = p.rect
-        x0, y0, x1, y1 = bbox
-        pad = 0.01
-        clip = fitz.Rect(
-            r.x0 + max(0, x0 - pad) * r.width, r.y0 + max(0, y0 - pad) * r.height,
-            r.x0 + min(1, x1 + pad) * r.width, r.y0 + min(1, y1 + pad) * r.height,
-        )
-        pix = p.get_pixmap(dpi=dpi, clip=clip, alpha=False)
-        im = _limit(Image.frombytes("RGB", (pix.width, pix.height), pix.samples), 2400)
-        return blobs.put_bytes(_png(im)), im.width, im.height
-    finally:
-        doc.close()
-
-
 def crop_image(blob: str, bbox: list[float]) -> tuple[str, int, int]:
     im = Image.open(io.BytesIO(blobs.read_bytes(blob))).convert("RGB")
     w, h = im.size
@@ -226,22 +107,6 @@ def crop_image(blob: str, bbox: list[float]) -> tuple[str, int, int]:
     c = im.crop(box)
     return blobs.put_bytes(_png(c)), c.width, c.height
 
-
-def image_size(blob: str) -> tuple[int, int]:
-    return Image.open(io.BytesIO(blobs.read_bytes(blob))).size
-
-
-def render_pdf_png(pdf: bytes, dpi: int = 150) -> tuple[str, int, int]:
-    doc = fitz.open(stream=pdf, filetype="pdf")
-    try:
-        pix = doc[0].get_pixmap(dpi=dpi, alpha=False)
-        im = _limit(Image.frombytes("RGB", (pix.width, pix.height), pix.samples), 2000)
-        return blobs.put_bytes(_png(im)), im.width, im.height
-    finally:
-        doc.close()
-
-
-# --------------------------------------------------------------------------- Markdown
 
 _FENCE_RE = re.compile(r"^(```|~~~)[ \t]*([\w+-]*)[^\n]*\n(.*?)^\1[ \t]*$", re.M | re.S)
 _IMG_RE = re.compile(r"!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")

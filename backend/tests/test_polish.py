@@ -5,13 +5,10 @@ from __future__ import annotations
 import io
 import zipfile
 
-from sqlalchemy import select
 
-from app.db import SessionLocal
 from app.pipeline.requests import RequestBuilder
 from app.services import prompts
 
-from .conftest import wait_job
 
 
 async def _course(admin, name, body):

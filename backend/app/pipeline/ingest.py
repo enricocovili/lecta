@@ -24,7 +24,7 @@ from typing import Any
 from sqlalchemy import delete, select
 
 from ..db import SessionLocal
-from ..models import Chapter, Course, IngestFigure, IngestItem, JobStep, SourceFile, Upload
+from ..models import Chapter, Course, IngestFigure, IngestItem, SourceFile, Upload
 from ..services import blobs, latexmacros, projects, templates
 from ..services import settings as settings_svc
 from ..services.texttools import slugify, strip_nul

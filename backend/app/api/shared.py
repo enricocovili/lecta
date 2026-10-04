@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..models import Course, Lesson, LessonShare
-from ..services import blobs
 from . import lessons as owner
 
 router = APIRouter(prefix="/public/lesson/{token}")
