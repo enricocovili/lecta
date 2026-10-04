@@ -128,7 +128,7 @@ async def activity(db: AsyncSession, limit: int = 30) -> list[dict[str, Any]]:
             for up_id, name, kind in (
                 await db.execute(
                     select(SourceFile.upload_id, SourceFile.name, SourceFile.kind)
-                    .where(SourceFile.upload_id.in_([u.id for u in ups]), SourceFile.parent_id.is_(None))
+                    .where(SourceFile.upload_id.in_([u.id for u in ups]))
                     .order_by(SourceFile.id)
                 )
             ).all():

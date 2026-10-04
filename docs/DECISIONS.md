@@ -470,5 +470,6 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 99. **The import takes only what a lesson gives it** (replaces 62, 68 and 69). The extraction reads a PDF, the notes and
     the pages written by hand; a lesson is one group. Zip unpacking (with its zip-slip and zip-bomb guards), photo
     straightening (OpenCV), HEIC, grouping by folders and file names, and the Markdown images looked up among uploaded
-    files are gone, with their settings and dependencies; the import tests start from a lesson. *Why:* since 96 nothing
+    files are gone, with their settings and dependencies, and `source_files` loses `parent_id` and `folder` (migration
+    `0020`); the import tests start from a lesson. *Why:* since 96 nothing
     fed those paths, and the zips were the most delicate code to keep safe.

@@ -25,7 +25,7 @@ router = APIRouter(dependencies=[Depends(require_admin)])
 
 def source_out(s: SourceFile) -> dict[str, Any]:
     return {
-        "id": s.id, "upload_id": s.upload_id, "parent_id": s.parent_id, "name": s.name, "folder": s.folder, "kind": s.kind,
+        "id": s.id, "upload_id": s.upload_id, "name": s.name, "kind": s.kind,
         "mime": s.mime, "size": s.size, "pages": s.pages, "language": s.language, "status": s.status, "reason": s.reason,
         "created_at": s.created_at, "has_original": bool(s.blob),
     }

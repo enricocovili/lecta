@@ -11,7 +11,6 @@ interface Source {
   id: number;
   upload_id: number;
   name: string;
-  folder: string | null;
   kind: string;
   mime: string | null;
   size: number;
@@ -60,7 +59,6 @@ export default function SourceView({ id }: { id: number }) {
           </div>
           <h1 className="pg-h1-file">{data.name}</h1>
           <div className="sub">
-            {data.folder && <span className="mono">{data.folder} · </span>}
             {fmtSize(data.size)}
             {data.pages ? ` · ${data.pages} pagine` : ""}
             {data.language ? ` · lingua ${data.language}` : ""} · caricata {fmtUpdated(data.created_at)}

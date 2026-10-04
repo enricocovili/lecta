@@ -395,15 +395,13 @@ class Upload(Base):
 
 
 class SourceFile(Base):
-    """A file handed to the import by a lesson (before lessons: an upload, or a member of an uploaded zip). Kept privately."""
+    """A file handed to the import by a lesson: its slides, its notes, its pages written by hand. Kept privately."""
 
     __tablename__ = "source_files"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     upload_id: Mapped[int] = mapped_column(ForeignKey("uploads.id", ondelete="CASCADE"), index=True)
-    parent_id: Mapped[int | None] = mapped_column(Integer)  # the zip it came from
     name: Mapped[str] = mapped_column(Text)  # original file name (untrusted hint)
-    folder: Mapped[str | None] = mapped_column(Text)  # folder inside the zip / relative path (untrusted hint)
     kind: Mapped[str] = mapped_column(String(20))  # pdf | image | markdown | text | zip | unsupported | junk
     mime: Mapped[str | None] = mapped_column(String(100))
     size: Mapped[int] = mapped_column(BigInteger, default=0)

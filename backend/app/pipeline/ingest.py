@@ -54,7 +54,7 @@ async def extract(ctx: JobContext, upload_id: int) -> dict[str, Any]:
         files = list((await db.execute(select(SourceFile).where(SourceFile.upload_id == upload_id).order_by(SourceFile.id))).scalars())
 
     usable = [f for f in files if f.status == "ok" and f.kind in ("pdf", "image", "markdown", "text")]
-    usable.sort(key=lambda f: ({"pdf": 0, "markdown": 1, "text": 1, "image": 2}[f.kind], _natural(f.folder or ""), _natural(f.name)))
+    usable.sort(key=lambda f: ({"pdf": 0, "markdown": 1, "text": 1, "image": 2}[f.kind], _natural(f.name)))
     items: list[dict[str, Any]] = []
     figures: list[dict[str, Any]] = []
     unsupported = [f for f in files if f.status != "ok"]
@@ -71,8 +71,8 @@ async def extract(ctx: JobContext, upload_id: int) -> dict[str, Any]:
     total = max(1, len(usable))
     for n, f in enumerate(usable):
         await ctx.progress(0.03 + 0.12 * n / total, f"extracting {f.name}")
-        label = "/".join(filter(None, [f.folder, f.name]))
-        base_meta = {"folder": f.folder, "file": f.name, "file_label": label}
+        label = f.name
+        base_meta = {"file": f.name, "file_label": label}
         if f.kind == "pdf":
             try:
                 res = await run_cpu(pdfextract.extract_pdf, str(blobs.path_for(f.blob)), f"f{n + 1}")
@@ -175,8 +175,7 @@ def _natural(s: str) -> list[Any]:
 
 
 async def _mark_error(ctx: JobContext, f: SourceFile, reason: str) -> None:
-    label = "/".join(filter(None, [f.folder, f.name]))
-    await ctx.log(f"{label}: {reason}", "error", stage="analyze", item=label, kind="unreadable_file")
+    await ctx.log(f"{f.name}: {reason}", "error", stage="analyze", item=f.name, kind="unreadable_file")
     await _mark(f.id, "error", reason)
 
 

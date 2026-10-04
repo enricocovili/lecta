@@ -51,7 +51,7 @@ export interface ImportResult {
 
 interface Manifest {
   upload: { id: number; target_course_id: number | null; target_chapter_id: number | null; note: string | null } | null;
-  files: { id: number; name: string; folder: string | null; kind: string; size: number; pages: number | null; status: string; reason: string | null; language: string | null }[];
+  files: { id: number; name: string; kind: string; size: number; pages: number | null; status: string; reason: string | null; language: string | null }[];
   items: ItemView[];
   figures: FigureView[];
   results: ImportResult[];
@@ -240,7 +240,6 @@ export default function IngestManifest({ jobId, active }: { jobId: number; activ
                   <span className="badge">{f.kind}</span>
                   {f.pages ? ` · ${f.pages} pagine` : ""}
                   {f.language ? ` · ${f.language}` : ""} · {fmtSize(f.size)}
-                  {f.folder && <span className="mono"> · {f.folder}</span>}
                   {f.status !== "ok" && f.reason && <span> · {f.reason}</span>}
                 </div>
               </div>
