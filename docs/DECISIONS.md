@@ -456,7 +456,7 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 96. **Material comes in from the lessons only.** The upload page (`/admin/upload`), the phone page (`/admin/quick`) and
     `POST /api/uploads…` are gone: almost always the material belonged to the subject already open, and a lesson always
     has its subject, so the import never has to guess the course. The import keeps its `Upload` rows (a lesson makes one,
-    `via = "lesson"`), the source files and the manifest; the extraction still understands photos and folders, which
+    `via = "lesson"`), the source files and the manifest; the extraction still understands folders, which
     only the tests feed it now. The phone's home-screen icon opens the lessons.
 97. **No «Da smistare».** With material coming only from lessons the course is always known, so placement only chooses
     among the chapters of that course or starts a new one; nothing is left in an inbox. The inbox page and API, the

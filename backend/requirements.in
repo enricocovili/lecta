@@ -11,9 +11,6 @@ cryptography
 httpx
 pymupdf
 pillow
-pillow-heif
-opencv-python-headless
-numpy
 fastembed
 pgvector
 webauthn

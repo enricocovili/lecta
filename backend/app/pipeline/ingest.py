@@ -57,14 +57,11 @@ async def extract(ctx: JobContext, upload_id: int) -> dict[str, Any]:
 
     usable = [f for f in files if f.status == "ok" and f.kind in ("pdf", "image", "markdown", "text")]
     usable.sort(key=lambda f: ({"pdf": 0, "markdown": 1, "text": 1, "image": 2}[f.kind], _natural(f.folder or ""), _natural(f.name)))
-    by_path = {"/".join(filter(None, [f.folder or "", f.name])).lower(): f for f in usable}
-    md_images: set[int] = set()
     items: list[dict[str, Any]] = []
     figures: list[dict[str, Any]] = []
     unsupported = [f for f in files if f.status != "ok"]
     position = 0
 
-    # Markdown first, to know which images it references (they become pictures, not pages).
     md_results: dict[int, dict[str, Any]] = {}
     for f in usable:
         if f.kind in ("markdown", "text"):
@@ -72,14 +69,6 @@ async def extract(ctx: JobContext, upload_id: int) -> dict[str, Any]:
                 md_results[f.id] = await run_cpu(analyze.analyze_markdown, blobs.read_bytes(f.blob))
             except Exception as e:  # noqa: BLE001
                 md_results[f.id] = {"error": str(e)}
-                continue
-            for b in md_results[f.id].get("blocks", []):
-                if b["type"] == "image":
-                    rel = str(PurePosixPath(f.folder or "") / b["path"]).lower()
-                    target = by_path.get(str(PurePosixPath(rel)).lstrip("./")) or by_path.get(b["path"].lower().lstrip("./"))
-                    if target is not None and target.kind == "image":
-                        md_images.add(target.id)
-                        b["source_file_id"] = target.id
 
     total = max(1, len(usable))
     for n, f in enumerate(usable):
@@ -126,31 +115,18 @@ async def extract(ctx: JobContext, upload_id: int) -> dict[str, Any]:
                     figures.append({"key": pic["id"], "item_key": key, "origin": pic["origin"], "source_ref": f"source:{f.id}:p{pg['page']}",
                                     "crop_blob": pic["blob"], "bbox": pic["bbox"]})
         elif f.kind == "image":
-            if f.id in md_images:
-                continue
             fmeta = f.meta or {}
-            if fmeta.get("lesson_page"):
-                # A page of the lesson written on by hand: already a clean picture, nothing to straighten.
-                position += 1
-                items.append(
-                    {"key": f"i{position}", "source_file_id": f.id, "page": None, "kind": "handwritten", "label": fmeta.get("label") or label,
-                     "text": None, "image_blob": f.blob, "preview_blob": fmeta.get("preview"), "width": fmeta.get("width"),
-                     "height": fmeta.get("height"), "language": None, "position": position,
-                     "meta": {**base_meta, "ops": [], "lesson": True, "lesson_title": (fmeta.get("lesson") or {}).get("title"),
-                              "lesson_page": fmeta["lesson_page"]}}
-                )
+            if not fmeta.get("lesson_page"):
+                await _mark_error(ctx, f, "not a page of a lesson")
                 continue
-            try:
-                res = await run_cpu(analyze.preprocess_photo, blobs.read_bytes(f.blob))
-            except Exception as e:  # noqa: BLE001
-                await _mark_error(ctx, f, f"could not read the image: {e}")
-                continue
+            # A page of the lesson written on by hand: already a clean picture, nothing to straighten.
             position += 1
             items.append(
-                {"key": f"i{position}", "source_file_id": f.id, "page": None, "kind": "photo" if res["looks_like_photo"] else "handwritten",
-                 "label": label, "text": None, "image_blob": res["image_blob"], "preview_blob": res["preview_blob"], "width": res["width"],
-                 "height": res["height"], "language": None, "position": position,
-                 "meta": {**base_meta, "ops": res["ops"], "stats": res["stats"], "original_blob": res["original_blob"]}}
+                {"key": f"i{position}", "source_file_id": f.id, "page": None, "kind": "handwritten", "label": fmeta.get("label") or label,
+                 "text": None, "image_blob": f.blob, "preview_blob": fmeta.get("preview"), "width": fmeta.get("width"),
+                 "height": fmeta.get("height"), "language": None, "position": position,
+                 "meta": {**base_meta, "ops": [], "lesson": True, "lesson_title": (fmeta.get("lesson") or {}).get("title"),
+                          "lesson_page": fmeta["lesson_page"]}}
             )
         else:
             r = md_results.get(f.id) or {}
@@ -168,16 +144,9 @@ async def extract(ctx: JobContext, upload_id: int) -> dict[str, Any]:
                     code = b["code"].replace("\\end{verbatim}", "\\end {verbatim}")
                     latex = latex.replace(placeholder, f"\\begin{{verbatim}}\n{code}\n\\end{{verbatim}}")
                     notes = notes.replace(placeholder, f"```{b['type']}\n{b['code']}\n```")
-                elif b.get("source_file_id"):
-                    src = next(u for u in usable if u.id == b["source_file_id"])
-                    fig_key = f"m{n + 1}x{b['n']}"
-                    figures.append({"key": fig_key, "item_key": key, "origin": "md_image", "source_ref": f"source:{src.id}",
-                                    "crop_blob": await run_cpu(_markdown_image, src.blob), "description": b.get("alt")})
-                    latex = latex.replace(placeholder, f"\\lectaimage[{templates.tex_escape(b.get('alt') or '')}]{{{fig_key}}}")
-                    notes = notes.replace(placeholder, f"[[IMG {fig_key}]]" + (f" ({b['alt']})" if b.get("alt") else ""))
                 else:
-                    latex = latex.replace(placeholder, f"\\review{{Immagine non trovata nel caricamento: {templates.tex_escape(b.get('path', ''))}}}")
-                    notes = notes.replace(placeholder, f"(immagine non trovata nel caricamento: {b.get('path', '')})")
+                    latex = latex.replace(placeholder, f"\\review{{Immagine citata negli appunti, non disponibile: {templates.tex_escape(b.get('path', ''))}}}")
+                    notes = notes.replace(placeholder, f"(immagine citata negli appunti, non disponibile: {b.get('path', '')})")
             await _set_pages(f.id, None, r.get("language"))
             items.append(
                 {"key": key, "source_file_id": f.id, "page": None, "kind": "markdown" if f.kind == "markdown" else "text", "label": label,
@@ -201,14 +170,6 @@ async def extract(ctx: JobContext, upload_id: int) -> dict[str, Any]:
     summary = {"items": len(items), "figures": len(figures), "kinds": dict(kinds), "unsupported": [f"{f.name}: {f.reason}" for f in unsupported]}
     await ctx.log(f"extracted: {len(items)} items ({dict(kinds)}), {len(figures)} pictures, {len(unsupported)} skipped", stage="analyze")
     return summary
-
-
-def _markdown_image(blob: str) -> str:
-    """Images referenced from Markdown keep their original bytes when they are PNG/JPEG."""
-    data = blobs.read_bytes(blob)
-    if data[:3] == b"\xff\xd8\xff" or data[:8] == b"\x89PNG\r\n\x1a\n":
-        return blob
-    return analyze.preprocess_photo(data)["original_blob"]
 
 
 def _natural(s: str) -> list[Any]:

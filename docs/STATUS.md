@@ -170,7 +170,7 @@ Open work, ideas and bugs are tracked on the [Features board](https://github.com
   unmeasured. The fake provider only checks the mechanics.
 * Drawing was tested with mouse and synthetic pen/touch events, not on a real tablet and stylus.
 * Splitting one group across several chapters has no end-to-end test: the fake classifier always returns one placement.
-* Language detection and "photo vs. page of notes" are heuristics.
+* Language detection is a heuristic.
 * Idle memory is about 1 GB, ~720 MB of it the worker with the embedding model resident; setting the embedding model
   to *off* in Settings saves it (retrieval then runs lexical-only).
 * `docs/PLAN.md` describes the architecture before the redesigns; the interface prototype PDF still shows the old name.

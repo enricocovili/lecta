@@ -1,8 +1,6 @@
 """Small synthetic fixtures, generated deterministically at test time.
 
   slides.pdf        3 landscape "slides", page 2 embeds a raster block diagram
-  appunti.jpg       handwriting-like photo of a page on a table, EXIF-rotated
-  appunti.heic      the same photo as HEIC (if the encoder is available)
   note.md           Markdown with inline/display math, a Mermaid block, an ASCII diagram and a relative image
   img/schema.png    the image referenced by note.md
 """
@@ -11,7 +9,6 @@ from __future__ import annotations
 
 import io
 import math
-import random
 from pathlib import Path
 
 import fitz
@@ -89,46 +86,6 @@ def slides_pdf() -> bytes:
     return doc.tobytes()
 
 
-def handwriting_photo(fmt: str = "JPEG") -> bytes:
-    rnd = random.Random(42)
-    page = Image.new("RGB", (1100, 1500), (246, 242, 230))
-    d = ImageDraw.Draw(page)
-    f = _font(46)
-    lines = [
-        "Appunti 12/3 - sistemi LTI",
-        "stabilita BIBO <=> h assolutamente",
-        "integrabile",
-        "esempio: h(t) = e^(-t) u(t)",
-        "  -> stabile e causale",
-        "convoluzione: y = h * x",
-    ]
-    y = 110
-    for line in lines:
-        x = 90 + rnd.randint(-10, 10)
-        for ch in line:
-            d.text((x, y + rnd.randint(-3, 3)), ch, fill=(20, 30, 110), font=f)
-            x += d.textlength(ch, font=f) + rnd.uniform(-1, 2)
-        y += 120 + rnd.randint(-8, 8)
-    # A little hand-drawn arrow diagram.
-    d.rectangle((150, 900, 400, 1050), outline=(20, 30, 110), width=5)
-    d.rectangle((650, 900, 900, 1050), outline=(20, 30, 110), width=5)
-    d.line((400, 975, 640, 975), fill=(20, 30, 110), width=5)
-    d.polygon([(650, 975), (625, 962), (625, 988)], fill=(20, 30, 110))
-    page = page.rotate(4, expand=True, fillcolor=(80, 60, 45))
-    table = Image.new("RGB", (page.width + 260, page.height + 260), (80, 60, 45))
-    table.paste(page, (130, 130))
-    # Stored sideways with an EXIF orientation tag, like a phone photo.
-    stored = table.rotate(90, expand=True)
-    exif = Image.Exif()
-    exif[274] = 6
-    buf = io.BytesIO()
-    if fmt == "HEIC":
-        stored.save(buf, "HEIF", quality=80, exif=exif.tobytes())
-    else:
-        stored.save(buf, "JPEG", quality=85, exif=exif.tobytes())
-    return buf.getvalue()
-
-
 def schema_png() -> bytes:
     buf = io.BytesIO()
     block_diagram(700, 300).save(buf, "PNG")
@@ -147,11 +104,6 @@ def make_all(dest: Path) -> dict[str, Path]:
         return p
 
     write("slides.pdf", slides_pdf())
-    write("appunti.jpg", handwriting_photo("JPEG"))
-    try:
-        write("appunti.heic", handwriting_photo("HEIC"))
-    except Exception:  # pragma: no cover - encoder missing
-        pass
     write("note.md", MD.encode())
     write("img/schema.png", schema_png())
 

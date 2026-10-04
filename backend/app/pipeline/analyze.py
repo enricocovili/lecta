@@ -2,8 +2,6 @@
 
 * PDFs: text layer, embedded images, page classification heuristics,
   page renders at ~150 DPI for the models, higher-DPI crops for figures.
-* Photos: EXIF rotation, HEIC conversion, page detection + perspective crop,
-  deskew, contrast, downscale.
 * Markdown: diagram code blocks and relative images extracted, then
   `pandoc --sandbox` to LaTeX (math preserved).
 """
@@ -16,20 +14,11 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Any
 
-import cv2
 import fitz  # PyMuPDF
-import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image
 
 from ..services import blobs
 from ..services.texttools import detect_language
-
-try:
-    import pillow_heif
-
-    pillow_heif.register_heif_opener()
-except Exception:  # pragma: no cover
-    pillow_heif = None
 
 MODEL_DPI = 150
 CROP_DPI = 220
@@ -224,113 +213,6 @@ def crop_pdf(data: bytes, page: int, bbox: list[float], dpi: int = CROP_DPI) -> 
         return blobs.put_bytes(_png(im)), im.width, im.height
     finally:
         doc.close()
-
-
-# --------------------------------------------------------------------------- photos
-
-
-def _order_quad(pts: np.ndarray) -> np.ndarray:
-    s = pts.sum(axis=1)
-    d = np.diff(pts, axis=1).ravel()
-    return np.array([pts[np.argmin(s)], pts[np.argmin(d)], pts[np.argmax(s)], pts[np.argmax(d)]], dtype="float32")
-
-
-def _find_page(bgr: np.ndarray) -> np.ndarray | None:
-    h, w = bgr.shape[:2]
-    scale = 900 / max(h, w)
-    small = cv2.resize(bgr, (int(w * scale), int(h * scale))) if scale < 1 else bgr.copy()
-    scale = min(scale, 1.0)
-    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-    gray = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.Canny(gray, 50, 150)
-    edges = cv2.dilate(edges, np.ones((3, 3), np.uint8), iterations=2)
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    area = small.shape[0] * small.shape[1]
-    for c in sorted(contours, key=cv2.contourArea, reverse=True)[:5]:
-        if cv2.contourArea(c) < 0.3 * area:
-            break
-        approx = cv2.approxPolyDP(c, 0.02 * cv2.arcLength(c, True), True)
-        if len(approx) == 4 and cv2.isContourConvex(approx):
-            return _order_quad(approx.reshape(4, 2).astype("float32") / scale)
-    return None
-
-
-def _warp(bgr: np.ndarray, quad: np.ndarray) -> np.ndarray:
-    tl, tr, br, bl = quad
-    wa, wb = np.linalg.norm(br - bl), np.linalg.norm(tr - tl)
-    ha, hb = np.linalg.norm(tr - br), np.linalg.norm(tl - bl)
-    W, H = int(max(wa, wb)), int(max(ha, hb))
-    dst = np.array([[0, 0], [W - 1, 0], [W - 1, H - 1], [0, H - 1]], dtype="float32")
-    M = cv2.getPerspectiveTransform(quad, dst)
-    return cv2.warpPerspective(bgr, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-
-
-def _skew_angle(gray: np.ndarray) -> float:
-    small = gray
-    if max(gray.shape) > 1200:
-        s = 1200 / max(gray.shape)
-        small = cv2.resize(gray, (int(gray.shape[1] * s), int(gray.shape[0] * s)))
-    thr = cv2.threshold(small, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
-    # Join characters of a line so the dominant direction is the text baseline.
-    thr = cv2.morphologyEx(thr, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (25, 3)))
-    lines = cv2.HoughLinesP(thr, 1, np.pi / 360, threshold=80, minLineLength=small.shape[1] // 4, maxLineGap=20)
-    if lines is None:
-        return 0.0
-    angles = [np.degrees(np.arctan2(y2 - y1, x2 - x1)) for x1, y1, x2, y2 in np.asarray(lines).reshape(-1, 4)]
-    angles = [a for a in angles if abs(a) < 15]
-    return float(np.median(angles)) if angles else 0.0
-
-
-def preprocess_photo(data: bytes) -> dict[str, Any]:
-    im = Image.open(io.BytesIO(data))
-    ops = []
-    exif_orientation = None
-    try:
-        exif_orientation = im.getexif().get(274)
-    except Exception:
-        pass
-    im = ImageOps.exif_transpose(im)
-    if exif_orientation and exif_orientation != 1:
-        ops.append(f"exif-rotate({exif_orientation})")
-    if im.format in ("HEIF", "HEIC") or (pillow_heif and type(im).__name__.startswith("Heif")):
-        ops.append("heic→png")
-    im = im.convert("RGB")
-    original = _limit(im, 2400)
-    bgr = cv2.cvtColor(np.array(im), cv2.COLOR_RGB2BGR)
-    quad = _find_page(bgr)
-    if quad is not None:
-        bgr = _warp(bgr, quad)
-        ops.append("page-crop")
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    angle = _skew_angle(gray)
-    if abs(angle) > 0.4:
-        h, w = bgr.shape[:2]
-        M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
-        bgr = cv2.warpAffine(bgr, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-        ops.append(f"deskew({angle:.1f}°)")
-    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
-    l_ch, a_ch, b_ch = cv2.split(lab)
-    l_ch = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(l_ch)
-    bgr = cv2.cvtColor(cv2.merge((l_ch, a_ch, b_ch)), cv2.COLOR_LAB2BGR)
-    ops.append("contrast")
-    out = Image.fromarray(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
-    if max(out.size) > MAX_MODEL_SIDE:
-        ops.append("downscale")
-    out = _limit(out)
-    # A real photograph (not a page of notes): colourful, few "paper" pixels.
-    hsv = cv2.cvtColor(np.array(out), cv2.COLOR_RGB2HSV)
-    colourful = float((hsv[:, :, 1] > 90).mean())
-    paper = float((cv2.cvtColor(np.array(out), cv2.COLOR_RGB2GRAY) > 170).mean())
-    return {
-        "image_blob": blobs.put_bytes(_jpeg(out, 88)),
-        "preview_blob": _thumb(out),
-        "original_blob": blobs.put_bytes(_jpeg(original, 90)),
-        "width": out.width,
-        "height": out.height,
-        "ops": ops,
-        "looks_like_photo": colourful > 0.35 and paper < 0.3,
-        "stats": {"colourful": round(colourful, 3), "paper": round(paper, 3)},
-    }
 
 
 def crop_image(blob: str, bbox: list[float]) -> tuple[str, int, int]:

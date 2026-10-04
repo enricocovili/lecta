@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DO_NOT_TRACK=1 \
     LECTA_MODEL_DIR=/opt/models
 
-# pandoc (Markdown -> LaTeX, run with --sandbox); libgomp for onnxruntime/opencv.
+# pandoc (Markdown -> LaTeX, run with --sandbox); libgomp for onnxruntime.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends pandoc libgomp1 tini \
  && rm -rf /var/lib/apt/lists/*

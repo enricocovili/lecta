@@ -60,7 +60,7 @@ def build_units(items: list[IngestItem], *, max_pages: int, max_chars: int) -> l
             flush()
             units.append({"kind": "latex", "items": [it.key]})
             continue
-        if it.kind in ("photo", "handwritten"):
+        if it.kind in ("photo", "handwritten"):  # "photo": jobs from before lessons, retried
             flush()
             units.append({"kind": "photo", "items": [it.key]})
             continue

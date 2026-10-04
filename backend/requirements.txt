@@ -81,14 +81,10 @@ mmh3==5.3.0
     # via fastembed
 numpy==2.5.3
     # via
-    #   -r requirements.in
     #   fastembed
     #   onnxruntime
-    #   opencv-python-headless
 onnxruntime==1.30.0
     # via fastembed
-opencv-python-headless==5.0.0.93
-    # via -r requirements.in
 packaging==26.3
     # via
     #   huggingface-hub
@@ -99,9 +95,6 @@ pillow==12.3.0
     # via
     #   -r requirements.in
     #   fastembed
-    #   pillow-heif
-pillow-heif==1.8.0
-    # via -r requirements.in
 protobuf==7.36.2
     # via onnxruntime
 py-rust-stemmers==0.1.8
