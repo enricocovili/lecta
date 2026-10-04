@@ -28,9 +28,6 @@ const meta = (c: PubCourse) =>
 
   <div class="section-label pub-section">
     <span>Materie · {courses.length}</span>
-    {courses.length > 0 && (
-      <a class="link" href="/api/public/courses.zip" download><Icon name="download" />Scarica tutto (ZIP)</a>
-    )}
   </div>
 
   {courses.length === 0 ? (

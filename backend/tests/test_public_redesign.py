@@ -1,9 +1,6 @@
-"""Public site additions: byline, page ranges/sizes, the all-courses zip."""
+"""Public site additions: byline, page ranges/sizes."""
 
 from __future__ import annotations
-
-import io
-import zipfile
 
 import fitz
 
@@ -71,21 +68,6 @@ async def test_public_course_pages_and_sizes(admin, anon):
     assert "pdf_blob" not in str(detail)
 
 
-async def test_courses_zip_contains_only_published(admin, anon):
-    pub = await _fake_publish(admin, "Zip Pubblico")
-    secret = (await admin.post("/api/courses", json={"name": "Zip Segreto", "chapters": ["Intro"]})).json()
-    hidden = await _fake_publish(admin, "Zip Ritirato")
-    await admin.post(f"/api/courses/{hidden['id']}/unpublish")
-
-    r = await anon.get("/api/public/courses.zip")
-    assert r.status_code == 200
-    assert r.headers["content-type"] == "application/zip"
-    assert r.headers["content-disposition"].startswith("attachment")
-    zf = zipfile.ZipFile(io.BytesIO(r.content))
-    names = set(zf.namelist())
-    published = {f"{x['slug']}.pdf" for x in (await anon.get("/api/public/courses")).json()}
-    assert names == published
-    assert f"{pub['slug']}.pdf" in names
-    assert f"{secret['slug']}.pdf" not in names and f"{hidden['slug']}.pdf" not in names
-    assert zf.read(f"{pub['slug']}.pdf") == pub["pdf"]
-    assert all(i.compress_type == zipfile.ZIP_STORED for i in zf.infolist())
+async def test_no_all_courses_zip(anon):
+    """«Scarica tutto (ZIP)» is gone from the public site, and so is its endpoint."""
+    assert (await anon.get("/api/public/courses.zip")).status_code == 404

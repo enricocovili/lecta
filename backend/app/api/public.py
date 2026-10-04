@@ -6,11 +6,8 @@ immutable `publications` snapshots.
 
 from __future__ import annotations
 
-import zipfile
-from collections.abc import Iterator
-
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -104,59 +101,6 @@ def _pdf(h: str, filename: str) -> FileResponse:
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'inline; filename="{filename}"',
-            "Cache-Control": "public, max-age=300",
-        },
-    )
-
-
-class _Sink:
-    """Write-only file object for ZipFile: buffers what it gets until the generator drains it."""
-
-    def __init__(self) -> None:
-        self.parts: list[bytes] = []
-
-    def write(self, b: bytes) -> int:
-        self.parts.append(bytes(b))
-        return len(b)
-
-    def flush(self) -> None:
-        pass
-
-    def drain(self) -> bytes:
-        out = b"".join(self.parts)
-        self.parts.clear()
-        return out
-
-
-def _zip_stream(entries: list[tuple[str, str, tuple[int, ...]]]) -> Iterator[bytes]:
-    """Stream a zip of blobs (stored, not deflated: PDFs are already compressed), 1 MiB at a time."""
-    sink = _Sink()
-    with zipfile.ZipFile(sink, "w", compression=zipfile.ZIP_STORED) as zf:  # type: ignore[arg-type]
-        for name, h, when in entries:
-            info = zipfile.ZipInfo(name, date_time=when)  # type: ignore[arg-type]
-            with blobs.path_for(h).open("rb") as src, zf.open(info, "w", force_zip64=True) as dst:
-                while chunk := src.read(1 << 20):
-                    dst.write(chunk)
-                    if sink.parts:
-                        yield sink.drain()
-    yield sink.drain()  # local headers' trailers + central directory
-
-
-@router.get("/courses.zip")
-async def courses_zip(db: AsyncSession = Depends(get_db)) -> StreamingResponse:
-    """All published course PDFs in one archive (`<slug>.pdf` each)."""
-    entries = [
-        (f"{c.slug}.pdf", p.pdf_blob, p.created_at.timetuple()[:6])
-        for c, p in await _published(db)
-        if blobs.exists(p.pdf_blob)
-    ]
-    if not entries:
-        raise _nf()
-    return StreamingResponse(
-        _zip_stream(entries),
-        media_type="application/zip",
-        headers={
-            "Content-Disposition": 'attachment; filename="lecta.zip"',
             "Cache-Control": "public, max-age=300",
         },
     )

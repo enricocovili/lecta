@@ -483,3 +483,5 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      reader the same menu (PDF, LaTeX source, and the PDF of the chapter being read) replaces the two download buttons
      and the «Download» list under the index. It is a `<details>` (`DownloadMenu.tsx`), so it works without
      JavaScript; `Public.astro` closes it on an outside click, Escape and a pick.
+102. **No «Scarica tutto (ZIP)».** The public Home loses the link and `/api/public/courses.zip` is gone (it served only
+     that link): every course downloads from its own «Scarica» menu.
