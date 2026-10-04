@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { ApiError } from "../lib/api";
 import { Icon } from "./icons";
 
@@ -146,7 +147,8 @@ export function Modal({
       el.focus({ preventScroll: true }); // the button that opened the dialog must not answer Enter (it would open it again)
     }
   }, []);
-  return (
+  // On <body>, so that the place that opens it (a one-line row, a top bar) lends it none of its styles.
+  return createPortal(
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={dialog} tabIndex={-1} className={`modal ${wide ? "wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="row between nowrap" style={{ alignItems: "flex-start" }}>
@@ -158,7 +160,8 @@ export function Modal({
         <div style={{ marginTop: "1rem" }}>{children}</div>
         {actions && <div className="actions">{actions}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
