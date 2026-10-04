@@ -359,9 +359,9 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
                 setShowGenerate(true);
               }}
               data-testid="generate-open"
-              title="Aggiungi appunti e slide al testo da studiare della materia"
+              title="Integra appunti e slide nel testo da studiare della materia"
             >
-              Aggiungi al testo
+              Integra appunti
             </button>
           )}
           <button type="button" className="btn ghost icon les-wide" data-theme-toggle aria-label="Cambia tema" title="Tema chiaro / scuro">

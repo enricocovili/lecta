@@ -142,7 +142,7 @@ export default function CourseOverview({ courseId }: { courseId: number }) {
             </a>
           </div>
           {chapters.length === 0 ? (
-            <Empty icon="book">Ancora nessun capitolo: nasce quando aggiungi al testo una lezione.</Empty>
+            <Empty icon="book">Ancora nessun capitolo: nasce quando integri gli appunti di una lezione.</Empty>
           ) : (
             <div className="card flush rows">
               {chapters.map((ch, i) => (

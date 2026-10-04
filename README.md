@@ -144,7 +144,7 @@ switch between slide + notes side by side, notes below, or slides only. Everythi
 when the connection drops) and the screen stays on. The list of lessons shows each one with its subject and the
 «Completata» switch; the title opens it.
 
-**Aggiungi al testo** turns the lesson into the study text of the subject: your notes are the backbone (a section per slide),
+**Integra appunti** turns the lesson into the study text of the subject: your notes are the backbone (a section per slide),
 the slides complete them, and what you drew or wrote on a slide is read from a picture of the annotated slide. A lesson is **In corso** until its text is merged into the
 subject's notes, then **Completata** (the «Completata» switch changes it by hand). Before it
 starts you are asked for the subject's **writing guidelines** (kept for next time, editable in the subject's settings); with
@@ -156,13 +156,13 @@ Details: [docs/LESSONS.md](docs/LESSONS.md).
 ## From a lesson to the study text (import)
 
 Material comes in from the **lessons** only: there is no upload of loose files (no
-zips, no photos from the phone, no "choose a course later"). **Aggiungi al testo**
+zips, no photos from the phone, no "choose a course later"). **Integra appunti**
 on a lesson hands the import its slides (the PDF), the notes typed next to every
 slide and a picture of every slide you drew on. The lesson always belongs to a
 course, so the text always lands in that course. The class notes are the backbone
 of the text; a lesson with slides and no notes gets a summary of the slides.
 
-**Aggiungi al testo** starts a job that runs to the end by itself
+**Integra appunti** starts a job that runs to the end by itself
 (Estrazione › Lettura › Stesura › Inserimento):
 
 1. **Extraction** (local, no AI). PDFs: the text layer in reading

@@ -1,5 +1,5 @@
 // A lesson's state: «In corso» while it is being worked on, «Completata» once its text is merged into the subject's notes
-// (an «Aggiungi al testo» that wrote into a chapter sets it). The owner switches it by hand with a «Completata» switch;
+// (an «Integra appunti» that wrote into a chapter sets it). The owner switches it by hand with a «Completata» switch;
 // the read-only view shows it as a pill.
 import { useState } from "react";
 import { patch } from "../../lib/api";

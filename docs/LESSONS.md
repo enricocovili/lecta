@@ -124,7 +124,7 @@ so their lesson gets a new chapter the first time.
 Each course has `guidelines` (text, up to 8000 characters; empty = the AI decides). They are asked **every time a text is
 generated** from a lesson (`GenerateDialog`).
 The dialog is prefilled with the saved guidelines; when the box is empty a notice says
-*«Non hai inserito linee guida: genererò il testo in automatico…»* and the button reads «Aggiungi al testo» («Aggiungi con queste linee guida» with some). A checkbox keeps
+*«Non hai inserito linee guida: genererò il testo in automatico…»* and the button reads «Integra appunti» («Integra con queste linee guida» with some). A checkbox keeps
 the text as the course's guidelines (also editable in the course settings). They reach the writing step as an instruction
 (`compose.GUIDELINES_INTRO`) and the assistant's system prompt, and never override the reply format or the rules about
 formulas, pictures and not inventing content. An import started without saying anything about guidelines falls back to the
