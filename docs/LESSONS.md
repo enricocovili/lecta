@@ -15,8 +15,7 @@ pages added by hand (a slide never has enough room). Every page has:
   (palm rejection). Pressure changes the width of pen strokes. **Shape recognition** (toggle «Forme», on by default), as in Xournal++: when a stroke is let go and it is a straight line (an underline; a line within 3° of level or plumb is made exactly so), a rectangle (also tilted), a triangle or an ellipse (a circle when the axes differ by under 12 %), it is replaced by the clean shape (`components/lessons/shapes.ts`, tested with `npm test`). Anything small (under 5 % of the page width) is handwriting and is left alone, like scribbles and open arcs; undo takes the whole shape away.
 
 The screen is kept on (Wake Lock) while the editor is open, and the layout is chosen by the user: slide + notes side by
-side (automatic single column under ~860 px), notes below the slide, or slides only. Zoom, a page rail with dots for
-"has notes" / "has ink", previous/next page (buttons, or the ← / → keys, also in a shared lesson; not while typing or in a dialog).
+side (automatic single column under ~860 px), notes below the slide, or slides only. Zoom, previous/next page (buttons, or the ← / → keys, also in a shared lesson; not while typing or in a dialog).
 
 Everything is **saved once a minute and on Ctrl+S** (which replaces the browser's "save page", also while typing in a note; the
 state next to the title is one icon (da salvare, in salvataggio, salvata, or a warning while it keeps retrying), with its

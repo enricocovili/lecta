@@ -142,7 +142,10 @@ test.describe.serial("Lezioni", () => {
     await expect(pages.nth(3).locator("textarea")).toBeVisible();
 
     // Nothing is lost on reload, and the lesson opens on the page that was open last.
-    await page.locator(".les-rail-item").nth(2).click();
+    await expect(page.getByTestId("page-number")).toContainText("3 /");
+    await page.getByRole("button", { name: "Pagina precedente" }).click();
+    await expect(page.getByTestId("page-number")).toContainText("2 /");
+    await page.getByRole("button", { name: "Pagina successiva" }).click();
     await expect(page.getByTestId("page-number")).toContainText("3 /");
     const third = (await stored(page)).pages[2].id;
     await expect.poll(async () => (await stored(page)).last_page_id, { timeout: 10_000 }).toBe(third);

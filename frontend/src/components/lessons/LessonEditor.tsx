@@ -98,7 +98,6 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
   const [zoomIdx, setZoomIdx] = useLocalStorage("lecta:lesson:zoom", 2);
   const [awake, setAwake] = useLocalStorage("lecta:lesson:awake", true);
   const [preview, setPreview] = useState(false);
-  const [rail, setRail] = useLocalStorage("lecta:lesson:rail", true);
   const [current, setCurrent] = useState(0);
   const [showGenerate, setShowGenerate] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -161,16 +160,6 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
       window.removeEventListener("pagehide", sendBookmark);
     };
   }, [sendBookmark]);
-
-  // The list of pages on the left follows the page being looked at (it scrolls on its own when there are more pages than fit).
-  const railRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const nav = railRef.current;
-    const item = nav?.children[current] as HTMLElement | undefined;
-    if (!nav || !item) return;
-    const top = nav.scrollTop + item.getBoundingClientRect().top - nav.getBoundingClientRect().top - (nav.clientHeight - item.offsetHeight) / 2;
-    nav.scrollTo({ top: Math.max(0, top) });
-  }, [current, rail]);
 
   const draw = useMemo<DrawSettings>(
     () => ({ tool: readOnly ? "hand" : tool, color: COLORS[colorIdx], hlColor: HL_COLORS[hlIdx], penWidth: PEN_WIDTHS[Math.min(penSize, PEN_WIDTHS.length - 1)], hlWidth: HL_WIDTHS[Math.min(hlSize, HL_WIDTHS.length - 1)], fingerDraws, shapes }),
@@ -318,9 +307,6 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
             <Icon name="arrow-left" />
           </a>
         )}
-        <button type="button" className={`btn ghost icon hide-mobile ${rail ? "active" : ""}`} onClick={() => setRail(!rail)} aria-pressed={rail} aria-label="Elenco pagine" title="Elenco delle pagine">
-          <Icon name="list" />
-        </button>
         <input
           className="les-title"
           type="text"
@@ -546,17 +532,6 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
       </div>
 
       <div className="les-body">
-        {rail && (
-          <nav className="les-rail" aria-label="Pagine" ref={railRef}>
-            {pages.map((p, i) => (
-              <button key={p.id} type="button" className={`les-rail-item ${i === current ? "on" : ""}`} onClick={() => goTo(i)} title={labels[i]}>
-                <span>{p.kind === "slide" ? p.slide_page : "+"}</span>
-                {p.notes.trim() && <i className="dot notes" aria-label="con appunti" />}
-                {p.ink.length > 0 && <i className="dot ink" aria-label="con scritte" />}
-              </button>
-            ))}
-          </nav>
-        )}
         <div className="les-scroll" ref={scroller} data-testid="lesson-scroll">
           {pdfError && <div className="alert danger">Non riesco a leggere le slide: {pdfError}</div>}
           {store.gone && (

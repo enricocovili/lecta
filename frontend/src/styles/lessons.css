@@ -143,50 +143,6 @@ body.ws-page .les {
   min-height: 0;
   display: flex;
 }
-.les-rail {
-  flex: none;
-  width: 76px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.5rem 0.4rem;
-  background: var(--bg);
-  border-right: 1px solid var(--border);
-}
-.les-rail-item {
-  position: relative;
-  height: 40px;
-  flex: none;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
-  color: var(--fg-muted);
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-.les-rail-item.on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 600;
-}
-.les-rail-item .dot {
-  position: absolute;
-  bottom: 4px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-.les-rail-item .dot.notes {
-  left: 8px;
-  background: var(--accent-line);
-}
-.les-rail-item .dot.ink {
-  right: 8px;
-  background: var(--danger);
-}
 .les-scroll {
   flex: 1;
   min-width: 0;
@@ -357,16 +313,10 @@ body.ws-page .les {
     width: 34px;
     height: 34px;
   }
-  .les-rail-item {
-    height: 46px;
-  }
 }
 @media (max-width: 860px) {
   .les-course,
   .les-lbl {
-    display: none;
-  }
-  .les-rail {
     display: none;
   }
   .les-scroll {
