@@ -22,6 +22,9 @@ export interface Actions {
   setNotes: (pid: number, v: string) => void;
   addStroke: (pid: number, s: Stroke) => void;
   eraseStrokes: (pid: number, idx: number[]) => void;
+  moveStrokes: (pid: number, moves: { from: Stroke; to: Stroke }[]) => void;
+  /** the strokes of a page picked with the select tool (none: nothing selected) */
+  select: (pid: number, strokes: Stroke[]) => void;
   addBlankAfter: (pid: number | null) => void;
   removePage: (pid: number) => void;
   visible: (index: number) => void;
@@ -40,9 +43,11 @@ interface Props {
   scroller: RefObject<HTMLElement | null>;
   actions: Actions;
   label: string;
+  /** the strokes of this page that are selected (null: none here) */
+  selected: Stroke[] | null;
 }
 
-function PageRow({ page, index, doc, draw, layout, preview, readOnly = false, scroller, actions, label }: Props) {
+function PageRow({ page, index, doc, draw, layout, preview, readOnly = false, scroller, actions, label, selected }: Props) {
   const row = useRef<HTMLElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -92,6 +97,9 @@ function PageRow({ page, index, doc, draw, layout, preview, readOnly = false, sc
           shapes={draw.shapes}
           onAdd={(s) => actions.addStroke(page.id, s)}
           onErase={(idx) => actions.eraseStrokes(page.id, idx)}
+          selected={selected}
+          onSelect={(strokes) => actions.select(page.id, strokes)}
+          onMoveStrokes={(moves) => actions.moveStrokes(page.id, moves)}
         />
         <span className="les-tag">{label}</span>
       </div>

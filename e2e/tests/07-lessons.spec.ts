@@ -414,6 +414,99 @@ test.describe.serial("Lezioni", () => {
     con.assertClean(EXPECTED);
   });
 
+  test("the select tool picks strokes with a click or a rectangle, drags them elsewhere, deletes them, all undoable", async ({ page }) => {
+    test.setTimeout(120_000);
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`/admin/lessons?course=${courseId}`);
+    await page.getByTestId("lesson-row").locator("a.pg-row-title").click();
+    await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
+    const pages = page.getByTestId("lesson-page");
+    const count = (await stored(page)).pages.length;
+    await expect(pages).toHaveCount(count);
+
+    // A blank page at the end with two strokes on it.
+    await page.getByRole("button", { name: "Pagina bianca in fondo" }).click();
+    await expect(pages).toHaveCount(count + 1);
+    const last = count;
+    const surface = page.getByTestId("ink-surface").nth(last);
+    const ink = async () => (await stored(page)).pages[last].ink as { p: number[] }[];
+    await page.getByTestId("tool-pen").click();
+    await scribble(page, last, [0.1, 0.15], [0.3, 0.25]);
+    await scribble(page, last, [0.6, 0.6], [0.8, 0.7]);
+    await save(page);
+    const drawn = await ink();
+    expect(drawn).toHaveLength(2);
+    const at = async (fx: number, fy: number) => {
+      const b = (await surface.boundingBox())!;
+      return [b.x + b.width * fx, b.y + b.height * fy] as const;
+    };
+
+    // A click picks the stroke under it; dragging it moves it (by a tenth of the page's width here).
+    await page.keyboard.press("s");
+    await expect(page.getByTestId("tool-select")).toHaveAttribute("aria-pressed", "true");
+    const count1 = page.getByTestId("selection-count");
+    await expect(count1).toContainText("Clic su un tratto");
+    const [ax, ay] = await at(0.1, 0.15);
+    await page.mouse.click(ax, ay);
+    await expect(count1).toHaveText("1 tratto selezionato");
+    const width = (await surface.boundingBox())!.width;
+    await page.mouse.move(ax, ay);
+    await page.mouse.down();
+    await page.mouse.move(ax + width * 0.05, ay, { steps: 4 });
+    await page.mouse.move(ax + width * 0.1, ay, { steps: 4 });
+    await page.mouse.up();
+    await save(page);
+    const moved = await ink();
+    expect(moved[0].p[0]).toBeCloseTo(drawn[0].p[0] + 0.1, 2);
+    expect(moved[0].p[1]).toBeCloseTo(drawn[0].p[1], 2);
+    expect(moved[1]).toEqual(drawn[1]);
+    await expect(count1).toHaveText("1 tratto selezionato");
+
+    // Undo puts it back where it was, redo moves it again.
+    await page.keyboard.press("Control+z");
+    await save(page);
+    expect((await ink())[0]).toEqual(drawn[0]);
+    await page.keyboard.press("Control+Shift+z");
+    await save(page);
+    expect((await ink())[0].p[0]).toBeCloseTo(drawn[0].p[0] + 0.1, 2);
+
+    // A click on an empty spot lets go; a rectangle around both picks both; Canc deletes them, undo brings them back.
+    const [ex, ey] = await at(0.5, 0.9);
+    await page.mouse.click(ex, ey);
+    await expect(count1).toContainText("Clic su un tratto");
+    const [rx0, ry0] = await at(0.02, 0.03);
+    const [rx1, ry1] = await at(0.97, 0.95);
+    await page.mouse.move(rx0, ry0);
+    await page.mouse.down();
+    await page.mouse.move(rx1, ry1, { steps: 8 });
+    await page.mouse.up();
+    await expect(count1).toHaveText("2 tratti selezionati");
+    await page.keyboard.press("Delete");
+    await expect(count1).toContainText("Clic su un tratto");
+    await save(page);
+    expect(await ink()).toHaveLength(0);
+    await page.keyboard.press("Control+z");
+    await save(page);
+    expect(await ink()).toHaveLength(2);
+
+    // The toolbar's button deletes too.
+    await page.mouse.move(rx0, ry0);
+    await page.mouse.down();
+    await page.mouse.move(rx1, ry1, { steps: 8 });
+    await page.mouse.up();
+    await page.getByTestId("delete-selection").click();
+    await save(page);
+    expect(await ink()).toHaveLength(0);
+
+    // The page goes away again, so the lesson is as it was.
+    await pages.nth(last).getByTestId("remove-page").click();
+    await page.keyboard.press("Enter");
+    await expect(pages).toHaveCount(count);
+    await page.getByTestId("tool-pen").click();
+    con.assertClean(EXPECTED);
+  });
+
   test("a lesson shared with a link: readers only look and follow, the write link edits, a revoked link stops", async ({ page, browser, baseURL }) => {
     test.setTimeout(180_000);
     const con = watchConsole(page);

@@ -9,7 +9,7 @@ import { Confirm, Seg, toastError, useLocalStorage } from "../ui";
 import GenerateDialog from "./GenerateDialog";
 import { clampZoom, stepZoom, useGestures, ZOOM_MAX, ZOOM_MIN, type GestureOptions } from "./gestures";
 import ShareDialog from "./ShareDialog";
-import { COLORS, HL_COLORS, HL_WIDTHS, PEN_WIDTHS, type Tool } from "./ink";
+import { COLORS, HL_COLORS, HL_WIDTHS, PEN_WIDTHS, type Stroke, type Tool } from "./ink";
 import LessonStatusPill, { type LessonStatus } from "./LessonStatus";
 import PageRow, { type Actions, type DrawSettings } from "./PageRow";
 import { usePdfDoc } from "./SlideView";
@@ -113,6 +113,8 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   const [showGenerate, setShowGenerate] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [askRemove, setAskRemove] = useState<number | null>(null);
+  // What the select tool picked: strokes of one page.
+  const [selection, setSelection] = useState<{ pid: number; strokes: Stroke[] } | null>(null);
 
   useEffect(() => {
     if (owner) get<unknown[]>(`/api/lessons/${lesson.id}/shares`).then((l) => setHasShares(l.length > 0)).catch(() => undefined);
@@ -180,7 +182,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   gestureOpts.current = { tool: draw.tool, fingerDraws, zoom, setZoom };
   const zoomTo = useGestures(scroller, gestureOpts);
 
-  const { setNotes, addStroke, eraseStrokes, addBlankAfter, removePage, undo, redo, flushAll } = store;
+  const { setNotes, addStroke, eraseStrokes, moveStrokes, addBlankAfter, removePage, undo, redo, flushAll } = store;
   const save = useCallback(async () => {
     if (!(await flushAll())) toastError(new Error("Non riesco a salvare: riprovo appena torna la connessione"));
   }, [flushAll]);
@@ -196,6 +198,11 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
       setNotes,
       addStroke,
       eraseStrokes,
+      moveStrokes: (pid, moves) => {
+        moveStrokes(pid, moves);
+        setSelection({ pid, strokes: moves.map((m) => m.to) });
+      },
+      select: (pid, strokes) => setSelection(strokes.length ? { pid, strokes } : null),
       visible: setCurrent,
       addBlankAfter: (pid) => {
         addBlankAfter(pid)
@@ -204,8 +211,26 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
       },
       removePage: setAskRemove,
     }),
-    [setNotes, addStroke, eraseStrokes, addBlankAfter],
+    [setNotes, addStroke, eraseStrokes, moveStrokes, addBlankAfter],
   );
+
+  // The selection is let go when another tool is picked, and keeps only the strokes that are still there (undo, erasing,
+  // someone else's save).
+  useEffect(() => {
+    if (tool !== "select") setSelection(null);
+  }, [tool]);
+  useEffect(() => {
+    if (!selection) return;
+    const ink = pages.find((p) => p.id === selection.pid)?.ink ?? [];
+    const still = selection.strokes.filter((s) => ink.includes(s));
+    if (still.length !== selection.strokes.length) setSelection(still.length ? { pid: selection.pid, strokes: still } : null);
+  }, [pages, selection]);
+  const deleteSelection = useCallback(() => {
+    if (!selection) return;
+    const ink = pagesRef.current.find((p) => p.id === selection.pid)?.ink ?? [];
+    eraseStrokes(selection.pid, selection.strokes.map((s) => ink.indexOf(s)).filter((i) => i >= 0));
+    setSelection(null);
+  }, [selection, eraseStrokes]);
 
   // Keyboard: ← / → go to the previous / next page (also in the read-only share view; not while typing or in a dialog).
   useEffect(() => {
@@ -248,17 +273,23 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
       } else if (mod && e.key.toLowerCase() === "y") {
         e.preventDefault();
         redo();
+      } else if ((e.key === "Delete" || e.key === "Backspace") && selection) {
+        e.preventDefault();
+        deleteSelection();
+      } else if (e.key === "Escape" && selection) {
+        setSelection(null);
       } else if (!mod && !e.altKey) {
         const k = e.key.toLowerCase();
         if (k === "p") setTool("pen");
         else if (k === "h") setTool("hl");
         else if (k === "e") setTool("eraser");
+        else if (k === "s") setTool("select");
         else if (k === "v") setTool("hand");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, save, readOnly]);
+  }, [undo, redo, save, readOnly, selection, deleteSelection]);
 
   // Keep the screen on while taking notes in class.
   useEffect(() => {
@@ -448,6 +479,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
           <ToolButton id="pen" icon="pencil" label="Penna (P)" tool={tool} onPick={setTool} />
           <ToolButton id="hl" icon="highlighter" label="Evidenziatore (H)" tool={tool} onPick={setTool} />
           <ToolButton id="eraser" icon="eraser" label="Gomma (E)" tool={tool} onPick={setTool} />
+          <ToolButton id="select" icon="select" label="Seleziona (S)" tool={tool} onPick={setTool} />
           <ToolButton id="hand" icon="hand" label="Scorri, senza scrivere (V)" tool={tool} onPick={setTool} />
         </div>
         {(tool === "pen" || tool === "hl") && (
@@ -479,6 +511,17 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
                 </button>
               ))}
             </div>
+          </>
+        )}
+        {tool === "select" && (
+          <>
+            <span className="les-sel-hint muted small" data-testid="selection-count">
+              {selection ? `${selection.strokes.length} ${selection.strokes.length === 1 ? "tratto selezionato" : "tratti selezionati"}` : "Clic su un tratto, o trascina un rettangolo"}
+            </span>
+            <button type="button" className="btn" onClick={deleteSelection} disabled={!selection} data-testid="delete-selection" title="Elimina i tratti selezionati (Canc)">
+              <Icon name="trash" />
+              <span className="les-lbl">Elimina</span>
+            </button>
           </>
         )}
         <div className="btn-group">
@@ -587,6 +630,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
                 scroller={scroller}
                 actions={actions}
                 label={labels[i]}
+                selected={selection?.pid === p.id ? selection.strokes : null}
               />
             ))}
             {!readOnly && (

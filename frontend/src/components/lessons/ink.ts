@@ -1,7 +1,7 @@
 // Ink: the pen strokes of a lesson page. Coordinates are in units of the page's width (x and y alike), so the
 // same numbers fit every zoom and screen, and match what the server stores and draws on the annotated PDF.
 
-export type Tool = "pen" | "hl" | "eraser" | "hand";
+export type Tool = "pen" | "hl" | "eraser" | "select" | "hand";
 
 export interface Stroke {
   /** pen | hl (highlighter) */
@@ -195,4 +195,40 @@ function distToSegment(px: number, py: number, ax: number, ay: number, bx: numbe
   const len2 = dx * dx + dy * dy;
   const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+// ------------------------------------------------------------------ selection
+
+/** How close (page widths) a click has to be to a stroke to pick it. */
+export const PICK_RADIUS = 0.008;
+
+/** The stroke a click at x, y picks (the one drawn on top: pens over highlighters, the latest first), or -1. */
+export function pick(strokes: Stroke[], x: number, y: number, r = PICK_RADIUS): number {
+  for (const kind of ["pen", "hl"] as const) {
+    for (let i = strokes.length - 1; i >= 0; i--) if (strokes[i].t === kind && hits(strokes[i], x, y, r)) return i;
+  }
+  return -1;
+}
+
+/** Whether all of a stroke lies inside the rectangle (the selection rectangle takes what it encloses, like Xournal++). */
+export function inside(s: Stroke, r: Rect): boolean {
+  const b = boxOf(s);
+  return b.x0 >= Math.min(r.x0, r.x1) && b.x1 <= Math.max(r.x0, r.x1) && b.y0 >= Math.min(r.y0, r.y1) && b.y1 <= Math.max(r.y0, r.y1);
+}
+
+/** The rectangle around some strokes (ink width included), or null for none. */
+export function boundsOf(strokes: Stroke[]): Rect | null {
+  return strokes.reduce<Rect | null>((acc, s) => unionRect(acc, strokeRect(s)), null);
+}
+
+/** The stroke moved by dx, dy (a new object: the history keeps the old one). */
+export function moveStroke(s: Stroke, dx: number, dy: number): Stroke {
+  return roundStroke({ ...s, p: s.p.map((v, i) => (i % 3 === 0 ? v + dx : i % 3 === 1 ? v + dy : v)) });
+}
+
+/** The move asked for, kept so that the box stays on the page (`ratio` = height / width); a box already past an edge is not
+ *  pulled back, only kept from going further. */
+export function clampShift(box: Rect, dx: number, dy: number, ratio: number): { dx: number; dy: number } {
+  const lim = (d: number, lo: number, hi: number) => Math.min(Math.max(d, Math.min(0, lo)), Math.max(0, hi));
+  return { dx: lim(dx, -box.x0, 1 - box.x1), dy: lim(dy, -box.y0, ratio - box.y1) };
 }

@@ -1,6 +1,6 @@
 // The pages of a lesson while they are being written: edits apply at once, are saved once a minute or when asked (Ctrl+S; and
 // at once when the tab is hidden or the structure changes), survive a lost connection (kept in memory and mirrored in localStorage, retried with a growing delay) and
-// can be undone: one history for strokes, erasing, typed notes and removed pages, in the order things were done.
+// can be undone: one history for strokes, erasing, moving, typed notes and removed pages, in the order things were done.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, post, del } from "../../lib/api";
 import { toastError } from "../ui";
@@ -23,6 +23,7 @@ export type SaveState = "saved" | "pending" | "saving" | "offline";
 type Action =
   | { type: "add"; pid: number; stroke: Stroke }
   | { type: "erase"; pid: number; items: { index: number; stroke: Stroke }[] }
+  | { type: "move"; pid: number; moves: { from: Stroke; to: Stroke }[] }
   | { type: "notes"; pid: number; patch: NotesPatch; at: number }
   | { type: "remove"; pid: number; page: PageState; index: number };
 
@@ -384,6 +385,18 @@ export function useLessonPages(src: LessonSource, initial: PageState[], poll: nu
     [markDirty, patchPage, pushHistory],
   );
 
+  /** Strokes moved with the select tool: each one is replaced, in its place, by its moved copy. */
+  const moveStrokes = useCallback(
+    (pid: number, moves: { from: Stroke; to: Stroke }[]) => {
+      if (!moves.length) return;
+      const map = new Map(moves.map((m) => [m.from, m.to]));
+      patchPage(pid, (p) => ({ ...p, ink: p.ink.map((s) => map.get(s) ?? s) }));
+      pushHistory({ type: "move", pid, moves });
+      markDirty(pid, "ink");
+    },
+    [markDirty, patchPage, pushHistory],
+  );
+
   // ------------------------------------------------------------------ structure
 
   const addBlankAfter = useCallback(
@@ -473,7 +486,10 @@ export function useLessonPages(src: LessonSource, initial: PageState[], poll: nu
         return;
       }
       const drop = (strokes: Stroke[]) => patchPage(a.pid, (p) => ({ ...p, ink: p.ink.filter((s) => !strokes.includes(s)) }));
-      if (a.type === "add") {
+      if (a.type === "move") {
+        const map = new Map(a.moves.map((m) => (inverse ? [m.to, m.from] : [m.from, m.to])));
+        patchPage(a.pid, (p) => ({ ...p, ink: p.ink.map((s) => map.get(s) ?? s) }));
+      } else if (a.type === "add") {
         if (inverse) drop([a.stroke]);
         else patchPage(a.pid, (p) => ({ ...p, ink: [...p.ink, a.stroke] }));
       } else if (inverse) {
@@ -522,7 +538,7 @@ export function useLessonPages(src: LessonSource, initial: PageState[], poll: nu
   );
 
   return useMemo(
-    () => ({ pages, saveState, gone, syncNow, setNotes, addStroke, eraseStrokes, undo, redo, canUndo: hist.undo > 0, canRedo: hist.redo > 0, addBlankAfter, removePage, flushAll }),
-    [pages, saveState, gone, syncNow, setNotes, addStroke, eraseStrokes, undo, redo, hist, addBlankAfter, removePage, flushAll],
+    () => ({ pages, saveState, gone, syncNow, setNotes, addStroke, eraseStrokes, moveStrokes, undo, redo, canUndo: hist.undo > 0, canRedo: hist.redo > 0, addBlankAfter, removePage, flushAll }),
+    [pages, saveState, gone, syncNow, setNotes, addStroke, eraseStrokes, moveStrokes, undo, redo, hist, addBlankAfter, removePage, flushAll],
   );
 }

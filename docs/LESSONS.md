@@ -9,8 +9,11 @@ pages added by hand (a slide never has enough room). Every page has:
 * **Markdown notes**, next to the slide (or below it): a plain text field that continues lists on Enter, indents with
   Tab, wraps `**bold**` / `*italic*` with Ctrl+B / Ctrl+I, grows with what is written, and has a rendered preview
   (maths with KaTeX). There is no limit to the room: the row grows past the slide.
-* **Ink over the slide**: pen (3 widths, 6 colours), highlighter, stroke eraser (drawn as a ring that follows the pointer, also while erasing; also the stylus' eraser end), a "hand" tool
-  that only scrolls, undo/redo (Ctrl+Z, Ctrl+Shift+Z): **one history** in the order things were done — strokes, erasing, the typed notes (typing in bursts, one step per pause or paste, kept as small patches in `components/lessons/history.ts`, also while the cursor is in a note) and removed pages (a removed slide asks in a dialog, and comes back with its notes and strokes through `pages/restore`). Mouse, stylus and finger; by default a finger scrolls the page and
+* **Ink over the slide**: pen (3 widths, 6 colours), highlighter, stroke eraser (drawn as a ring that follows the pointer, also while erasing; also the stylus' eraser end), a **select** tool (S: a click
+  picks the stroke under it, the one on top, and dragging moves it at once; a drag on an empty spot draws a rectangle that picks
+  the strokes it encloses; a drag inside the dashed box moves the whole selection, kept on the page; Shift adds or removes a
+  stroke; Canc/Backspace or «Elimina» deletes it, Esc or a click on an empty spot lets it go; one page at a time), a "hand" tool
+  that only scrolls, undo/redo (Ctrl+Z, Ctrl+Shift+Z): **one history** in the order things were done — strokes, erasing, moving a selection, the typed notes (typing in bursts, one step per pause or paste, kept as small patches in `components/lessons/history.ts`, also while the cursor is in a note) and removed pages (a removed slide asks in a dialog, and comes back with its notes and strokes through `pages/restore`). Mouse, stylus and finger; by default a finger scrolls the page and
   only mouse and pen write ("Dito scrive" makes the finger write). Fingers are handled once for the whole editor
   (`components/lessons/gestures.ts`): a drag scrolls as soon as it moves a few pixels and glides on when flicked, the hand tool
   also scrolls with pen and mouse. **Palm rejection** looks at what the pen does, not at when it was last seen: a touch is the

@@ -41,3 +41,48 @@ test("erased strokes are skipped and the region is the union of what was erased"
   drawRegion(ctx, strokes, 1000, r, new Set([0]));
   assert.equal(log.strokes, 1);
 });
+
+// ------------------------------------------------------------------ selection
+
+import { boundsOf, clampShift, inside, moveStroke, pick } from "../src/components/lessons/ink.ts";
+
+test("a click picks the stroke under it, the one drawn on top when several are: pens over highlighters, the latest first", () => {
+  const hl = stroke(0.1, 0.5, 0.9, 0.5, "hl");
+  const first = stroke(0.1, 0.5, 0.9, 0.5);
+  const latest = stroke(0.5, 0.2, 0.5, 0.8);
+  const strokes = [first, latest, hl];
+  assert.equal(pick(strokes, 0.5, 0.5), 1);
+  assert.equal(pick(strokes, 0.2, 0.502), 0);
+  assert.equal(pick([hl], 0.2, 0.5), 0);
+  assert.equal(pick(strokes, 0.2, 0.7), -1);
+});
+
+test("the selection rectangle takes the strokes it encloses, drawn in any direction, not those it only crosses", () => {
+  const small = stroke(0.2, 0.2, 0.3, 0.25);
+  const long = stroke(0.2, 0.4, 0.9, 0.4);
+  assert.equal(inside(small, { x0: 0.1, y0: 0.1, x1: 0.4, y1: 0.3 }), true);
+  assert.equal(inside(small, { x0: 0.4, y0: 0.3, x1: 0.1, y1: 0.1 }), true);
+  assert.equal(inside(long, { x0: 0.1, y0: 0.3, x1: 0.5, y1: 0.5 }), false);
+  assert.equal(boundsOf([]), null);
+  const b = boundsOf([small, long]);
+  assert.ok(b.x0 < 0.2 && b.x1 > 0.9 && b.y0 < 0.2 && b.y1 > 0.4);
+});
+
+test("a moved stroke is a new one with the same look, every point shifted and the pressure untouched", () => {
+  const s = { t: "pen", c: "#d32f2f", w: 0.003, p: [0.1, 0.2, 0.4, 0.3, 0.25, 0.9] };
+  const m = moveStroke(s, 0.05, -0.1);
+  assert.notEqual(m, s);
+  assert.deepEqual(s.p, [0.1, 0.2, 0.4, 0.3, 0.25, 0.9]);
+  assert.deepEqual(m, { t: "pen", c: "#d32f2f", w: 0.003, p: [0.15, 0.1, 0.4, 0.35, 0.15, 0.9] });
+});
+
+test("a selection dragged past an edge of the page stops at it", () => {
+  const box = { x0: 0.1, y0: 0.1, x1: 0.3, y1: 0.2 };
+  assert.deepEqual(clampShift(box, 0.2, 0.1, 0.75), { dx: 0.2, dy: 0.1 });
+  assert.deepEqual(clampShift(box, -0.5, 0.9, 0.75), { dx: -0.1, dy: 0.55 });
+  assert.deepEqual(clampShift(box, 0.9, -0.5, 0.75), { dx: 0.7, dy: -0.1 });
+  // Already past the edge (a pen stroke's width): it can still move back in, not further out.
+  const out = { x0: -0.01, y0: 0.1, x1: 0.2, y1: 0.2 };
+  assert.deepEqual(clampShift(out, -0.05, 0, 0.75), { dx: 0, dy: 0 });
+  assert.deepEqual(clampShift(out, 0.05, 0, 0.75), { dx: 0.05, dy: 0 });
+});

@@ -254,6 +254,12 @@ body.ws-page .les {
 .les-ink.tool-hand {
   cursor: grab;
 }
+.les-ink.tool-select {
+  cursor: default;
+}
+.les-sel-hint {
+  white-space: nowrap;
+}
 
 .les-notes {
   display: flex;
@@ -333,6 +339,7 @@ body.ws-page .les {
 }
 @media (max-width: 860px) {
   .les-course,
+  .les-sel-hint,
   .les-lbl {
     display: none;
   }

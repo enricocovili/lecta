@@ -515,3 +515,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      box (CSS), so the old picture stretches until the new one is drawn, and never get more than 8 M pixels, which at 300 %
      lowers their density instead of taking hundreds of MB per page. The zoom is continuous now (`lecta:lesson:scale`), the
      buttons step from wherever a pinch left it.
+107. **Selected strokes are moved by replacing them.** The select tool picks strokes by identity (the editor keeps the stroke
+     objects, not their indices, so a selection survives others being added or erased) and a move puts a moved copy in each
+     one's place; the history keeps the pairs (`move`: from → to), so undo swaps them back and nothing else on the page moves.
+     The rectangle takes only the strokes it **encloses** (as in Xournal++), so selecting the writing inside a hand-drawn box
+     does not take the box. Deleting the selection is an ordinary erase (one step). Moves are kept on the page, since the server
+     draws the strokes on the slide and anything off it would be lost in the annotated PDF.
