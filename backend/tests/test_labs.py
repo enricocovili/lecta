@@ -60,7 +60,8 @@ def test_comment_anchors_are_validated():
     assert lb.clean_anchor({}) == {} and lb.clean_anchor(None) == {}
     assert lb.clean_anchor({"from": 3, "to": 5, "text": "int x;", "extra": 1}) == {"from": 3, "to": 5, "text": "int x;"}
     assert lb.clean_anchor({"from": 2}) == {"from": 2, "to": 2, "text": ""}
-    for bad in ([], "x", {"from": 0}, {"from": 5, "to": 3}, {"from": "1"}, {"from": True}, {"from": 1, "text": 3}, {"page": 1}):
+    assert lb.clean_anchor({"cell": 3, "x": 1}) == {"cell": 3} and lb.clean_anchor({"page": 12}) == {"page": 12}
+    for bad in ([], "x", {"from": 0}, {"from": 5, "to": 3}, {"from": "1"}, {"from": True}, {"from": 1, "text": 3}, {"page": 0}, {"cell": "2"}, {"other": 1}):
         with pytest.raises(lb.AnchorError):
             lb.clean_anchor(bad)
 

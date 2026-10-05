@@ -156,7 +156,8 @@ Details: [docs/LESSONS.md](docs/LESSONS.md).
 **Laboratorio**: every lesson can have a lab, opened from its top bar («Laboratorio»; the lab leads back with «Lezione
 teorica»). Load the files explained in class (sources of any language, notebooks, PDFs, pictures; several at once, whole
 folders too, by picker or drag and drop, up to 20 MB each) and read them in a file tree with the colours of their language.
-Select lines and **comment** them while the lecturer explains (Markdown and maths, saved like the lesson's notes), or comment
+Notebooks show their cells and saved outputs (never run, no HTML), PDFs their pages.
+Select lines, a cell or a page and **comment** them while the lecturer explains (Markdown and maths, saved like the lesson's notes), or comment
 a whole file; **edit** a text file by hand (the comments follow their lines); free **notes** of the lab sit next to the files. Files are never executed. The lab stays apart from the study text and is private for now. Details: [docs/LABS.md](docs/LABS.md).
 
 ## From a lesson to the study text (import)

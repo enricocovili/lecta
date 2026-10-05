@@ -137,7 +137,8 @@ class AnchorError(ValueError):
 
 
 def clean_anchor(raw: object) -> dict:
-    """Where a comment sits: `{}` (the whole file) or `{from, to, text}` (lines, 1-based, with their text)."""
+    """Where a comment sits: `{}` (the whole file), `{from, to, text}` (lines, 1-based, with their text), `{cell}` (a cell of a
+    notebook) or `{page}` (a page of a PDF)."""
     if raw in (None, {}):
         return {}
     if not isinstance(raw, dict):
@@ -153,6 +154,12 @@ def clean_anchor(raw: object) -> dict:
         if raw.get("gone") is True:  # its lines were removed by an edit: the comment stays on the file
             out["gone"] = True
         return out
+    for key in ("cell", "page"):  # a cell of a notebook, a page of a PDF (1-based)
+        if key in raw:
+            n = raw[key]
+            if not isinstance(n, int) or isinstance(n, bool) or not 1 <= n <= 100_000:
+                raise AnchorError("Posizione del commento non valida")
+            return {key: n}
     raise AnchorError("Posizione del commento non valida")
 
 

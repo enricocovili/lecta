@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { login, watchConsole } from "./helpers";
 
 const EXPECTED = [/status of 404/];
@@ -17,10 +18,19 @@ int main(void) {
   return 0;
 }
 `;
-const PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-  "base64",
-);
+const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+const PNG = Buffer.from(PNG_B64, "base64");
+
+const NOTEBOOK = JSON.stringify({
+  nbformat: 4,
+  metadata: { language_info: { name: "python" } },
+  cells: [
+    { cell_type: "markdown", source: ["# Liste in Python\n", "Una **lista** si scorre con `for`."] },
+    { cell_type: "code", execution_count: 1, source: ["for x in [1, 2, 3]:\n", "    print(x * 2)"], outputs: [{ output_type: "stream", name: "stdout", text: ["2\n", "4\n", "6\n"] }] },
+    { cell_type: "code", execution_count: 2, source: ["1 / 0"], outputs: [{ output_type: "error", ename: "ZeroDivisionError", evalue: "division by zero", traceback: ["\u001b[31mZeroDivisionError\u001b[0m"] }] },
+    { cell_type: "code", execution_count: 3, source: ["show()"], outputs: [{ output_type: "display_data", data: { "text/html": "<b id='evil'>no</b>" } }, { output_type: "display_data", data: { "image/png": PNG_B64 } }] },
+  ],
+});
 
 /** A new lesson without slides in a new course; returns the lesson's address. */
 async function newLesson(page: Page, course: string, title: string): Promise<string> {
@@ -197,6 +207,53 @@ test.describe.serial("Laboratorio", () => {
     await page.reload();
     await expect(card).toContainText("Righe rimosse");
     await expect(code).not.toContainText("int somma(int n)");
+    con.assertClean(EXPECTED);
+  });
+
+  test("notebooks show their cells and PDFs their pages, each with its comments", async ({ page }) => {
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`${lessonPath}/lab`);
+    await page.getByTestId("lab-file-input").setInputFiles([
+      { name: "liste.ipynb", mimeType: "application/json", buffer: Buffer.from(NOTEBOOK) },
+      { name: "testo.pdf", mimeType: "application/pdf", buffer: readFileSync("/e2e/.fixtures/slides.pdf") },
+    ]);
+    await expect(page.getByTestId("lab-file")).toHaveCount(5);
+
+    // The notebook: Markdown rendered, code coloured, outputs as saved, no HTML.
+    await page.getByTestId("lab-file").filter({ hasText: "liste.ipynb" }).click();
+    const cells = page.getByTestId("lab-cell");
+    await expect(cells).toHaveCount(4);
+    await expect(cells.nth(0).locator(".md-h")).toHaveText("Liste in Python");
+    await expect(cells.nth(1).locator(".lt-keyword").first()).toHaveText("for");
+    await expect(cells.nth(1).locator(".lab-out")).toHaveText("2\n4\n6\n");
+    await expect(cells.nth(2).locator(".lab-out.err")).toContainText("ZeroDivisionError: division by zero");
+    await expect(cells.nth(3)).toContainText("Output HTML non mostrato");
+    await expect(page.locator("#evil")).toHaveCount(0);
+    await expect(cells.nth(3).locator("img.lab-out-img")).toBeVisible();
+    await page.getByRole("button", { name: "Commenta la cella 2" }).click();
+    await page.keyboard.type("Il ciclo raddoppia ogni elemento");
+    await page.keyboard.press("Escape");
+
+    // The PDF: its pages, one commented.
+    await page.getByTestId("lab-file").filter({ hasText: "testo.pdf" }).click();
+    const pdfPages = page.locator(".lab-pdf-page");
+    await expect(pdfPages).toHaveCount(3);
+    await expect(pdfPages.first().locator("canvas")).toBeVisible();
+    await pdfPages.nth(1).getByRole("button", { name: "Commenta" }).click();
+    await page.keyboard.type("La consegna dell'esercizio");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Control+s");
+    await expect(page.getByTestId("lab-save-state")).toHaveClass(/saved/);
+
+    await page.reload();
+    await expect(page.getByTestId("lab-comment")).toContainText("Pagina 2");
+    await expect(pdfPages.nth(1).locator(".lab-count")).toHaveText("1");
+    await page.getByTestId("lab-file").filter({ hasText: "liste.ipynb" }).click();
+    await expect(page.getByTestId("lab-comment")).toContainText("Cella 2");
+    await page.getByTestId("lab-comment").click();
+    await expect(cells.nth(1)).toHaveClass(/on/);
+    await page.screenshot({ path: "/e2e/.results/lab-notebook.png" });
     con.assertClean(EXPECTED);
   });
 });

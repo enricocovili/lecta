@@ -13,11 +13,15 @@ export interface LineAnchor {
   gone?: boolean;
 }
 
+/** A cell of a notebook, a page of a PDF (1-based). */
+export type CellAnchor = { cell: number };
+export type PageAnchor = { page: number };
+
 export interface LabComment {
   id: string;
   file_id: number;
   /** `{}`: the whole file */
-  anchor: LineAnchor | Record<string, never>;
+  anchor: LineAnchor | CellAnchor | PageAnchor | Record<string, never>;
   body: string;
   /** 0 until the server has it */
   version: number;
@@ -62,6 +66,14 @@ function readBackup(key: string): Backup {
 
 export function isLines(a: LabComment["anchor"]): a is LineAnchor {
   return typeof (a as LineAnchor).from === "number";
+}
+
+/** The cell or page a comment is on, or null. */
+export function cellOf(a: LabComment["anchor"]): number | null {
+  return typeof (a as CellAnchor).cell === "number" ? (a as CellAnchor).cell : null;
+}
+export function pageOf(a: LabComment["anchor"]): number | null {
+  return typeof (a as PageAnchor).page === "number" ? (a as PageAnchor).page : null;
 }
 
 export function newId(): string {

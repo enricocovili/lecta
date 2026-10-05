@@ -457,3 +457,126 @@ body.ws-page .lab {
 .lab-code.editing .cm-gutters {
   background: var(--accent-soft);
 }
+
+/* ------------------------------------------------------------------ notebooks and PDFs */
+
+.lab-static {
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--paper-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.lt-keyword { color: var(--syn-keyword); }
+.lt-string { color: var(--syn-string); }
+.lt-comment { color: var(--syn-comment); font-style: italic; }
+.lt-number { color: var(--syn-number); }
+.lt-type { color: var(--syn-type); }
+.lt-function { color: var(--syn-function); }
+.lt-meta { color: var(--syn-meta); }
+.lt-property { color: var(--syn-property); }
+
+.lab-notebook {
+  max-width: 64rem;
+  padding: 1rem 1rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.lab-cell {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(0, 1fr) 2.6rem;
+  gap: 0.4rem;
+  padding: 0.3rem 0.2rem;
+  border-radius: var(--radius-sm);
+  scroll-margin: 1rem;
+}
+.lab-cell.on {
+  background: color-mix(in srgb, var(--warn-soft) 70%, transparent);
+}
+.lab-cell-side {
+  padding-top: 0.55rem;
+  font-size: 0.75rem;
+  color: var(--fg-faint);
+  text-align: right;
+}
+.lab-cell-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.lab-cell-md {
+  padding: 0 0.25rem;
+  line-height: 1.6;
+}
+.lab-cell-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding-top: 0.3rem;
+}
+.lab-cell-actions .lab-count {
+  margin-left: 0;
+}
+.lab-out {
+  margin: 0;
+  padding: 0.3rem 0.75rem;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--fg-muted);
+}
+.lab-out.err {
+  color: var(--danger-fg);
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+}
+.lab-out.md {
+  font-family: var(--font);
+  color: var(--fg);
+}
+.lab-out-img {
+  max-width: 100%;
+  align-self: flex-start;
+  background: #fff;
+  border-radius: var(--radius-sm);
+}
+
+.lab-pdf {
+  height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem 3rem;
+}
+.lab-pdf-page {
+  flex: none;
+  scroll-margin: 1rem;
+}
+.lab-pdf-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2rem;
+}
+.lab-pdf-head .lab-count {
+  margin-left: 0;
+}
+.lab-pdf-sheet {
+  position: relative;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+.lab-pdf-page.on .lab-pdf-sheet {
+  outline: 3px solid var(--warn);
+}

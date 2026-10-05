@@ -9,7 +9,9 @@ import { Markdown } from "../workspace/Markdown";
 import { Confirm, Empty, Loading, Modal, toast, toastError } from "../ui";
 import CodeView, { type Lines, type Mark, type Moved } from "./CodeView";
 import { MAX_FILE_BYTES, baseName, fileIcon, fromDrop, fromInput, tree, worthUploading, type Folder, type LabAccess, type LabData, type LabFile, type Picked } from "./files";
-import { isLines, useLabStore, type LabComment, type SaveState } from "./useLabStore";
+import NotebookView from "./NotebookView";
+import PdfPages from "./PdfPages";
+import { cellOf, isLines, pageOf, useLabStore, type LabComment, type SaveState } from "./useLabStore";
 
 type Store = ReturnType<typeof useLabStore>;
 
@@ -391,6 +393,17 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
   );
   const mineRef = useRef(mine);
   mineRef.current = mine;
+  const count = (of: (a: LabComment["anchor"]) => number | null) => {
+    const m = new Map<number, number>();
+    for (const c of mine) {
+      const n = of(c.anchor);
+      if (n !== null) m.set(n, (m.get(n) ?? 0) + 1);
+    }
+    return m;
+  };
+  const cellCounts = useMemo(() => count(cellOf), [mine]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pageCounts = useMemo(() => count(pageOf), [mine]); // eslint-disable-line react-hooks/exhaustive-deps
+  const activeAnchor = mine.find((c) => c.id === active)?.anchor ?? {};
   const onMoved = useCallback(
     (moved: Moved[]) => {
       for (const m of moved) {
@@ -419,7 +432,7 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
         <span className="mono lab-file-path" data-testid="lab-open-path">{file.path}</span>
         <span className="muted small">{[file.language && file.language !== "text" ? file.language : null, fmtSize(file.size)].filter(Boolean).join(" · ")}</span>
         <span className="grow" />
-        {isText && canEdit && !editing && <span className="muted small hide-mobile">Seleziona delle righe per commentarle</span>}
+        {file.kind === "text" && canEdit && !editing && <span className="muted small hide-mobile">Seleziona delle righe per commentarle</span>}
         {editing && <span className="muted small hide-mobile">Modifiche salvate con i commenti (Ctrl+S) · Ctrl+Alt+M commenta</span>}
         {canChange && content !== null && (
           <button
@@ -443,29 +456,31 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
         <div className="lab-file-body">
           {error ? (
             <div className="alert danger">{error}</div>
-          ) : isText ? (
-            content === null ? (
-              <Loading />
-            ) : (
-              <CodeView
-                content={content}
-                filename={file.path}
-                marks={marks}
-                active={active}
-                reveal={reveal}
-                editable={editing}
-                onMark={focus}
-                onComment={canEdit ? (lines: Lines) => start(lines) : undefined}
-                onChange={(doc) => store.setFileContent(file.id, doc)}
-                onMoved={onMoved}
-              />
-            )
+          ) : isText && content === null ? (
+            <Loading />
+          ) : file.kind === "notebook" && content !== null ? (
+            <NotebookView content={content} language={file.language} counts={cellCounts} activeCell={cellOf(activeAnchor)} canComment={canEdit} onComment={(cell) => start({ cell })} />
+          ) : file.kind === "pdf" ? (
+            <PdfPages url={raw} counts={pageCounts} activePage={pageOf(activeAnchor)} canComment={canEdit} onComment={(page) => start({ page })} />
+          ) : isText && content !== null ? (
+            <CodeView
+              content={content}
+              filename={file.path}
+              marks={marks}
+              active={active}
+              reveal={reveal}
+              editable={editing}
+              onMark={focus}
+              onComment={canEdit ? (lines: Lines) => start(lines) : undefined}
+              onChange={(doc) => store.setFileContent(file.id, doc)}
+              onMoved={onMoved}
+            />
           ) : file.kind === "image" ? (
             <div className="lab-image"><img src={raw} alt={file.path} /></div>
           ) : (
             <div className="lab-empty">
               <Empty icon={fileIcon(file)}>
-                {file.kind === "pdf" ? "I PDF si leggono qui a breve: per ora scaricalo." : "Questo file non è testo: si può solo scaricare (non viene mai eseguito)."}{" "}
+                Questo file non è testo: si può solo scaricare (non viene mai eseguito).{" "}
                 <a href={raw} download>Scarica {baseName(file.path)}</a>
               </Empty>
             </div>
@@ -482,7 +497,15 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
           </div>
           {mine.length === 0 ? (
             <p className="muted small lab-comments-empty">
-              {canEdit ? (isText ? "Seleziona delle righe del codice e premi «Commenta» (Ctrl+Alt+M), oppure commenta tutto il file." : "Commenta tutto il file con «Sul file».") : "Nessun commento."}
+              {!canEdit
+                ? "Nessun commento."
+                : file.kind === "text"
+                  ? "Seleziona delle righe del codice e premi «Commenta» (Ctrl+Alt+M), oppure commenta tutto il file."
+                  : file.kind === "notebook"
+                    ? "Commenta una cella con il suo fumetto, oppure tutto il file."
+                    : file.kind === "pdf"
+                      ? "Commenta una pagina con «Commenta», oppure tutto il file."
+                      : "Commenta tutto il file con «Sul file»."}
             </p>
           ) : (
             mine.map((c) => (
@@ -496,6 +519,9 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
                   if (writing === c.id) return;
                   setActive(c.id);
                   if (isLines(c.anchor) && !c.anchor.gone) setReveal({ line: c.anchor.from });
+                  const cell = cellOf(c.anchor);
+                  const page = pageOf(c.anchor);
+                  if (cell ?? page) document.getElementById(cell ? `lab-cell-${cell}` : `lab-page-${page}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
                 }}
                 onEdit={() => setWriting(c.id)}
                 onDone={() => {
@@ -541,11 +567,15 @@ function NotesView({ text, onChange, canEdit }: { text: string; onChange: (t: st
 
 function sortComments(list: LabComment[]): LabComment[] {
   // Whole-file comments first, then by line; those whose lines were removed at the end.
-  const line = (c: LabComment) => (isLines(c.anchor) ? (c.anchor.gone ? Number.MAX_SAFE_INTEGER : c.anchor.from) : 0);
+  const line = (c: LabComment) => (isLines(c.anchor) ? (c.anchor.gone ? Number.MAX_SAFE_INTEGER : c.anchor.from) : (cellOf(c.anchor) ?? pageOf(c.anchor) ?? 0));
   return [...list].sort((a, b) => line(a) - line(b) || a.created_at.localeCompare(b.created_at));
 }
 
 function where(c: LabComment): string {
+  const cell = cellOf(c.anchor);
+  const page = pageOf(c.anchor);
+  if (cell) return `Cella ${cell}`;
+  if (page) return `Pagina ${page}`;
   if (!isLines(c.anchor)) return "Tutto il file";
   if (c.anchor.gone) return "Righe rimosse";
   return c.anchor.from === c.anchor.to ? `Riga ${c.anchor.from}` : `Righe ${c.anchor.from}–${c.anchor.to}`;

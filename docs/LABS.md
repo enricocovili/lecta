@@ -37,10 +37,17 @@ recognised by their bytes keep their own type, so the viewer can draw them.
 lab's has «Lezione teorica». A lesson without a lab offers «Crea il laboratorio» there. On the left the **tree** of the
 files (folders from the names, folders first), on the right the open file, remembered in the address (`?file=src/main.c`):
 
-* text and notebooks in a read-only **CodeMirror** view (`components/labs/CodeView.tsx`): line numbers, folding, the
-  colours of the language found from the file name (`@codemirror/language-data`, each language loaded on demand; a few
-  lab extensions such as `.h`, `.m`, `.v`, `.asm` are mapped by hand), colours from the `--syn-*` tokens for both themes;
-* pictures as pictures; PDFs and other files with a download link.
+* text in a read-only **CodeMirror** view (`components/labs/CodeView.tsx`): line numbers, folding, the colours of the
+  language found from the file name (`@codemirror/language-data`, each language loaded on demand; a few lab extensions such
+  as `.h`, `.m`, `.v`, `.asm` are mapped by hand), colours from the `--syn-*` tokens for both themes;
+* **notebooks** as their cells (`NotebookView.tsx`): Markdown rendered by the safe renderer, code coloured once as plain
+  spans (`StaticCode.tsx`, the same colours as `lt-*` classes) in the kernel's language, and the outputs the notebook already
+  holds: streams, results as text, errors (terminal colours stripped), pictures (PNG, JPEG, GIF as `data:` images; SVG only as
+  an `<img>`, where it can't run anything). **HTML outputs are never rendered** («Output HTML non mostrato»); long outputs are
+  cut at 20 000 characters. Nothing runs;
+* **PDFs** page after page with pdf.js (`PdfPages.tsx`, the lessons' `SlideView`; a page keeps its pixels only near the
+  viewport);
+* pictures as pictures; other files with a download link only.
 
 **Uploading**: «Carica file» (several at once), the folder button (a whole folder with its sub-folders: the names keep the
 folders) or a **drop** of files and folders anywhere on the page. Files over 20 MB are refused before sending; hidden files
@@ -50,15 +57,18 @@ notice says so). Each file has «Rinomina» (also into a folder: `src/main.c`) a
 
 ## Comments, written live
 
-`lab_comments`: Markdown with `$…$` maths (KaTeX), on a file. A comment sits on **lines** (anchor `{from, to, text}`,
+`lab_comments`: Markdown with `$…$` maths (KaTeX), on a file. A comment sits on a **cell** of a notebook (`{cell}`), a
+**page** of a PDF (`{page}`, both 1-based), on **lines** of a text file (anchor `{from, to, text}`,
 1-based, with the text of those lines so it can find them again after an edit; `gone` once they were removed) or on the **whole file** (`{}`). Its id is a
 UUID made by the page (`crypto.randomUUID`, or `getRandomValues` on a plain-HTTP page): `PUT` creates or replaces it, so a
 comment written offline and sent twice is never doubled. A comment stays on its file and goes with it.
 
 On the page: select lines of the code and press the **«Commenta»** bubble over the selection (or Ctrl+Alt+M); «Sul file»
-comments the whole file. The comments of the open file are listed on the right, whole-file ones first, then by line; the
+comments the whole file; a notebook cell has its speech-bubble button and a PDF page its «Commenta». The comments of the
+open file are listed on the right, whole-file ones first, then by line, cell or page; the
 commented lines are tinted in the code with a dot in the gutter (the number of comments when several start there), and the
-dot, the card and the code point at each other. A card is written in the notes field of the lessons (lists go on with
+dot, the card and the code point at each other (a cell or a page with comments shows how many, and is tinted while its
+comment is picked). A card is written in the notes field of the lessons (lists go on with
 Enter, Ctrl+B / Ctrl+I) and shown rendered when it loses the focus (Escape); an empty comment that loses the focus goes away.
 The tree shows how many comments each file has.
 
