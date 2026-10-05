@@ -161,4 +161,42 @@ test.describe.serial("Laboratorio", () => {
     await expect(page.getByTestId("lab-notes").locator("li")).toHaveCount(2);
     con.assertClean(EXPECTED);
   });
+
+  test("a text file is edited by hand and its comments follow their lines", async ({ page }) => {
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`${lessonPath}/lab?file=main.c`);
+    const code = page.getByTestId("lab-code");
+    const card = page.getByTestId("lab-comment");
+    await expect(card).toHaveCount(1);
+    await expect(card).toContainText("Righe 4–7");
+
+    // Two lines written above the comment move it down.
+    await page.getByTestId("lab-edit").click();
+    await code.locator(".cm-line").first().click();
+    await page.keyboard.press("Control+Home");
+    await page.keyboard.type("// Laboratorio 3\n// Autore: io\n");
+    await expect(card).toContainText("Righe 6–9");
+    await expect(code.locator(".cm-lab-mark").first()).toContainText("int somma");
+    await page.keyboard.press("Control+s");
+    await expect(page.getByTestId("lab-save-state")).toHaveClass(/saved/);
+    await page.reload();
+    await expect(code.locator(".cm-line").first()).toHaveText("// Laboratorio 3");
+    await expect(card).toContainText("Righe 6–9");
+
+    // Deleting the commented lines keeps the comment, as «Righe rimosse».
+    await page.getByTestId("lab-edit").click();
+    await code.locator(".cm-line").nth(5).click({ position: { x: 2, y: 5 } });
+    await page.keyboard.press("Home");
+    for (let i = 0; i < 4; i++) await page.keyboard.press("Shift+ArrowDown");
+    await page.keyboard.press("Delete");
+    await expect(card).toContainText("Righe rimosse");
+    await expect(code.locator(".cm-lab-mark")).toHaveCount(0);
+    await page.getByTestId("lab-edit").click(); // «Fine» saves
+    await expect(page.getByTestId("lab-save-state")).toHaveClass(/saved/);
+    await page.reload();
+    await expect(card).toContainText("Righe rimosse");
+    await expect(code).not.toContainText("int somma(int n)");
+    con.assertClean(EXPECTED);
+  });
 });

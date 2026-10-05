@@ -51,7 +51,7 @@ notice says so). Each file has «Rinomina» (also into a folder: `src/main.c`) a
 ## Comments, written live
 
 `lab_comments`: Markdown with `$…$` maths (KaTeX), on a file. A comment sits on **lines** (anchor `{from, to, text}`,
-1-based, with the text of those lines so it can find them again after an edit) or on the **whole file** (`{}`). Its id is a
+1-based, with the text of those lines so it can find them again after an edit; `gone` once they were removed) or on the **whole file** (`{}`). Its id is a
 UUID made by the page (`crypto.randomUUID`, or `getRandomValues` on a plain-HTTP page): `PUT` creates or replaces it, so a
 comment written offline and sent twice is never doubled. A comment stays on its file and goes with it.
 
@@ -66,6 +66,21 @@ Saving works as in the lessons (`components/labs/useLabStore.ts`): edits apply a
 Ctrl+S** and when the tab is hidden; what is unsaved is mirrored in `localStorage` (`lecta:lab:<id>:unsaved`, also deletes)
 and retried with a growing delay, and comes back on the next visit if the server has not changed that comment meanwhile.
 The save state is the same icon as in the lesson editor. A comment is sent once it says something.
+
+## Editing a file
+
+A **text** file has «Modifica»: the view becomes an editor (CodeMirror with its history, Tab indents, Ctrl+Alt+M still
+comments the selection) and «Fine» goes back to reading. The text is saved in the same queue as the comments (once a minute,
+Ctrl+S, «Fine», the tab hidden; unsent edits come back after a reload if the file has not changed meanwhile) with the version
+it started from: if the file changed elsewhere meanwhile (`409`), the edit is dropped with a notice and the file is read
+again. Notebooks are not edited by hand.
+
+**Comments follow their lines.** In the editor every edit maps each comment's lines through the change (CodeMirror position
+mapping): lines added above move it, lines added inside widen it, its text is kept up to date. A comment whose lines are all
+deleted stays on the file as **«Righe rimosse»** (`anchor.gone`, with the text it had), at the end of the list and no longer
+marked in the code. When a text file is **uploaded again** under the same name, or later changed by the assistant, the
+server does the same with a line diff (`services/labs.remap_anchors`: the unchanged lines carry the comment; none left →
+`gone`), and the page reads the file and its comments again.
 
 ## Notes
 
@@ -84,8 +99,9 @@ The routes hang off the lesson, so a share link of the lesson can reach the same
 | `POST /api/lessons/{id}/lab` | makes the lab if the lesson has none, else returns it |
 | `DELETE /api/lessons/{id}/lab` | the lab and its files |
 | `PUT /api/lessons/{id}/lab/notes` `{notes}` | the lab's free notes (replace) → `{version}` |
-| `POST /api/lessons/{id}/lab/files?path=` | raw body: one file (the page sends several in a row); same path = replace → the file with `replaced` |
+| `POST /api/lessons/{id}/lab/files?path=` | raw body: one file (the page sends several in a row); same path = replace (the comments of a text file follow their lines) → the file with `replaced` |
 | `GET /api/lessons/{id}/lab/files/{fid}` | the file with `content` (text and notebooks; `null` for the others) |
+| `PUT /api/lessons/{id}/lab/files/{fid}/content` `{content, base_version}` | the text of a text file, edited by hand → the file; `409` with the current `version` if it changed since `base_version`, or if it isn't text |
 | `PATCH /api/lessons/{id}/lab/files/{fid}` `{path}` · `DELETE` | rename (a text file takes the new name's language; a taken name is 409) · remove |
 | `GET /api/lessons/{id}/lab/files/{fid}/raw` | the file to download (text in UTF-8), always as an attachment |
 | `PUT /api/lessons/{id}/lab/comments/{uuid}` `{file_id, anchor, body}` | create or replace a comment → the comment with its `version`; another file or lab's comment is 404 |

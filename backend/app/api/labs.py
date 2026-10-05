@@ -178,6 +178,8 @@ async def upload_file(lesson_id: int, request: Request, path: str = Query(..., m
         db.add(existing)
         replaced = False
     else:
+        if existing.content is not None and c.content is not None:
+            await _follow(db, existing, existing.content, c.content)
         existing.kind, existing.language, existing.size, existing.content, existing.blob = c.kind, c.language, size, c.content, blob
         existing.version += 1
         existing.updated_at = now
@@ -185,6 +187,42 @@ async def upload_file(lesson_id: int, request: Request, path: str = Query(..., m
     lab.updated_at = now
     await db.commit()
     return {**file_out(existing), "replaced": replaced}
+
+
+async def _follow(db: AsyncSession, f: LabFile, old: str, new: str) -> None:
+    """The comments on a text file follow their lines when the text changes."""
+    comments = [c for c in (await db.execute(select(LabComment).where(LabComment.file_id == f.id))).scalars() if "from" in (c.anchor or {})]
+    if not comments or old == new:
+        return
+    for c, anchor in zip(comments, lb.remap_anchors([c.anchor for c in comments], old, new), strict=True):
+        if anchor != c.anchor:
+            c.anchor = anchor
+            c.version += 1
+            c.updated_at = _now()
+
+
+class ContentSave(BaseModel):
+    content: str = Field(max_length=lb.MAX_FILE_BYTES)
+    base_version: int  # the version the edit started from: if the file changed meanwhile the edit is refused
+
+
+@router.put("/lessons/{lesson_id}/lab/files/{file_id}/content")
+async def save_content(lesson_id: int, file_id: int, body: ContentSave, db: AsyncSession = Depends(get_db)) -> dict:
+    """The text of a text file, edited by hand. The comments were moved by the page with the edit; they are not touched here."""
+    lab = await _lab(db, lesson_id)
+    f = await _file(db, lab, file_id)
+    if f.kind != "text":
+        raise HTTPException(status_code=409, detail="Si possono modificare solo i file di testo")
+    if body.base_version != f.version:
+        raise HTTPException(status_code=409, detail={"message": f"«{f.path}» è cambiato nel frattempo: ricarico l'ultima versione", "version": f.version})
+    data = body.content.replace("\x00", "").replace("\r\n", "\n")
+    if len(data.encode()) > lb.MAX_FILE_BYTES:
+        raise HTTPException(status_code=413, detail=f"«{f.path}» supera i {lb.MAX_FILE_BYTES // (1024 * 1024)} MB")
+    f.content, f.size = data, len(data.encode())
+    f.version += 1
+    f.updated_at = lab.updated_at = _now()
+    await db.commit()
+    return file_out(f)
 
 
 @router.get("/lessons/{lesson_id}/lab/files/{file_id}")

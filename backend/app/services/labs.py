@@ -3,6 +3,7 @@ bytes and its name; nothing here ever runs a file."""
 
 from __future__ import annotations
 
+import difflib
 import json
 import posixpath
 import re
@@ -148,5 +149,32 @@ def clean_anchor(raw: object) -> dict:
         text = raw.get("text", "")
         if not isinstance(text, str):
             raise AnchorError("Testo delle righe non valido")
-        return {"from": a, "to": b, "text": text[:MAX_ANCHOR_TEXT]}
+        out: dict = {"from": a, "to": b, "text": text[:MAX_ANCHOR_TEXT]}
+        if raw.get("gone") is True:  # its lines were removed by an edit: the comment stays on the file
+            out["gone"] = True
+        return out
     raise AnchorError("Posizione del commento non valida")
+
+
+def remap_anchor(anchor: dict, old: str, new: str, matcher: difflib.SequenceMatcher | None = None) -> dict:
+    """Where a comment's lines are after the file changed from `old` to `new` (a new upload, an edit of the assistant): the lines
+    that survive unchanged carry it; if none does, it is kept as `gone` with the text it had."""
+    if "from" not in anchor or anchor.get("gone"):
+        return anchor
+    old_lines, new_lines = old.split("\n"), new.split("\n")
+    sm = matcher or difflib.SequenceMatcher(None, old_lines, new_lines, autojunk=False)
+    moved: dict[int, int] = {}
+    for tag, i1, i2, j1, _ in sm.get_opcodes():
+        if tag == "equal":
+            for k in range(i2 - i1):
+                moved[i1 + k] = j1 + k
+    kept = [moved[i] for i in range(anchor["from"] - 1, anchor["to"]) if i in moved]
+    if not kept:
+        return {**anchor, "gone": True}
+    a, b = min(kept), max(kept)
+    return {"from": a + 1, "to": b + 1, "text": "\n".join(new_lines[a : b + 1])[:MAX_ANCHOR_TEXT]}
+
+
+def remap_anchors(anchors: list[dict], old: str, new: str) -> list[dict]:
+    sm = difflib.SequenceMatcher(None, old.split("\n"), new.split("\n"), autojunk=False)
+    return [remap_anchor(a, old, new, sm) for a in anchors]

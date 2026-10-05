@@ -65,6 +65,20 @@ def test_comment_anchors_are_validated():
             lb.clean_anchor(bad)
 
 
+def test_comments_follow_their_lines_when_the_text_changes():
+    old = "a\nb\nc\nd\ne"
+    anchor = {"from": 3, "to": 4, "text": "c\nd"}
+    # Lines added above move it down; lines inside keep it whole.
+    assert lb.remap_anchor(anchor, old, "x\ny\n" + old) == {"from": 5, "to": 6, "text": "c\nd"}
+    assert lb.remap_anchor(anchor, old, "a\nb\nc\nnew\nd\ne") == {"from": 3, "to": 5, "text": "c\nnew\nd"}
+    # One of its lines changed: it keeps to the other one.
+    assert lb.remap_anchor(anchor, old, "a\nb\nC\nd\ne") == {"from": 4, "to": 4, "text": "d"}
+    # All its lines gone: it stays, marked as gone, with the text it had.
+    assert lb.remap_anchor(anchor, old, "a\nb\ne") == {**anchor, "gone": True}
+    assert lb.remap_anchor({}, old, "") == {}
+    assert lb.clean_anchor({"from": 1, "to": 1, "text": "x", "gone": True})["gone"] is True
+
+
 # --------------------------------------------------------------------------- the API
 
 
@@ -215,3 +229,34 @@ async def test_the_lab_has_free_notes(admin):
     lab = (await admin.get(f"/api/lessons/{lid}/lab")).json()
     assert lab["notes"] == "- all'esame chiede i puntatori" and lab["notes_version"] == 2
     assert (await admin.put(f"/api/lessons/{lid}/lab/notes", json={"notes": "x" * (lb.MAX_NOTES_CHARS + 1)})).status_code == 422
+
+
+async def test_a_text_file_is_edited_by_hand(admin):
+    _, lesson, _ = await new_lab(admin)
+    lid = lesson["id"]
+    f = (await upload(admin, lid, "main.c", "int a;\n")).json()
+    url = f"/api/lessons/{lid}/lab/files/{f['id']}/content"
+    r = await admin.put(url, json={"content": "int a;\r\nint b;\n", "base_version": 1})
+    assert r.status_code == 200 and r.json()["version"] == 2 and r.json()["size"] == len("int a;\nint b;\n")
+    assert (await admin.get(f"/api/lessons/{lid}/lab/files/{f['id']}")).json()["content"] == "int a;\nint b;\n"
+    # An edit started from an older version is refused, with the current version.
+    r = await admin.put(url, json={"content": "lost", "base_version": 1})
+    assert r.status_code == 409 and r.json()["detail"]["version"] == 2
+    png = (await upload(admin, lid, "x.png", PNG)).json()
+    assert (await admin.put(f"/api/lessons/{lid}/lab/files/{png['id']}/content", json={"content": "x", "base_version": 1})).status_code == 409
+
+
+async def test_comments_follow_a_file_uploaded_again(admin):
+    _, lesson, _ = await new_lab(admin)
+    lid = lesson["id"]
+    f = (await upload(admin, lid, "main.c", "int a;\nint b;\nint c;\n")).json()
+    on_b, on_file = str(uuid.uuid4()), str(uuid.uuid4())
+    await admin.put(f"/api/lessons/{lid}/lab/comments/{on_b}", json={"file_id": f["id"], "anchor": {"from": 2, "to": 2, "text": "int b;"}, "body": "b"})
+    await admin.put(f"/api/lessons/{lid}/lab/comments/{on_file}", json={"file_id": f["id"], "body": "tutto"})
+    await upload(admin, lid, "main.c", "// nuovo\nint a;\nint b;\nint c;\n")
+    comments = {c["id"]: c for c in (await admin.get(f"/api/lessons/{lid}/lab")).json()["comments"]}
+    assert comments[on_b]["anchor"] == {"from": 3, "to": 3, "text": "int b;"} and comments[on_b]["version"] == 2
+    assert comments[on_file]["anchor"] == {} and comments[on_file]["version"] == 1
+    await upload(admin, lid, "main.c", "int z;\n")
+    gone = next(c for c in (await admin.get(f"/api/lessons/{lid}/lab")).json()["comments"] if c["id"] == on_b)
+    assert gone["anchor"]["gone"] is True and gone["anchor"]["text"] == "int b;"

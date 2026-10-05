@@ -7,7 +7,7 @@ import { Icon } from "../icons";
 import NotesField from "../lessons/NotesField";
 import { Markdown } from "../workspace/Markdown";
 import { Confirm, Empty, Loading, Modal, toast, toastError } from "../ui";
-import CodeView, { type Lines, type Mark } from "./CodeView";
+import CodeView, { type Lines, type Mark, type Moved } from "./CodeView";
 import { MAX_FILE_BYTES, baseName, fileIcon, fromDrop, fromInput, tree, worthUploading, type Folder, type LabAccess, type LabData, type LabFile, type Picked } from "./files";
 import { isLines, useLabStore, type LabComment, type SaveState } from "./useLabStore";
 
@@ -92,7 +92,28 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const root = useMemo(() => tree(files), [files]);
-  const store = useLabStore(base, String(lab.id), lab.comments, { text: lab.notes, version: lab.notes_version });
+  // A file read again from the server (uploaded again, or changed elsewhere while edited here) is opened anew.
+  const [reloads, setReloads] = useState<Record<number, number>>({});
+  const storeRef = useRef<Store | null>(null);
+  const reloadFile = useCallback(
+    async (fileId: number) => {
+      try {
+        const fresh = await get<LabData>(`${base}/lab`);
+        setFiles(fresh.files);
+        const f = fresh.files.find((x) => x.id === fileId);
+        if (f) storeRef.current?.adopt(fileId, f.version, fresh.comments);
+        setReloads((r) => ({ ...r, [fileId]: (r[fileId] ?? 0) + 1 }));
+      } catch (e) {
+        toastError(e);
+      }
+    },
+    [base],
+  );
+  const store = useLabStore(base, String(lab.id), lab.comments, { text: lab.notes, version: lab.notes_version }, lab.files, {
+    onFileSaved: (f) => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, version: f.version, size: f.size } : x))),
+    onFileConflict: (id) => void reloadFile(id),
+  });
+  storeRef.current = store;
   const perFile = useMemo(() => {
     const m = new Map<number, number>();
     for (const c of store.comments) m.set(c.file_id, (m.get(c.file_id) ?? 0) + 1);
@@ -135,7 +156,10 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
           );
           const { replaced, ...file } = f;
           setFiles((cur) => [...cur.filter((x) => x.id !== file.id), file]);
-          if (replaced) toast(`«${file.path}» sostituito con il nuovo file`);
+          if (replaced) {
+            toast(`«${file.path}» sostituito con il nuovo file`);
+            await reloadFile(file.id); // its comments followed their lines on the server
+          }
           last = file.path;
         } catch (e) {
           toastError(e);
@@ -144,7 +168,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
       setUploading(null);
       if (last) choose(last);
     },
-    [base, choose],
+    [base, choose, reloadFile],
   );
 
   const onDrop = async (e: DragEvent) => {
@@ -263,7 +287,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
           {notesOpen ? (
             <NotesView text={store.notes} onChange={store.setNotes} canEdit={canEdit} />
           ) : open ? (
-            <FileView key={`${open.id}:${open.version}`} file={open} base={base} store={store} canEdit={canEdit} />
+            <FileView key={`${open.id}:${reloads[open.id] ?? 0}`} file={open} base={base} store={store} canEdit={canEdit} />
           ) : (
             <div className="lab-empty">
               <Empty icon="flask">
@@ -342,23 +366,46 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
+  const [writing, setWriting] = useState<string | null>(null);
   const [reveal, setReveal] = useState<{ line: number } | null>(null);
+  const [editing, setEditing] = useState(false);
   const isText = file.kind === "text" || file.kind === "notebook";
+  const canChange = canEdit && file.kind === "text";
   useEffect(() => {
     if (!isText) return;
     api<{ content: string }>(`${base}/lab/files/${file.id}`)
-      .then((r) => setContent(r.content))
+      .then((r) => {
+        // An edit made here and not saved yet (the tab was closed, the connection dropped) comes back.
+        const pending = store.pendingContent(file.id);
+        setContent(pending ?? r.content);
+        if (pending !== undefined) setEditing(true);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [base, file.id, isText]);
 
   const mine = useMemo(() => sortComments(store.comments.filter((c) => c.file_id === file.id)), [store.comments, file.id]);
-  const marks = useMemo<Mark[]>(() => mine.flatMap((c) => (isLines(c.anchor) ? [{ id: c.id, from: c.anchor.from, to: c.anchor.to }] : [])), [mine]);
+  const marks = useMemo<Mark[]>(
+    () => mine.flatMap((c) => (isLines(c.anchor) && !c.anchor.gone ? [{ id: c.id, from: c.anchor.from, to: c.anchor.to }] : [])),
+    [mine],
+  );
+  const mineRef = useRef(mine);
+  mineRef.current = mine;
+  const onMoved = useCallback(
+    (moved: Moved[]) => {
+      for (const m of moved) {
+        const c = mineRef.current.find((x) => x.id === m.id);
+        if (!c || !isLines(c.anchor)) continue;
+        store.setAnchor(m.id, m.gone ? { ...c.anchor, gone: true } : { from: m.from, to: m.to, text: m.text });
+      }
+    },
+    [store],
+  );
 
   const start = (anchor: LabComment["anchor"]) => {
     const id = store.create(file.id, anchor);
     setActive(id);
-    setEditing(id);
+    setWriting(id);
   };
   const focus = (id: string) => {
     setActive(id);
@@ -372,7 +419,22 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
         <span className="mono lab-file-path" data-testid="lab-open-path">{file.path}</span>
         <span className="muted small">{[file.language && file.language !== "text" ? file.language : null, fmtSize(file.size)].filter(Boolean).join(" · ")}</span>
         <span className="grow" />
-        {isText && canEdit && <span className="muted small hide-mobile">Seleziona delle righe per commentarle</span>}
+        {isText && canEdit && !editing && <span className="muted small hide-mobile">Seleziona delle righe per commentarle</span>}
+        {editing && <span className="muted small hide-mobile">Modifiche salvate con i commenti (Ctrl+S) · Ctrl+Alt+M commenta</span>}
+        {canChange && content !== null && (
+          <button
+            type="button"
+            className={`btn sm ${editing ? "primary" : "ghost"}`}
+            onClick={() => {
+              if (editing) void store.flushAll();
+              setEditing(!editing);
+            }}
+            data-testid="lab-edit"
+            title={editing ? "Torna alla lettura" : "Modifica il testo del file (i commenti seguono le loro righe)"}
+          >
+            <Icon name={editing ? "check" : "pencil"} /> {editing ? "Fine" : "Modifica"}
+          </button>
+        )}
         <a className="btn ghost icon sm" href={raw} download aria-label="Scarica il file" title="Scarica il file">
           <Icon name="download" />
         </a>
@@ -391,8 +453,11 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
                 marks={marks}
                 active={active}
                 reveal={reveal}
+                editable={editing}
                 onMark={focus}
                 onComment={canEdit ? (lines: Lines) => start(lines) : undefined}
+                onChange={(doc) => store.setFileContent(file.id, doc)}
+                onMoved={onMoved}
               />
             )
           ) : file.kind === "image" ? (
@@ -425,16 +490,16 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
                 key={c.id}
                 comment={c}
                 active={active === c.id}
-                editing={editing === c.id}
+                editing={writing === c.id}
                 canEdit={canEdit}
                 onPick={() => {
-                  if (editing === c.id) return;
+                  if (writing === c.id) return;
                   setActive(c.id);
-                  if (isLines(c.anchor)) setReveal({ line: c.anchor.from });
+                  if (isLines(c.anchor) && !c.anchor.gone) setReveal({ line: c.anchor.from });
                 }}
-                onEdit={() => setEditing(c.id)}
+                onEdit={() => setWriting(c.id)}
                 onDone={() => {
-                  setEditing(null);
+                  setWriting(null);
                   if (!c.body.trim()) store.remove(c.id);
                 }}
                 onBody={(b) => store.setBody(c.id, b)}
@@ -475,12 +540,14 @@ function NotesView({ text, onChange, canEdit }: { text: string; onChange: (t: st
 }
 
 function sortComments(list: LabComment[]): LabComment[] {
-  const line = (c: LabComment) => (isLines(c.anchor) ? c.anchor.from : 0);
+  // Whole-file comments first, then by line; those whose lines were removed at the end.
+  const line = (c: LabComment) => (isLines(c.anchor) ? (c.anchor.gone ? Number.MAX_SAFE_INTEGER : c.anchor.from) : 0);
   return [...list].sort((a, b) => line(a) - line(b) || a.created_at.localeCompare(b.created_at));
 }
 
 function where(c: LabComment): string {
   if (!isLines(c.anchor)) return "Tutto il file";
+  if (c.anchor.gone) return "Righe rimosse";
   return c.anchor.from === c.anchor.to ? `Riga ${c.anchor.from}` : `Righe ${c.anchor.from}–${c.anchor.to}`;
 }
 
@@ -494,7 +561,7 @@ function CommentCard({ comment, active, editing, canEdit, onPick, onEdit, onDone
   }, [editing]);
   const snippet = isLines(comment.anchor) ? comment.anchor.text.split("\n").find((l) => l.trim())?.trim() : null;
   return (
-    <article id={`lab-comment-${comment.id}`} className={`lab-comment ${active ? "on" : ""}`} data-testid="lab-comment" onClick={onPick}>
+    <article id={`lab-comment-${comment.id}`} className={`lab-comment ${active ? "on" : ""} ${isLines(comment.anchor) && comment.anchor.gone ? "gone" : ""}`} data-testid="lab-comment" onClick={onPick}>
       <header className="lab-comment-head">
         <span className="lab-comment-where">{where(comment)}</span>
         {snippet && <code className="lab-comment-snippet">{snippet}</code>}

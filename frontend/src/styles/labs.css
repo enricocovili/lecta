@@ -445,3 +445,15 @@ body.ws-page .lab {
   background: var(--bg-elev);
   color: var(--fg);
 }
+.lab-comment.gone .lab-comment-where {
+  color: var(--danger-fg);
+}
+.lab-comment.gone .lab-comment-snippet {
+  text-decoration: line-through;
+}
+.lab-code.editing .cm-content {
+  caret-color: var(--accent);
+}
+.lab-code.editing .cm-gutters {
+  background: var(--accent-soft);
+}

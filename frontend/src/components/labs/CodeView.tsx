@@ -1,10 +1,11 @@
 // A file of the lab as code: CodeMirror with line numbers and the colours of its language (found from the file name, loaded
-// on demand). Read-only here: the text can be selected (and commented) but not changed. Colours come from CSS variables (`--syn-*`), so the
+// on demand). Read-only unless `editable`; comments sit on lines and follow them through the edits. Colours come from CSS variables (`--syn-*`), so the
 // light and dark themes both work.
 import { useEffect, useRef } from "react";
 import { HighlightStyle, LanguageDescription, syntaxHighlighting, bracketMatching, foldGutter } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
-import { Compartment, EditorState, RangeSet, RangeSetBuilder, StateEffect, StateField, type Extension, type Text } from "@codemirror/state";
+import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { Compartment, EditorState, RangeSet, RangeSetBuilder, StateEffect, StateField, type Extension, type Text, type Transaction } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -46,8 +47,8 @@ const theme = EditorView.theme({
   ".cm-content": { caretColor: "var(--fg)" },
 });
 
-/** Base extensions of every code view; `extra` adds what a caller needs (comment markers, editing…). */
-export function baseExtensions(readOnly: boolean): Extension[] {
+/** Base extensions of every code view (read-only or not is up to the caller). */
+export function baseExtensions(): Extension[] {
   return [
     lineNumbers(),
     foldGutter(),
@@ -58,7 +59,6 @@ export function baseExtensions(readOnly: boolean): Extension[] {
     bracketMatching(),
     syntaxHighlighting(highlight),
     theme,
-    EditorState.readOnly.of(readOnly),
     EditorState.tabSize.of(4),
   ];
 }
@@ -96,9 +96,17 @@ export interface Lines {
   text: string;
 }
 
+/** Where a comment's lines went after an edit; `gone` when they were all removed. */
+export interface Moved extends Lines {
+  id: string;
+  gone: boolean;
+}
+
 interface Hooks {
   onMark?: (id: string) => void;
   onComment?: (lines: Lines) => void;
+  onChange?: (doc: string) => void;
+  onMoved?: (moved: Moved[]) => void;
 }
 
 const setMarks = StateEffect.define<{ marks: Mark[]; active: string | null }>();
@@ -123,15 +131,20 @@ interface MarkState {
   lines: DecorationSet;
   gutter: RangeSet<GutterMarker>;
   marks: Mark[];
+  active: string | null;
+  /** what the last edit moved */
+  moved: Moved[];
 }
 
-function build(doc: Text, marks: Mark[], active: string | null): MarkState {
+const clampLine = (doc: Text, n: number) => Math.min(Math.max(1, n), doc.lines);
+
+function build(doc: Text, marks: Mark[], active: string | null, moved: Moved[] = []): MarkState {
   const lines = new RangeSetBuilder<Decoration>();
   const per = new Map<number, string[]>();
   const cls = new Map<number, string>();
   for (const m of marks) {
-    const a = Math.min(Math.max(1, m.from), doc.lines);
-    const b = Math.min(Math.max(a, m.to), doc.lines);
+    const a = clampLine(doc, m.from);
+    const b = Math.max(a, clampLine(doc, m.to));
     per.set(a, [...(per.get(a) ?? []), m.id]);
     for (let n = a; n <= b; n++) if (cls.get(n) !== "on") cls.set(n, m.id === active ? "on" : "mark");
   }
@@ -143,7 +156,35 @@ function build(doc: Text, marks: Mark[], active: string | null): MarkState {
     const ids = per.get(n)!;
     gutter.add(doc.line(n).from, doc.line(n).from, new CommentMarker(ids, active !== null && ids.includes(active)));
   }
-  return { lines: lines.finish(), gutter: gutter.finish(), marks };
+  return { lines: lines.finish(), gutter: gutter.finish(), marks, active, moved };
+}
+
+/** The marks after an edit: each follows its lines; one whose lines were all deleted is gone. */
+function follow(marks: Mark[], tr: Transaction): { marks: Mark[]; moved: Moved[] } {
+  const before = tr.startState.doc;
+  const after = tr.state.doc;
+  const kept: Mark[] = [];
+  const moved: Moved[] = [];
+  for (const m of marks) {
+    const a = before.line(clampLine(before, m.from)).from;
+    const b = before.line(clampLine(before, m.to)).to;
+    let gone = false;
+    tr.changes.iterChangedRanges((fromA, toA) => {
+      if (toA > fromA && fromA <= a && toA >= b) gone = true;
+    });
+    const na = tr.changes.mapPos(a, 1);
+    const nb = Math.max(na, tr.changes.mapPos(b, -1));
+    const from = after.lineAt(na).number;
+    const to = after.lineAt(nb).number;
+    if (gone) {
+      moved.push({ id: m.id, from: m.from, to: m.to, text: "", gone: true });
+      continue;
+    }
+    kept.push({ id: m.id, from, to });
+    const text = after.sliceString(after.line(from).from, after.line(to).to);
+    if (from !== m.from || to !== m.to || tr.changes.touchesRange(a, b)) moved.push({ id: m.id, from, to, text, gone: false });
+  }
+  return { marks: kept, moved };
 }
 
 /** The lines a selection covers (a selection ending at the start of a line doesn't take that line). */
@@ -156,13 +197,15 @@ export function selectedLines(state: EditorState): Lines {
   return { from: first.number, to: last.number, text: doc.sliceString(first.from, last.to) };
 }
 
-/** Marked lines, the dots in their gutter, and the «Commenta» bubble over a selection. */
+/** Marked lines (following the edits), the dots in their gutter, Ctrl+Alt+M. */
 function comments(hooks: { current: Hooks }, canComment: boolean): Extension[] {
   const field = StateField.define<MarkState>({
     create: (state) => build(state.doc, [], null),
     update(value, tr) {
       for (const e of tr.effects) if (e.is(setMarks)) return build(tr.state.doc, e.value.marks, e.value.active);
-      return tr.docChanged ? build(tr.state.doc, value.marks, null) : value;
+      if (!tr.docChanged) return value.moved.length ? { ...value, moved: [] } : value;
+      const { marks, moved } = follow(value.marks, tr);
+      return build(tr.state.doc, marks, value.active, moved);
     },
     provide: (f) => EditorView.decorations.from(f, (v) => v.lines),
   });
@@ -178,10 +221,21 @@ function comments(hooks: { current: Hooks }, canComment: boolean): Extension[] {
       },
     },
   });
+  const report = EditorView.updateListener.of((u) => {
+    if (!u.docChanged) return;
+    const moved = u.state.field(field).moved;
+    if (moved.length) hooks.current.onMoved?.(moved);
+    hooks.current.onChange?.(u.state.doc.toString());
+  });
   const ask = (view: EditorView) => {
     hooks.current.onComment?.(selectedLines(view.state));
     return true;
   };
+  return [field, marksGutter, report, ...(canComment ? [keymap.of([{ key: "Mod-Alt-m", run: ask }])] : [])];
+}
+
+/** The «Commenta» bubble over a selection (only while reading: while editing a selection is for typing over). */
+function askBubble(hooks: { current: Hooks }): Extension {
   const bubble = StateField.define<Tooltip | null>({
     create: () => null,
     update(_, tr) {
@@ -200,14 +254,19 @@ function comments(hooks: { current: Hooks }, canComment: boolean): Extension[] {
           dom.textContent = "Commenta";
           dom.title = "Commenta le righe selezionate (Ctrl+Alt+M)";
           dom.addEventListener("mousedown", (e) => e.preventDefault());
-          dom.addEventListener("click", () => ask(view));
+          dom.addEventListener("click", () => hooks.current.onComment?.(selectedLines(view.state)));
           return { dom };
         },
       };
     },
     provide: (f) => showTooltip.from(f),
   });
-  return [field, marksGutter, ...(canComment ? [bubble, keymap.of([{ key: "Mod-Alt-m", run: ask }])] : [])];
+  return bubble;
+}
+
+function editing(on: boolean, hooks: { current: Hooks }, canComment: boolean): Extension {
+  if (on) return [EditorState.readOnly.of(false), history(), keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab])];
+  return [EditorState.readOnly.of(true), canComment ? askBubble(hooks) : []];
 }
 
 export default function CodeView({
@@ -216,27 +275,36 @@ export default function CodeView({
   marks = [],
   active = null,
   reveal = null,
+  editable = false,
   onMark,
   onComment,
+  onChange,
+  onMoved,
 }: {
+  /** the text the view starts from: a new value is a new view (edits made here don't come back through it) */
   content: string;
   filename: string;
   marks?: Mark[];
   active?: string | null;
   /** scroll to this line (a new object each time) */
   reveal?: { line: number } | null;
+  editable?: boolean;
 } & Hooks) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const lang = useRef(new Compartment());
-  const hooks = useRef<Hooks>({ onMark, onComment });
-  hooks.current = { onMark, onComment };
+  const edit = useRef(new Compartment());
+  const hooks = useRef<Hooks>({ onMark, onComment, onChange, onMoved });
+  hooks.current = { onMark, onComment, onChange, onMoved };
 
   useEffect(() => {
     if (!host.current) return;
     const v = new EditorView({
       parent: host.current,
-      state: EditorState.create({ doc: content, extensions: [baseExtensions(true), lang.current.of([]), comments(hooks, !!onComment)] }),
+      state: EditorState.create({
+        doc: content,
+        extensions: [baseExtensions(), lang.current.of([]), edit.current.of(editing(editable, hooks, !!onComment)), comments(hooks, !!onComment)],
+      }),
     });
     view.current = v;
     let alive = true;
@@ -253,15 +321,23 @@ export default function CodeView({
   }, [content, filename]);
 
   useEffect(() => {
+    const v = view.current;
+    if (!v) return;
+    v.dispatch({ effects: edit.current.reconfigure(editing(editable, hooks, !!onComment)) });
+    if (editable) v.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editable]);
+
+  useEffect(() => {
     view.current?.dispatch({ effects: setMarks.of({ marks, active }) });
   }, [marks, active, content]);
 
   useEffect(() => {
     const v = view.current;
     if (!v || !reveal) return;
-    const line = v.state.doc.line(Math.min(Math.max(1, reveal.line), v.state.doc.lines));
+    const line = v.state.doc.line(clampLine(v.state.doc, reveal.line));
     v.dispatch({ effects: EditorView.scrollIntoView(line.from, { y: "center" }) });
   }, [reveal]);
 
-  return <div className="lab-code" ref={host} data-testid="lab-code" />;
+  return <div className={`lab-code ${editable ? "editing" : ""}`} ref={host} data-testid="lab-code" />;
 }
