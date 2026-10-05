@@ -100,6 +100,26 @@ what the exam asks, anything not tied to a file. «Note del laboratorio» at the
 address), with the same notes field and a preview; they are saved with the comments, in the same queue
 (`components/labs/useLabStore.ts`).
 
+## The assistant
+
+«Assistente» in the lab's top bar (owner only) opens the course's AI panel on the lab (`components/labs/LabAssistant.tsx`),
+with its own conversations (`chat_sessions.lab_id`; the course's text lists only those without a lab). It knows the open
+file; selecting lines and pressing **«Chiedi»** (next to «Commenta» over the selection) adds them as context. Quick actions:
+explain this file, find errors, comment the code, connect it to the theory.
+
+The turn is the course assistant's (`agent._drive`), prepared by `pipeline/lab_agent.py` with the prompt `lab.system`
+(editable in Settings → Prompt) and its own tools (`pipeline/lab_tools.py`):
+
+| reads | writes (not in «explain» mode) |
+|-------|--------------------------------|
+| `lab_overview`, `read_lab_file` (text with line numbers, notebooks as cells with their saved outputs, PDFs as text by page, pictures as images), `grep_lab`, `read_comments`, `read_lab_notes`, `read_lesson` (the theory lesson's typed notes), `read_chapter` (the lesson's section of its chapter) | `edit_lab_file` (exact search/replace), `write_lab_file` (a new text file or a rewrite), `add_comment` (lines, cell, page or whole file: **only when the user asks** to comment) |
+
+Nothing is ever executed: the prompt says so and there is no tool for it. Edits move the comments with their lines. Changes
+are applied at once; the first write of a turn snapshots the lab (each file's version and text, stored in the blob store, and
+the ids of the comments) and the change card's **Annulla** puts back the files it edited, removes the files and comments it
+added, and moves the comments back; it is refused (409) when a file it changed has been changed again since. After a turn
+(or its undo) the page reads the touched files and their comments again; the card's file names open the file.
+
 ## API (admin only, like the rest)
 
 The routes hang off the lesson, so a share link of the lesson can reach the same lab.
@@ -117,5 +137,9 @@ The routes hang off the lesson, so a share link of the lesson can reach the same
 | `GET /api/lessons/{id}/lab/files/{fid}/raw` | the file to download (text in UTF-8), always as an attachment |
 | `PUT /api/lessons/{id}/lab/comments/{uuid}` `{file_id, anchor, body}` | create or replace a comment → the comment with its `version`; another file or lab's comment is 404 |
 | `DELETE /api/lessons/{id}/lab/comments/{uuid}` | remove it (already gone is fine) |
+
+The assistant uses the chat API (`docs/AI-WORKSPACE.md`): `POST /api/chat/sessions {course_id, lab_id}`,
+`GET /api/chat/sessions?course_id=&lab_id=`, and messages with `scope: {file_id, selection: {from_line, to_line, text}, mode}`
+(`ask` | `edit` | `explain`; no `review`).
 
 `GET /api/lessons/{id}` tells whether the lesson has a lab: `lab: {files, comments}` (counts) or `null`.

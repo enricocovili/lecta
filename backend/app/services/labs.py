@@ -9,6 +9,12 @@ import posixpath
 import re
 from dataclasses import dataclass
 
+from datetime import UTC, datetime
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models import LabComment, LabFile
 from .sniff import sniff_bytes
 
 MAX_FILE_BYTES = 20 * 1024 * 1024
@@ -185,3 +191,17 @@ def remap_anchor(anchor: dict, old: str, new: str, matcher: difflib.SequenceMatc
 def remap_anchors(anchors: list[dict], old: str, new: str) -> list[dict]:
     sm = difflib.SequenceMatcher(None, old.split("\n"), new.split("\n"), autojunk=False)
     return [remap_anchor(a, old, new, sm) for a in anchors]
+
+
+async def follow_comments(db: AsyncSession, f: LabFile, old: str, new: str) -> None:
+    """The comments on a text file follow their lines when its text changes (a new upload, the assistant, an undo)."""
+    if old == new:
+        return
+    comments = [c for c in (await db.execute(select(LabComment).where(LabComment.file_id == f.id))).scalars() if "from" in (c.anchor or {})]
+    if not comments:
+        return
+    for c, anchor in zip(comments, remap_anchors([c.anchor for c in comments], old, new), strict=True):
+        if anchor != c.anchor:
+            c.anchor = anchor
+            c.version += 1
+            c.updated_at = datetime.now(UTC)

@@ -6,7 +6,9 @@ import { ApiError, api, del, fmtSize, get, patch, post, uploadRaw } from "../../
 import { Icon } from "../icons";
 import NotesField from "../lessons/NotesField";
 import { Markdown } from "../workspace/Markdown";
-import { Confirm, Empty, Loading, Modal, toast, toastError } from "../ui";
+import { Confirm, Empty, Loading, Modal, toast, toastError, useLocalStorage } from "../ui";
+import type { ChangedFile, SelectionScope } from "../workspace/types";
+import LabAssistant from "./LabAssistant";
 import CodeView, { type Lines, type Mark, type Moved } from "./CodeView";
 import { MAX_FILE_BYTES, baseName, fileIcon, fromDrop, fromInput, tree, worthUploading, type Folder, type LabAccess, type LabData, type LabFile, type Picked } from "./files";
 import NotebookView from "./NotebookView";
@@ -111,11 +113,41 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
     },
     [base],
   );
+  // The assistant (the owner's only): mounted the first time it opens, then kept so its conversation survives closing it.
+  const [aiOpen, setAiOpen] = useLocalStorage("lecta:lab:ai", false);
+  const [aiMounted, setAiMounted] = useState(false);
+  const [aiSelection, setAiSelection] = useState<SelectionScope | null>(null);
+  const [aiFocus, setAiFocus] = useState(0);
+  const showAi = owner && aiOpen;
+  useEffect(() => {
+    if (showAi) setAiMounted(true);
+  }, [showAi]);
   const store = useLabStore(base, String(lab.id), lab.comments, { text: lab.notes, version: lab.notes_version }, lab.files, {
     onFileSaved: (f) => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, version: f.version, size: f.size } : x))),
     onFileConflict: (id) => void reloadFile(id),
   });
   storeRef.current = store;
+
+  /** After a turn of the assistant (or its undo): the files and comments it touched are read again. */
+  const afterAi = useCallback(
+    async (changed: ChangedFile[]) => {
+      const ids = changed.map((f) => f.file_id).filter((x): x is number => x != null);
+      if (!ids.length) return;
+      try {
+        const fresh = await get<LabData>(`${base}/lab`);
+        setFiles(fresh.files);
+        for (const id of ids) {
+          const f = fresh.files.find((x) => x.id === id);
+          if (f) storeRef.current?.adopt(id, f.version, fresh.comments);
+          else storeRef.current?.forgetFile(id);
+        }
+        setReloads((r) => Object.fromEntries([...Object.entries(r), ...ids.map((id) => [id, (r[id] ?? 0) + 1])]));
+      } catch (e) {
+        toastError(e);
+      }
+    },
+    [base],
+  );
   const perFile = useMemo(() => {
     const m = new Map<number, number>();
     for (const c of store.comments) m.set(c.file_id, (m.get(c.file_id) ?? 0) + 1);
@@ -137,6 +169,9 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [canEdit, save]);
+
+  // Lines picked for the assistant belong to the file they were picked in.
+  useEffect(() => setAiSelection(null), [open?.id]);
 
   // The first file opens by itself when nothing is chosen.
   useEffect(() => {
@@ -235,6 +270,12 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
             </a>
           )}
           {owner && (
+            <button type="button" className={`btn ${showAi ? "active" : "ghost"}`} onClick={() => setAiOpen(!aiOpen)} aria-pressed={showAi} data-testid="lab-ai-toggle" title="L’assistente del laboratorio: spiega e modifica i file, commenta se glielo chiedi">
+              <Icon name="sparkles" />
+              <span className="wsb-lbl">Assistente</span>
+            </button>
+          )}
+          {owner && (
             <span className="pill sm lab-publish" title="Il laboratorio è privato: la pubblicazione sul sito arriverà più avanti" data-testid="lab-publish">
               <Icon name="globe" /> Pubblicazione: in sviluppo
             </span>
@@ -273,7 +314,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
         </div>
       )}
 
-      <div className="lab-body">
+      <div className={`lab-body ${showAi ? "ai-on" : ""}`}>
         <aside className="lab-tree" aria-label="File del laboratorio" data-testid="lab-tree">
           <button type="button" className={`lab-tree-row lab-notes-entry ${notesOpen ? "on" : ""}`} onClick={showNotes} data-testid="lab-notes-open">
             <Icon name="notebook" /> <span>Note del laboratorio</span>
@@ -289,7 +330,22 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
           {notesOpen ? (
             <NotesView text={store.notes} onChange={store.setNotes} canEdit={canEdit} />
           ) : open ? (
-            <FileView key={`${open.id}:${reloads[open.id] ?? 0}`} file={open} base={base} store={store} canEdit={canEdit} />
+            <FileView
+              key={`${open.id}:${reloads[open.id] ?? 0}`}
+              file={open}
+              base={base}
+              store={store}
+              canEdit={canEdit}
+              onAsk={
+                owner
+                  ? (lines) => {
+                      setAiSelection({ from_line: lines.from, to_line: lines.to, text: lines.text });
+                      setAiOpen(true);
+                      setAiFocus((n) => n + 1);
+                    }
+                  : undefined
+              }
+            />
           ) : (
             <div className="lab-empty">
               <Empty icon="flask">
@@ -305,6 +361,20 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
             </div>
           )}
         </main>
+        {owner && aiMounted && (
+          <LabAssistant
+            lab={lab}
+            files={files}
+            openFile={open}
+            selection={aiSelection}
+            open={showAi}
+            focusNonce={aiFocus}
+            onClose={() => setAiOpen(false)}
+            onClearSelection={() => setAiSelection(null)}
+            onChanged={(changed) => void afterAi(changed)}
+            onOpenFile={(path) => choose(path)}
+          />
+        )}
       </div>
       {dragging && <div className="lab-drop" aria-hidden><Icon name="upload" /> Lascia qui i file per caricarli</div>}
 
@@ -363,7 +433,7 @@ function FolderView({ folder, depth, open, choose, canEdit, counts, onRename, on
   );
 }
 
-function FileView({ file, base, store, canEdit }: { file: LabFile; base: string; store: Store; canEdit: boolean }) {
+function FileView({ file, base, store, canEdit, onAsk }: { file: LabFile; base: string; store: Store; canEdit: boolean; onAsk?: (lines: Lines) => void }) {
   const raw = `${base}/lab/files/${file.id}/raw`;
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -472,6 +542,7 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
               editable={editing}
               onMark={focus}
               onComment={canEdit ? (lines: Lines) => start(lines) : undefined}
+              onAsk={onAsk}
               onChange={(doc) => store.setFileContent(file.id, doc)}
               onMoved={onMoved}
             />

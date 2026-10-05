@@ -580,3 +580,26 @@ body.ws-page .lab {
 .lab-pdf-page.on .lab-pdf-sheet {
   outline: 3px solid var(--warn);
 }
+
+/* ------------------------------------------------------------------ the assistant */
+
+.lab-body.ai-on {
+  grid-template-columns: 15rem minmax(0, 1fr) auto;
+}
+.lab-body.ai-on .lab-file-split {
+  grid-template-columns: minmax(0, 1fr) 18rem;
+}
+.lab-ai {
+  width: 26rem;
+  min-height: 0;
+  display: flex;
+  background: var(--bg-elev);
+  border-left: 1px solid var(--border);
+}
+.lab-ai.off {
+  display: none;
+}
+.cm-lab-bubble {
+  display: flex;
+  gap: 0.3rem;
+}

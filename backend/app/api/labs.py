@@ -179,7 +179,7 @@ async def upload_file(lesson_id: int, request: Request, path: str = Query(..., m
         replaced = False
     else:
         if existing.content is not None and c.content is not None:
-            await _follow(db, existing, existing.content, c.content)
+            await lb.follow_comments(db, existing, existing.content, c.content)
         existing.kind, existing.language, existing.size, existing.content, existing.blob = c.kind, c.language, size, c.content, blob
         existing.version += 1
         existing.updated_at = now
@@ -187,18 +187,6 @@ async def upload_file(lesson_id: int, request: Request, path: str = Query(..., m
     lab.updated_at = now
     await db.commit()
     return {**file_out(existing), "replaced": replaced}
-
-
-async def _follow(db: AsyncSession, f: LabFile, old: str, new: str) -> None:
-    """The comments on a text file follow their lines when the text changes."""
-    comments = [c for c in (await db.execute(select(LabComment).where(LabComment.file_id == f.id))).scalars() if "from" in (c.anchor or {})]
-    if not comments or old == new:
-        return
-    for c, anchor in zip(comments, lb.remap_anchors([c.anchor for c in comments], old, new), strict=True):
-        if anchor != c.anchor:
-            c.anchor = anchor
-            c.version += 1
-            c.updated_at = _now()
 
 
 class ContentSave(BaseModel):

@@ -105,6 +105,8 @@ export interface Moved extends Lines {
 interface Hooks {
   onMark?: (id: string) => void;
   onComment?: (lines: Lines) => void;
+  /** ask the assistant about the selected lines */
+  onAsk?: (lines: Lines) => void;
   onChange?: (doc: string) => void;
   onMoved?: (moved: Moved[]) => void;
 }
@@ -234,9 +236,20 @@ function comments(hooks: { current: Hooks }, canComment: boolean): Extension[] {
   return [field, marksGutter, report, ...(canComment ? [keymap.of([{ key: "Mod-Alt-m", run: ask }])] : [])];
 }
 
-/** The «Commenta» bubble over a selection (only while reading: while editing a selection is for typing over). */
-function askBubble(hooks: { current: Hooks }): Extension {
-  const bubble = StateField.define<Tooltip | null>({
+/** The bubble over a selection: «Commenta» and «Chiedi» (only while reading: while editing a selection is for typing over). */
+function askBubble(hooks: { current: Hooks }, canComment: boolean, canAsk: boolean): Extension {
+  const button = (label: string, title: string, testid: string, run: () => void) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn sm cm-lab-ask";
+    b.dataset.testid = testid;
+    b.textContent = label;
+    b.title = title;
+    b.addEventListener("mousedown", (e) => e.preventDefault());
+    b.addEventListener("click", run);
+    return b;
+  };
+  return StateField.define<Tooltip | null>({
     create: () => null,
     update(_, tr) {
       const sel = tr.state.selection.main;
@@ -247,26 +260,21 @@ function askBubble(hooks: { current: Hooks }): Extension {
         strictSide: true,
         arrow: false,
         create: (view) => {
-          const dom = document.createElement("button");
-          dom.type = "button";
-          dom.className = "btn sm cm-lab-ask";
-          dom.dataset.testid = "lab-comment-selection";
-          dom.textContent = "Commenta";
-          dom.title = "Commenta le righe selezionate (Ctrl+Alt+M)";
-          dom.addEventListener("mousedown", (e) => e.preventDefault());
-          dom.addEventListener("click", () => hooks.current.onComment?.(selectedLines(view.state)));
+          const dom = document.createElement("div");
+          dom.className = "cm-lab-bubble";
+          if (canComment) dom.append(button("Commenta", "Commenta le righe selezionate (Ctrl+Alt+M)", "lab-comment-selection", () => hooks.current.onComment?.(selectedLines(view.state))));
+          if (canAsk) dom.append(button("Chiedi", "Chiedi all’assistente di queste righe", "lab-ask-selection", () => hooks.current.onAsk?.(selectedLines(view.state))));
           return { dom };
         },
       };
     },
     provide: (f) => showTooltip.from(f),
   });
-  return bubble;
 }
 
-function editing(on: boolean, hooks: { current: Hooks }, canComment: boolean): Extension {
+function editing(on: boolean, hooks: { current: Hooks }, canComment: boolean, canAsk: boolean): Extension {
   if (on) return [EditorState.readOnly.of(false), history(), keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab])];
-  return [EditorState.readOnly.of(true), canComment ? askBubble(hooks) : []];
+  return [EditorState.readOnly.of(true), canComment || canAsk ? askBubble(hooks, canComment, canAsk) : []];
 }
 
 export default function CodeView({
@@ -278,6 +286,7 @@ export default function CodeView({
   editable = false,
   onMark,
   onComment,
+  onAsk,
   onChange,
   onMoved,
 }: {
@@ -294,8 +303,8 @@ export default function CodeView({
   const view = useRef<EditorView | null>(null);
   const lang = useRef(new Compartment());
   const edit = useRef(new Compartment());
-  const hooks = useRef<Hooks>({ onMark, onComment, onChange, onMoved });
-  hooks.current = { onMark, onComment, onChange, onMoved };
+  const hooks = useRef<Hooks>({ onMark, onComment, onAsk, onChange, onMoved });
+  hooks.current = { onMark, onComment, onAsk, onChange, onMoved };
 
   useEffect(() => {
     if (!host.current) return;
@@ -303,7 +312,7 @@ export default function CodeView({
       parent: host.current,
       state: EditorState.create({
         doc: content,
-        extensions: [baseExtensions(), lang.current.of([]), edit.current.of(editing(editable, hooks, !!onComment)), comments(hooks, !!onComment)],
+        extensions: [baseExtensions(), lang.current.of([]), edit.current.of(editing(editable, hooks, !!onComment, !!onAsk)), comments(hooks, !!onComment)],
       }),
     });
     view.current = v;
@@ -323,7 +332,7 @@ export default function CodeView({
   useEffect(() => {
     const v = view.current;
     if (!v) return;
-    v.dispatch({ effects: edit.current.reconfigure(editing(editable, hooks, !!onComment)) });
+    v.dispatch({ effects: edit.current.reconfigure(editing(editable, hooks, !!onComment, !!onAsk)) });
     if (editable) v.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editable]);

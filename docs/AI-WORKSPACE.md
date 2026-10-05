@@ -121,3 +121,10 @@ Other calls:
 
 The CodeMirror editor, the file tree, diagnostics, SyncTeX, the inline diff bar and the old “Chat” panel. The
 endpoints for file content still exist (used by tests), but no page uses them.
+
+## The lab's assistant
+
+A lesson's laboratory has its own assistant on the same machinery: conversations with `lab_id`, the turn run by
+`agent._drive` on a bench prepared by `pipeline/lab_agent.py` (prompt `lab.system`, tools in `pipeline/lab_tools.py`), its
+own snapshot and undo by file versions. See [LABS.md](LABS.md#the-assistant).
+

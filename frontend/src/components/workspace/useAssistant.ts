@@ -1,4 +1,4 @@
-// The AI conversation of a course: sessions, sending, live streaming of a turn (with reconnect) and undo.
+// The AI conversation of a course (or of one of its lessons' labs): sessions, sending, live streaming of a turn (with reconnect) and undo.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, del, get, post, streamSSE } from "../../lib/api";
 import { toast, toastError } from "../ui";
@@ -35,11 +35,14 @@ export function recentAiChapters(messages: Message[], hours = 24): Set<number> {
 
 interface Opts {
   courseId: number;
+  /** the conversations of this lab instead of the course's text */
+  labId?: number;
   /** The AI wrote something (`final`: the turn is over or was undone). Refresh the draft. */
   onChange: (files: ChangedFile[], final: boolean) => void;
 }
 
-export function useAssistant({ courseId, onChange }: Opts) {
+export function useAssistant({ courseId, labId, onChange }: Opts) {
+  const where = labId ? { course_id: courseId, lab_id: labId } : { course_id: courseId };
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -167,7 +170,7 @@ export function useAssistant({ courseId, onChange }: Opts) {
   useEffect(() => {
     let stop = false;
     setLoading(true);
-    get<SessionInfo[]>(`/api/chat/sessions?course_id=${courseId}`)
+    get<SessionInfo[]>(`/api/chat/sessions?course_id=${courseId}${labId ? `&lab_id=${labId}` : ""}`)
       .then(async (list) => {
         if (stop) return;
         const sorted = [...list].sort((a, b) => b.id - a.id);
@@ -185,11 +188,11 @@ export function useAssistant({ courseId, onChange }: Opts) {
       stop = true;
       detach();
     };
-  }, [courseId, loadSession, detach]);
+  }, [courseId, labId, loadSession, detach]);
 
   const ensureSession = async (): Promise<number> => {
     if (sidRef.current) return sidRef.current;
-    const s = await post<SessionInfo>("/api/chat/sessions", { course_id: courseId });
+    const s = await post<SessionInfo>("/api/chat/sessions", where);
     setSessions((xs) => [s, ...xs]);
     sidRef.current = s.id;
     setSessionId(s.id);
@@ -265,7 +268,7 @@ export function useAssistant({ courseId, onChange }: Opts) {
     if (messages.length === 0) return;
     detach();
     try {
-      const s = await post<SessionInfo>("/api/chat/sessions", { course_id: courseId });
+      const s = await post<SessionInfo>("/api/chat/sessions", where);
       setSessions((xs) => [s, ...xs]);
       sidRef.current = s.id;
       setSessionId(s.id);

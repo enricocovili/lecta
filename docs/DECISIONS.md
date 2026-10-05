@@ -497,3 +497,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      attachment with `nosniff` and a sandbox CSP, typed from the file's bytes (only PDFs and pictures keep their own type).
      An uploaded HTML or SVG page is source code. *Why:* the files come from anywhere (the lecturer, classmates) and Lecta
      sits on a public host; showing them must never be a way to run them.
+105. **The lab has its own assistant, on the same turn.** The course assistant's loop was split (`agent._drive` runs a turn on
+     a «bench» its caller prepares) so the lab gets its own prompt, tools and undo without a second loop: it reads the lab,
+     the theory lesson and its chapter, edits only the lab's text files, and adds comments only when the user asks. Its
+     conversations belong to the lab (`chat_sessions.lab_id`) and a lab turn does not block the course's assistant. *Why:*
+     a lab needs explanations of code next to the code, and the student's comments are theirs unless they ask for help.
+

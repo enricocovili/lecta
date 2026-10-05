@@ -52,6 +52,7 @@ class Turn:
     reply_id: int
     session_id: int
     course_id: int
+    lab_id: int | None = None  # a turn of a lab's assistant (lab_agent.py)
     events: list[tuple[int, str, dict[str, Any]]] = field(default_factory=list)
     finished: bool = False
     finished_at: float = 0.0
@@ -80,7 +81,8 @@ def _purge() -> None:
 
 
 def running_turn(course_id: int) -> Turn | None:
-    return next((t for t in RUNS.values() if t.course_id == course_id and not t.finished), None)
+    """The course assistant's turn running on this course (a lab's assistant runs apart: lab_agent.running_turn)."""
+    return next((t for t in RUNS.values() if t.course_id == course_id and t.lab_id is None and not t.finished), None)
 
 
 async def stream_events(turn: Turn, after: int = 0):

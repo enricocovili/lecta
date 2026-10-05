@@ -274,4 +274,43 @@ test.describe.serial("Laboratorio", () => {
     await page.waitForURL(new RegExp(`${lessonPath}$`));
     con.assertClean(EXPECTED);
   });
+
+  test("the lab's assistant explains the picked lines, comments when asked, and Annulla takes it back", async ({ page }) => {
+    test.setTimeout(180_000);
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`${lessonPath}/lab?file=main.c`);
+    const code = page.getByTestId("lab-code");
+    await expect(code.locator(".cm-line").first()).toHaveText("// Laboratorio 3");
+
+    // Pick two lines and ask about them: the panel opens with them as context.
+    await code.locator(".cm-line").nth(0).click({ position: { x: 2, y: 5 } });
+    await code.locator(".cm-line").nth(1).click({ modifiers: ["Shift"] });
+    await page.getByTestId("lab-ask-selection").click();
+    const panel = page.getByTestId("lab-ai");
+    await expect(panel).toBeVisible();
+    await expect(panel.locator(".ai-scope-pill")).toContainText("main.c · selezione di 2 righe");
+    await page.getByTestId("ai-composer").fill("Cosa fanno queste righe?");
+    await page.getByTestId("ai-composer").press("Enter");
+    await expect(panel.getByTestId("ai-message").last()).toContainText("fanno il lavoro principale", { timeout: 60_000 });
+    await expect(panel.getByTestId("ai-change-card")).toHaveCount(0);
+
+    // Asked to comment, it comments: the comment shows up next to the code; Annulla takes it away.
+    const before = await page.getByTestId("lab-comment").count();
+    await page.getByTestId("ai-composer").fill("Commenta la prima riga");
+    await page.getByTestId("ai-composer").press("Enter");
+    await expect(panel.getByTestId("ai-change-card")).toContainText("Ho aggiunto dei commenti", { timeout: 60_000 });
+    await expect(page.getByTestId("lab-comment")).toHaveCount(before + 1);
+    await expect(page.getByTestId("lab-comment").first()).toContainText("Riga 1");
+    await page.screenshot({ path: "/e2e/.results/lab-assistant.png" });
+    await panel.getByTestId("ai-undo").click();
+    await expect(panel.getByTestId("ai-change-card")).toContainText("Annullato");
+    await expect(page.getByTestId("lab-comment")).toHaveCount(before);
+
+    // The course's text has its own conversations: the lab's don't show up there.
+    const course = /\/admin\/courses\/(\d+)/.exec(lessonPath)![1];
+    const sessions = await (await page.request.get(`/api/chat/sessions?course_id=${course}`)).json();
+    expect(sessions).toEqual([]);
+    con.assertClean(EXPECTED);
+  });
 });

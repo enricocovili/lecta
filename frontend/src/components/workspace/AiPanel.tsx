@@ -3,11 +3,16 @@
 import { useEffect, useRef } from "react";
 import { fmtWhen } from "../ui";
 import { Icon } from "../icons";
-import Composer, { QUICK_ACTIONS, type ScopeView } from "./Composer";
+import Composer, { QUICK_ACTIONS, type QuickAction, type ScopeView } from "./Composer";
 import Pop from "./Pop";
 import MessageView, { type MessageCtx } from "./MessageView";
 import type { Assistant } from "./useAssistant";
 import type { Mode } from "./types";
+
+const DOC_INTRO = {
+  title: "Lavora sul documento",
+  text: "L’assistente conosce tutto il corso: capitoli, appunti e fonti. Seleziona un pezzo di testo nella bozza per chiedere una spiegazione o una modifica, oppure scrivi qui sotto. Le modifiche sono immediate e puoi annullarle con un clic.",
+};
 
 export default function AiPanel({
   assistant,
@@ -18,6 +23,8 @@ export default function AiPanel({
   prefill,
   onClearScope,
   onClose,
+  intro = DOC_INTRO,
+  quick = QUICK_ACTIONS,
 }: {
   assistant: Assistant;
   ctx: MessageCtx;
@@ -29,6 +36,9 @@ export default function AiPanel({
   onClearScope: () => void;
   /** Absent on phones, where the tab bar switches between the document and the assistant. */
   onClose?: () => void;
+  /** what the empty conversation says, and the quick actions (the course's text by default; the lab has its own) */
+  intro?: { title: string; text: string };
+  quick?: QuickAction[];
 }) {
   const { messages, loading, busy, sessions, sessionId } = assistant;
   const list = useRef<HTMLDivElement>(null);
@@ -106,13 +116,10 @@ export default function AiPanel({
             <span className="ai-empty-ico">
               <Icon name="sparkles" />
             </span>
-            <h2>Lavora sul documento</h2>
-            <p>
-              L’assistente conosce tutto il corso: capitoli, appunti e fonti. Seleziona un pezzo di testo nella bozza per chiedere una spiegazione o una modifica, oppure scrivi
-              qui sotto. Le modifiche sono immediate e puoi annullarle con un clic.
-            </p>
+            <h2>{intro.title}</h2>
+            <p>{intro.text}</p>
             <div className="ai-quick big">
-              {QUICK_ACTIONS.map((q) => (
+              {quick.map((q) => (
                 <button key={q.label} type="button" className="ai-chip" onClick={() => send(q.text, q.mode)}>
                   {q.label}
                 </button>
@@ -131,6 +138,7 @@ export default function AiPanel({
         focusNonce={focusNonce}
         prefill={prefill}
         showQuick={!empty && !busy}
+        quick={quick}
         onSend={send}
         onStop={() => void assistant.cancel()}
         onClearScope={onClearScope}

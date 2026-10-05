@@ -244,6 +244,8 @@ class FakeAdapter(Adapter):
         def call(name: str, **args: Any) -> PreparedCall:
             return PreparedCall(f"fake_{req.request_key}_{name}", name, args)
 
+        if m.get("lab"):
+            return self._lab_agent(req, msg, low, mode, results, done, call)
         # Test hooks.
         if "FAKE:LOOP" in msg:
             return done("Continuo a leggere. ", [call("course_overview")])
@@ -284,3 +286,32 @@ class FakeAdapter(Adapter):
         if sel:
             return done(f"Spiegazione di «{sel[:80]}»: è il passaggio che il capitolo usa per introdurre l'idea; te lo riformulo con parole semplici." + suggestions)
         return done("Ho letto il capitolo: nulla da cambiare." + suggestions)
+
+    def _lab_agent(self, req: Prepared, msg: str, low: str, mode: str, results: list[Any], done: Any, call: Any) -> Completion:
+        """The lab assistant, scripted: reads the open file; edits it, writes a new file or comments it when asked."""
+        path = req.meta.get("file_path")
+        if not results:
+            if not path:
+                return done("Il laboratorio non ha ancora file di testo: caricane uno.", [])
+            return done("Leggo il file. ", [call("read_lab_file", path=path)])
+        last = results[-1]
+        suggestions = '\n\n```suggestions\n["Spiega la riga successiva", "Commenta il ciclo"]\n```'
+        if last.tool_name == "read_lab_file" and mode != "explain":
+            fenced = re.search(r"<<<UNTRUSTED-[0-9a-f]+>>>[^\n]*\n(.*)\n<<<END-[0-9a-f]+>>>", last.text or "", re.S)
+            lines = [re.sub(r"^\s*\d+\| ", "", ln) for ln in (fenced.group(1) if fenced else "").split("\n")]
+            first = next((ln for ln in lines if ln.strip()), "")
+            if "commenta" in low:
+                return done("Aggiungo un commento. ", [call("add_comment", path=path, from_line=1, to_line=1, body="Qui inizia il programma: è la prima riga.")])
+            if "soluzione" in low:
+                return done("Scrivo la soluzione. ", [call("write_lab_file", path="soluzione.txt", content="La soluzione dell'esercizio.\n")])
+            if first and (mode == "edit" or "aggiungi" in low or "modifica" in low):
+                return done("Modifico il file. ", [call("edit_lab_file", path=path, search=first, replace="// Modificato dall'assistente\n" + first)])
+        if last.tool_name in ("edit_lab_file", "write_lab_file", "add_comment"):
+            if last.is_error:
+                return done("Non ci sono riuscito: " + (last.text or "")[:120])
+            what = {"edit_lab_file": "Ho modificato il file", "write_lab_file": "Ho scritto la soluzione in soluzione.txt", "add_comment": "Ho commentato la prima riga"}[last.tool_name]
+            return done(what + "." + suggestions)
+        sel = (req.meta.get("selection") or {}).get("text")
+        if sel:
+            return done(f"Queste righe («{sel[:60]}») fanno il lavoro principale del programma: te le spiego passo per passo." + suggestions)
+        return done("Ho letto il file: è un programma di esempio del laboratorio." + suggestions)

@@ -158,7 +158,9 @@ teorica»). Load the files explained in class (sources of any language, notebook
 folders too, by picker or drag and drop, up to 20 MB each) and read them in a file tree with the colours of their language.
 Notebooks show their cells and saved outputs (never run, no HTML), PDFs their pages.
 Select lines, a cell or a page and **comment** them while the lecturer explains (Markdown and maths, saved like the lesson's notes), or comment
-a whole file; **edit** a text file by hand (the comments follow their lines); free **notes** of the lab sit next to the files. Files are never executed. The lab stays apart from the study text and is private for now. Details: [docs/LABS.md](docs/LABS.md).
+a whole file; **edit** a text file by hand (the comments follow their lines); free **notes** of the lab sit next to the files.
+The lab's **assistant** explains the lines you pick («Chiedi»), the files and their link to the theory lesson, edits them
+and comments them when you ask (one click undoes a reply). Files are never executed. The lab stays apart from the study text and is private for now. Details: [docs/LABS.md](docs/LABS.md).
 
 ## From a lesson to the study text (import)
 

@@ -15,7 +15,9 @@ export interface ScopeView {
   pinned: boolean;
 }
 
-export const QUICK_ACTIONS: { label: string; text: string; mode: Mode }[] = [
+export type QuickAction = { label: string; text: string; mode: Mode };
+
+export const QUICK_ACTIONS: QuickAction[] = [
   { label: "Riassumi il capitolo", text: "Riassumi il capitolo in pochi punti chiari, per un ripasso veloce.", mode: "explain" },
   { label: "Trova lacune rispetto alle fonti", text: "Confronta il testo con le fonti caricate e dimmi cosa manca o è trattato in modo incompleto.", mode: "explain" },
   { label: "Migliora la struttura", text: "Migliora la struttura: ordine degli argomenti, titoli delle sezioni e passaggi tra un punto e l'altro.", mode: "edit" },
@@ -34,6 +36,7 @@ export default function Composer({
   focusNonce,
   prefill,
   showQuick,
+  quick = QUICK_ACTIONS,
   onSend,
   onStop,
   onClearScope,
@@ -43,6 +46,7 @@ export default function Composer({
   focusNonce: number;
   prefill: { nonce: number; text: string } | null;
   showQuick: boolean;
+  quick?: QuickAction[];
   onSend: (text: string, mode?: Mode) => Promise<boolean> | boolean;
   onStop: () => void;
   onClearScope: () => void;
@@ -84,7 +88,7 @@ export default function Composer({
     <div className="ai-composer" data-testid="ai-composer-box">
       {showQuick && !busy && text === "" && (
         <div className="ai-quick" aria-label="Azioni rapide">
-          {QUICK_ACTIONS.map((q) => (
+          {quick.map((q) => (
             <button key={q.label} type="button" className="ai-chip" onClick={() => onSend(q.text, q.mode)}>
               {q.label}
             </button>

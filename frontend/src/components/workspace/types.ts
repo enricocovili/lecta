@@ -49,10 +49,13 @@ export interface Hunk {
 export interface ChangedFile {
   path: string;
   chapter_id: number | null;
-  op: "modify" | "create" | "delete" | "rename";
+  op: "modify" | "create" | "delete" | "rename" | "comment";
   added: number;
   removed: number;
   hunks: Hunk[];
+  /** a lab's file (the lab assistant), and the comments it added there */
+  file_id?: number;
+  comments?: number;
 }
 
 export interface Step {
@@ -93,6 +96,8 @@ export interface SelectionScope {
 
 export interface Scope {
   chapter_id?: number | null;
+  /** the lab file being looked at (a lab's conversation) */
+  file_id?: number | null;
   selection?: SelectionScope;
   mode?: Mode;
   attachments?: { source_file_id: number; page?: number }[];

@@ -10,6 +10,9 @@ export interface MessageCtx {
   onJump: (chapterId: number | null, targets?: FlashTarget[]) => void;
   onAsk: (text: string, opts?: { mode?: Mode; chapterId?: number | null; scope?: Scope; noScope?: boolean }) => Promise<boolean> | boolean;
   onUndo: (replyId: number) => Promise<boolean>;
+  /** a lab's conversation: open one of its files, and name the file a message was about */
+  onFile?: (path: string) => void;
+  fileName?: (fileId: number) => string | null;
 }
 
 const chapterName = (ctx: MessageCtx, id: number | null | undefined) => {
@@ -22,15 +25,16 @@ const chapterName = (ctx: MessageCtx, id: number | null | undefined) => {
 
 function UserMessage({ m, ctx }: { m: Message; ctx: MessageCtx }) {
   const ch = chapterName(ctx, m.scope.chapter_id);
+  const file = m.scope.file_id != null ? (ctx.fileName?.(m.scope.file_id) ?? "File") : null;
   const sel = m.scope.selection;
   const review = m.scope.mode === "review";
   return (
     <div className="ai-msg user" data-testid="ai-message" data-role="user">
-      {(review || ch || sel) && (
-        <div className="ai-scope-chip" title={ch?.title}>
-          <Icon name={review ? "sparkles" : sel ? "pencil" : "file-text"} />
+      {(review || ch || sel || file) && (
+        <div className="ai-scope-chip" title={ch?.title ?? file ?? undefined}>
+          <Icon name={review ? "sparkles" : sel ? "pencil" : file ? "code" : "file-text"} />
           <span>
-            {review ? "Revisione del corso" : ch ? `Capitolo ${ch.n}` : "Capitolo"}
+            {review ? "Revisione del corso" : file ? file : ch ? `Capitolo ${ch.n}` : "Capitolo"}
             {sel && !review && <> · «{sel.text.replace(/\s+/g, " ").slice(0, 70)}{sel.text.length > 70 ? "…" : ""}»</>}
           </span>
         </div>
@@ -93,7 +97,7 @@ function fileLabel(f: ChangedFile, ctx: MessageCtx): string {
   return f.path;
 }
 
-const OP_LABEL: Record<string, string> = { create: "nuovo", delete: "eliminato", rename: "rinominato" };
+const OP_LABEL: Record<string, string> = { create: "nuovo", delete: "eliminato", rename: "rinominato", comment: "commentato" };
 const CH_OP: Record<string, string> = { created: "Nuovo capitolo", renamed: "Capitolo rinominato", deleted: "Capitolo eliminato", moved: "Capitolo spostato" };
 
 function ChangeCard({ m, live, canUndo, ctx }: { m: Message; live: boolean; canUndo: boolean; ctx: MessageCtx }) {
@@ -111,7 +115,7 @@ function ChangeCard({ m, live, canUndo, ctx }: { m: Message; live: boolean; canU
     <div className={`ai-change ${undone ? "undone" : ""}`} data-testid="ai-change-card" data-status={c.status}>
       <div className="ai-change-head">
         <Icon name={live ? "loader" : undone ? "refresh" : "check-circle"} className={live ? "spin" : ""} />
-        <strong>{live ? "Sto modificando…" : undone ? "Annullato" : n > 0 ? `Ho modificato ${n} file` : "Ho cambiato la struttura"}</strong>
+        <strong>{live ? "Sto modificando…" : undone ? "Annullato" : n > 0 && c.files.every((f) => f.op === "comment") ? "Ho aggiunto dei commenti" : n > 0 ? `Ho modificato ${n} file` : "Ho cambiato la struttura"}</strong>
         {undone && <span className="badge">ripristinato</span>}
       </div>
       {n > 0 && (
@@ -120,13 +124,22 @@ function ChangeCard({ m, live, canUndo, ctx }: { m: Message; live: boolean; canU
             const targets: FlashTarget[] = f.chapter_id != null ? f.hunks.map((h) => ({ chapterId: f.chapter_id!, from: h.from_line, to: h.to_line })) : [];
             return (
               <li key={f.path}>
-                <button type="button" className="ai-change-link" disabled={f.chapter_id == null || undone} onClick={() => ctx.onJump(f.chapter_id, targets.slice(0, 1))} title={f.path}>
-                  {fileLabel(f, ctx)}
-                </button>
+                {ctx.onFile && f.file_id != null ? (
+                  <button type="button" className="ai-change-link" disabled={undone} onClick={() => ctx.onFile!(f.path)} title={f.path}>
+                    {f.path}
+                  </button>
+                ) : (
+                  <button type="button" className="ai-change-link" disabled={f.chapter_id == null || undone} onClick={() => ctx.onJump(f.chapter_id, targets.slice(0, 1))} title={f.path}>
+                    {fileLabel(f, ctx)}
+                  </button>
+                )}
                 {OP_LABEL[f.op] && <span className="badge">{OP_LABEL[f.op]}</span>}
-                <span className="ai-diff mono">
-                  <span className="add">+{f.added}</span> <span className="del">−{f.removed}</span>
-                </span>
+                {f.op !== "comment" && (
+                  <span className="ai-diff mono">
+                    <span className="add">+{f.added}</span> <span className="del">−{f.removed}</span>
+                  </span>
+                )}
+                {f.comments ? <span className="badge">{f.comments === 1 ? "+1 commento" : `+${f.comments} commenti`}</span> : null}
               </li>
             );
           })}
