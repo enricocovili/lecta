@@ -53,8 +53,8 @@ When asked to work on an issue ("do #12", "fix the next bug", "what's ready?"):
    them to ✔️ Fatta; until pushed, they stay in 🚧 In corso.
 5. Wrap up with the commits made and the issues they close, plus any issue created along the way.
 
-To have the agent work through the board on its own (ready, then da definire issues, by priority), run
-`/board-solve [N | ready | define | max issues]` (`.claude/skills/board-solve/SKILL.md`). It follows the rules
+To have the agent work through the board on its own (all the ready, then da definire issues, by priority), run
+`/board-solve [N | ready | define]` (`.claude/skills/board-solve/SKILL.md`). It follows the rules
 here, never pushes, and asks questions on the issue instead of guessing product-level decisions.
 
 ### Recording new work
