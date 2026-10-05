@@ -204,3 +204,14 @@ async def test_another_labs_comment_is_not_reachable(admin):
     assert (await admin.put(f"/api/lessons/{b['id']}/lab/comments/{cid}", json={"file_id": fb["id"], "body": "rubato"})).status_code == 404
     await admin.delete(f"/api/lessons/{b['id']}/lab/comments/{cid}")
     assert [c["body"] for c in (await admin.get(f"/api/lessons/{a['id']}/lab")).json()["comments"]] == ["mio"]
+
+
+async def test_the_lab_has_free_notes(admin):
+    _, lesson, lab = await new_lab(admin)
+    lid = lesson["id"]
+    assert lab["notes"] == "" and lab["notes_version"] == 1
+    r = await admin.put(f"/api/lessons/{lid}/lab/notes", json={"notes": "- all'esame chiede i puntatori"})
+    assert r.status_code == 200 and r.json()["version"] == 2
+    lab = (await admin.get(f"/api/lessons/{lid}/lab")).json()
+    assert lab["notes"] == "- all'esame chiede i puntatori" and lab["notes_version"] == 2
+    assert (await admin.put(f"/api/lessons/{lid}/lab/notes", json={"notes": "x" * (lb.MAX_NOTES_CHARS + 1)})).status_code == 422

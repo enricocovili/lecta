@@ -157,7 +157,7 @@ Details: [docs/LESSONS.md](docs/LESSONS.md).
 teorica»). Load the files explained in class (sources of any language, notebooks, PDFs, pictures; several at once, whole
 folders too, by picker or drag and drop, up to 20 MB each) and read them in a file tree with the colours of their language.
 Select lines and **comment** them while the lecturer explains (Markdown and maths, saved like the lesson's notes), or comment
-a whole file. Files are never executed. The lab stays apart from the study text and is private for now. Details: [docs/LABS.md](docs/LABS.md).
+a whole file; free **notes** of the lab sit next to the files. Files are never executed. The lab stays apart from the study text and is private for now. Details: [docs/LABS.md](docs/LABS.md).
 
 ## From a lesson to the study text (import)
 

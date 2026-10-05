@@ -62,10 +62,17 @@ dot, the card and the code point at each other. A card is written in the notes f
 Enter, Ctrl+B / Ctrl+I) and shown rendered when it loses the focus (Escape); an empty comment that loses the focus goes away.
 The tree shows how many comments each file has.
 
-Saving works as in the lessons (`components/labs/useLabComments.ts`): edits apply at once, are sent **once a minute, on
+Saving works as in the lessons (`components/labs/useLabStore.ts`): edits apply at once, are sent **once a minute, on
 Ctrl+S** and when the tab is hidden; what is unsaved is mirrored in `localStorage` (`lecta:lab:<id>:unsaved`, also deletes)
 and retried with a growing delay, and comes back on the next visit if the server has not changed that comment meanwhile.
 The save state is the same icon as in the lesson editor. A comment is sent once it says something.
+
+## Notes
+
+Besides the comments a lab has free **notes** (`labs.notes`, Markdown, with its own version): announcements, deadlines,
+what the exam asks, anything not tied to a file. «Note del laboratorio» at the top of the tree opens them (`?notes` in the
+address), with the same notes field and a preview; they are saved with the comments, in the same queue
+(`components/labs/useLabStore.ts`).
 
 ## API (admin only, like the rest)
 
@@ -73,9 +80,10 @@ The routes hang off the lesson, so a share link of the lesson can reach the same
 
 | call | |
 |------|-|
-| `GET /api/lessons/{id}/lab` · `GET /api/courses/{course_id}/lessons/{n}/lab` | the lab: `lesson` (id, number, title, course, chapter), `files` (no content) and `comments` · 404 when the lesson has none |
+| `GET /api/lessons/{id}/lab` · `GET /api/courses/{course_id}/lessons/{n}/lab` | the lab: `notes`, `notes_version`, `lesson` (id, number, title, course, chapter), `files` (no content) and `comments` · 404 when the lesson has none |
 | `POST /api/lessons/{id}/lab` | makes the lab if the lesson has none, else returns it |
 | `DELETE /api/lessons/{id}/lab` | the lab and its files |
+| `PUT /api/lessons/{id}/lab/notes` `{notes}` | the lab's free notes (replace) → `{version}` |
 | `POST /api/lessons/{id}/lab/files?path=` | raw body: one file (the page sends several in a row); same path = replace → the file with `replaced` |
 | `GET /api/lessons/{id}/lab/files/{fid}` | the file with `content` (text and notebooks; `null` for the others) |
 | `PATCH /api/lessons/{id}/lab/files/{fid}` `{path}` · `DELETE` | rename (a text file takes the new name's language; a taken name is 409) · remove |

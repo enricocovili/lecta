@@ -415,3 +415,33 @@ body.ws-page .lab {
   color: var(--primary-fg);
   border-color: var(--primary);
 }
+
+/* ------------------------------------------------------------------ the lab's notes */
+
+.lab-notes-entry {
+  width: 100%;
+  padding-left: 0.5rem;
+  margin-bottom: 0.35rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+.lab-notes-entry:hover {
+  background: var(--bg-hover);
+}
+.lab-notes-entry.on {
+  background: var(--accent-soft);
+}
+.lab-notes {
+  padding: 1rem 1.25rem 3rem;
+  max-width: 54rem;
+}
+.lab-notes .les-notes-field {
+  background: var(--bg-elev);
+  color: var(--fg);
+}

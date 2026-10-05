@@ -1,6 +1,6 @@
-// The comments of a lab while they are being written in class: they change at once on the page, are saved once a minute or
-// when asked (Ctrl+S; at once when the tab is hidden), survive a lost connection (kept in memory and mirrored in localStorage,
-// retried with a growing delay). A comment's id is made here, so sending it twice never makes two.
+// What is written in a lab during the class, the comments and the free notes: edits change the page at once, are saved once a
+// minute or when asked (Ctrl+S; at once when the tab is hidden), survive a lost connection (kept in memory and mirrored in
+// localStorage, retried with a growing delay). A comment's id is made here, so sending it twice never makes two.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../../lib/api";
 import { toastError } from "../ui";
@@ -29,6 +29,7 @@ const AUTOSAVE_MS = 60_000;
 interface Backup {
   put: Record<string, { c: LabComment; base: number }>;
   del: string[];
+  notes?: { text: string; base: number };
 }
 
 const backupKey = (key: string) => `lecta:lab:${key}:unsaved`;
@@ -36,7 +37,7 @@ const backupKey = (key: string) => `lecta:lab:${key}:unsaved`;
 function readBackup(key: string): Backup {
   try {
     const b = JSON.parse(localStorage.getItem(backupKey(key)) || "null") as Backup | null;
-    return b && typeof b === "object" ? { put: b.put ?? {}, del: b.del ?? [] } : { put: {}, del: [] };
+    return b && typeof b === "object" ? { put: b.put ?? {}, del: b.del ?? [], notes: b.notes } : { put: {}, del: [] };
   } catch {
     return { put: {}, del: [] };
   }
@@ -56,16 +57,21 @@ export function newId(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
+/** The id of the lab's free notes in the save queue (comments have UUIDs, so it can't clash). */
+const NOTES = "notes";
+
 /** `base`: the lesson's API (`/api/lessons/12`, or a share link's); `key` names the lab in localStorage. */
-export function useLabComments(base: string, key: string, initial: LabComment[]) {
+export function useLabStore(base: string, key: string, initial: LabComment[], initialNotes: { text: string; version: number }) {
   const [comments, setComments] = useState<LabComment[]>(initial);
   const ref = useRef(comments);
+  const [notes, setNotesState] = useState(initialNotes.text);
+  const notesRef = useRef(notes);
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const dirty = useRef(new Set<string>());
   const deleted = useRef(new Set<string>());
   const inflight = useRef(new Set<string>());
   const again = useRef(new Set<string>());
-  const versions = useRef(new Map<string, number>(initial.map((c) => [c.id, c.version])));
+  const versions = useRef(new Map<string, number>([...initial.map((c) => [c.id, c.version] as const), [NOTES, initialNotes.version]]));
   const failures = useRef(0);
   const retry = useRef<number | null>(null);
 
@@ -82,10 +88,14 @@ export function useLabComments(base: string, key: string, initial: LabComment[])
     try {
       const out: Backup = { put: {}, del: [...deleted.current] };
       for (const id of new Set([...dirty.current, ...inflight.current])) {
+        if (id === NOTES) {
+          out.notes = { text: notesRef.current, base: versions.current.get(NOTES) ?? 0 };
+          continue;
+        }
         const c = ref.current.find((x) => x.id === id);
         if (c) out.put[id] = { c, base: versions.current.get(id) ?? 0 };
       }
-      if (Object.keys(out.put).length || out.del.length) localStorage.setItem(backupKey(key), JSON.stringify(out));
+      if (Object.keys(out.put).length || out.del.length || out.notes) localStorage.setItem(backupKey(key), JSON.stringify(out));
       else localStorage.removeItem(backupKey(key));
     } catch {
       /* storage full or unavailable: the in-memory retry still works */
@@ -94,6 +104,11 @@ export function useLabComments(base: string, key: string, initial: LabComment[])
 
   /** A comment is sent once it says something (an empty one being written stays here). */
   const sendable = (c: LabComment) => c.body.trim() !== "" || versions.current.get(c.id);
+  const waitingFor = (id: string) => {
+    if (id === NOTES) return true;
+    const c = ref.current.find((x) => x.id === id);
+    return !!c && !!sendable(c);
+  };
 
   const flushOne = useCallback(
     async (id: string): Promise<void> => {
@@ -102,8 +117,9 @@ export function useLabComments(base: string, key: string, initial: LabComment[])
         return;
       }
       const isDelete = deleted.current.has(id);
+      const isNotes = id === NOTES;
       const c = ref.current.find((x) => x.id === id);
-      if (!isDelete && (!c || !sendable(c))) {
+      if (!isDelete && !isNotes && (!c || !sendable(c))) {
         if (!c) dirty.current.delete(id);
         return;
       }
@@ -112,7 +128,10 @@ export function useLabComments(base: string, key: string, initial: LabComment[])
       inflight.current.add(id);
       refresh();
       try {
-        if (isDelete) {
+        if (isNotes) {
+          const r = await api<{ version: number }>(`${base}/lab/notes`, { method: "PUT", json: { notes: notesRef.current } });
+          versions.current.set(NOTES, r.version);
+        } else if (isDelete) {
           await api(`${base}/lab/comments/${id}`, { method: "DELETE" });
           versions.current.delete(id);
         } else if (c) {
@@ -148,11 +167,7 @@ export function useLabComments(base: string, key: string, initial: LabComment[])
     for (let round = 0; round < 3; round++) {
       await Promise.all([...dirty.current, ...deleted.current].map((id) => flushOne(id)));
       while (inflight.current.size) await new Promise((r) => setTimeout(r, 60));
-      const waiting = [...dirty.current].filter((id) => {
-        const c = ref.current.find((x) => x.id === id);
-        return c && sendable(c);
-      });
-      if (!waiting.length && !deleted.current.size) return true;
+      if (![...dirty.current].some(waitingFor) && !deleted.current.size) return true;
     }
     return false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,6 +186,12 @@ export function useLabComments(base: string, key: string, initial: LabComment[])
   useEffect(() => {
     const b = readBackup(key);
     let restored = 0;
+    if (b.notes && b.notes.base === versions.current.get(NOTES)) {
+      notesRef.current = b.notes.text;
+      setNotesState(b.notes.text);
+      dirty.current.add(NOTES);
+      restored += 1;
+    }
     update((cur) => {
       let next = cur;
       for (const [id, { c, base: v }] of Object.entries(b.put)) {
@@ -200,11 +221,7 @@ export function useLabComments(base: string, key: string, initial: LabComment[])
     }, AUTOSAVE_MS);
     const hide = () => document.visibilityState === "hidden" && void flushAll();
     const leave = (e: BeforeUnloadEvent) => {
-      const waiting = [...dirty.current].some((cid) => {
-        const c = ref.current.find((x) => x.id === cid);
-        return c && sendable(c);
-      });
-      if (waiting || deleted.current.size || inflight.current.size) {
+      if ([...dirty.current].some(waitingFor) || deleted.current.size || inflight.current.size) {
         void flushAll();
         e.preventDefault();
         e.returnValue = "";
@@ -259,6 +276,16 @@ export function useLabComments(base: string, key: string, initial: LabComment[])
     [persist, refresh, update],
   );
 
+  const setNotes = useCallback(
+    (text: string) => {
+      notesRef.current = text;
+      setNotesState(text);
+      touch(NOTES);
+      if (failures.current) void flushOne(NOTES);
+    },
+    [flushOne, touch],
+  );
+
   /** The comments of a file that is gone leave with it (the server already dropped them). */
   const forgetFile = useCallback(
     (fileId: number) => {
@@ -270,5 +297,8 @@ export function useLabComments(base: string, key: string, initial: LabComment[])
     [persist, refresh, update],
   );
 
-  return useMemo(() => ({ comments, saveState, create, setBody, remove, forgetFile, flushAll }), [comments, saveState, create, setBody, remove, forgetFile, flushAll]);
+  return useMemo(
+    () => ({ comments, notes, saveState, create, setBody, remove, setNotes, forgetFile, flushAll }),
+    [comments, notes, saveState, create, setBody, remove, setNotes, forgetFile, flushAll],
+  );
 }

@@ -225,6 +225,8 @@ class Lab(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     lesson_id: Mapped[int] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"), unique=True)
+    notes: Mapped[str] = mapped_column(Text, default="", server_default="")  # free Markdown notes, not tied to a file
+    notes_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     created_at: Mapped[datetime] = _now()
     updated_at: Mapped[datetime] = _now()
 

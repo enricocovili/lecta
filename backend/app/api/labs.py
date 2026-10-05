@@ -74,7 +74,7 @@ async def lab_out(db: AsyncSession, lab: Lab) -> dict[str, Any]:
     course = await db.get(Course, lesson.course_id)
     chapter = await db.get(Chapter, lesson.chapter_id) if lesson.chapter_id else None
     return {
-        "id": lab.id, "created_at": lab.created_at, "updated_at": lab.updated_at,
+        "id": lab.id, "notes": lab.notes, "notes_version": lab.notes_version, "created_at": lab.created_at, "updated_at": lab.updated_at,
         "lesson": {
             "id": lesson.id, "number": lesson.number, "title": lesson.title, "course_id": lesson.course_id,
             "course_name": course.name if course else "", "chapter": {"id": chapter.id, "title": chapter.title} if chapter else None,
@@ -125,6 +125,21 @@ async def delete_lab(lesson_id: int, db: AsyncSession = Depends(get_db)) -> dict
     await db.delete(await _lab(db, lesson_id))
     await db.commit()
     return {"ok": True}
+
+
+class NotesSave(BaseModel):
+    notes: str = Field(max_length=lb.MAX_NOTES_CHARS)
+
+
+@router.put("/lessons/{lesson_id}/lab/notes")
+async def save_notes(lesson_id: int, body: NotesSave, db: AsyncSession = Depends(get_db)) -> dict:
+    """The lab's free notes (what is sent replaces what is stored)."""
+    lab = await _lab(db, lesson_id)
+    lab.notes = body.notes.replace("\x00", "")
+    lab.notes_version += 1
+    lab.updated_at = _now()
+    await db.commit()
+    return {"version": lab.notes_version}
 
 
 # --------------------------------------------------------------------------- files

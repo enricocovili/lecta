@@ -1,5 +1,5 @@
 // The files of a lab on the page: their shape, the tree they make, and what a drop or a picker hands over (with folders).
-import type { LabComment } from "./useLabComments";
+import type { LabComment } from "./useLabStore";
 
 export type LabFileKind = "text" | "notebook" | "pdf" | "image" | "binary";
 
@@ -16,6 +16,8 @@ export interface LabFile {
 export interface LabData {
   id: number;
   lesson: { id: number; number: number; title: string; course_id: number; course_name: string; chapter: { id: number; title: string } | null };
+  notes: string;
+  notes_version: number;
   files: LabFile[];
   comments: LabComment[];
 }

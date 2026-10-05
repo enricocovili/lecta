@@ -145,4 +145,20 @@ test.describe.serial("Laboratorio", () => {
     await expect(page.getByTestId("lab-comment")).toHaveCount(1);
     con.assertClean(EXPECTED);
   });
+
+  test("the lab has free notes, not tied to a file", async ({ page }) => {
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`${lessonPath}/lab`);
+    await page.getByTestId("lab-notes-open").click();
+    await expect(page).toHaveURL(/\?notes$/);
+    await page.getByTestId("lab-notes").locator("textarea").fill("- consegna entro venerdì\n- all'esame: i puntatori");
+    await page.keyboard.press("Control+s");
+    await expect(page.getByTestId("lab-save-state")).toHaveClass(/saved/);
+    await page.reload();
+    await expect(page.getByTestId("lab-notes").locator("textarea")).toHaveValue("- consegna entro venerdì\n- all'esame: i puntatori");
+    await page.getByRole("button", { name: "Anteprima delle note" }).click();
+    await expect(page.getByTestId("lab-notes").locator("li")).toHaveCount(2);
+    con.assertClean(EXPECTED);
+  });
 });

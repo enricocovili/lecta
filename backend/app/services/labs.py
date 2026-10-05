@@ -13,6 +13,7 @@ from .sniff import sniff_bytes
 MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_FILES = 500
 MAX_PATH = 300
+MAX_NOTES_CHARS = 200_000
 
 # Extension (or whole file name) -> language, for the colours of the viewer and for the assistant.
 LANGUAGES: dict[str, str] = {

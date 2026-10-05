@@ -9,9 +9,9 @@ import { Markdown } from "../workspace/Markdown";
 import { Confirm, Empty, Loading, Modal, toast, toastError } from "../ui";
 import CodeView, { type Lines, type Mark } from "./CodeView";
 import { MAX_FILE_BYTES, baseName, fileIcon, fromDrop, fromInput, tree, worthUploading, type Folder, type LabAccess, type LabData, type LabFile, type Picked } from "./files";
-import { isLines, useLabComments, type LabComment, type SaveState } from "./useLabComments";
+import { isLines, useLabStore, type LabComment, type SaveState } from "./useLabStore";
 
-type Comments = ReturnType<typeof useLabComments>;
+type Store = ReturnType<typeof useLabStore>;
 
 const SAVE_LABEL: Record<SaveState, string> = { saved: "Salvato", pending: "Da salvare", saving: "Salvataggio…", offline: "Non salvato · riprovo" };
 
@@ -59,25 +59,32 @@ export default function LabPage({ courseId, number }: { courseId: number; number
   return <LabEditor lab={lab} access="owner" base={`/api/lessons/${lab.lesson.id}`} lessonHref={`/admin/courses/${courseId}/lessons/${number}`} />;
 }
 
-/** Which file is open: kept in the address (`?file=src/main.c`) so a link or a reload opens it again. */
+/** What is open: a file or the lab's notes, kept in the address (`?file=src/main.c`, `?notes`) so a link or a reload opens it again. */
 function useOpenFile(files: LabFile[]) {
-  const [path, setPath] = useState<string | null>(() => new URLSearchParams(location.search).get("file"));
-  const open = files.find((f) => f.path === path) ?? null;
-  const choose = useCallback((p: string | null) => {
-    setPath(p);
+  const [where, setWhere] = useState<{ path: string | null; notes: boolean }>(() => {
+    const q = new URLSearchParams(location.search);
+    return { path: q.get("file"), notes: q.has("notes") };
+  });
+  const open = where.notes ? null : (files.find((f) => f.path === where.path) ?? null);
+  const go = useCallback((path: string | null, notes: boolean) => {
+    setWhere({ path, notes });
     const url = new URL(location.href);
-    if (p) url.searchParams.set("file", p);
-    else url.searchParams.delete("file");
-    history.replaceState(null, "", url);
+    url.searchParams.delete("file");
+    url.searchParams.delete("notes");
+    if (notes) url.searchParams.set("notes", "");
+    else if (path) url.searchParams.set("file", path);
+    history.replaceState(null, "", url.href.replace(/notes=(&|$)/, "notes$1"));
   }, []);
-  return [open, choose] as const;
+  const choose = useCallback((p: string | null) => go(p, false), [go]);
+  const showNotes = useCallback(() => go(null, true), [go]);
+  return { open, notes: where.notes, choose, showNotes };
 }
 
 export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; access: LabAccess; base: string; lessonHref: string | null }) {
   const owner = access === "owner";
   const canEdit = access !== "read";
   const [files, setFiles] = useState<LabFile[]>(lab.files);
-  const [open, choose] = useOpenFile(files);
+  const { open, notes: notesOpen, choose, showNotes } = useOpenFile(files);
   const [uploading, setUploading] = useState<{ name: string; done: number; total: number; fraction: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [renaming, setRenaming] = useState<LabFile | null>(null);
@@ -85,7 +92,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const root = useMemo(() => tree(files), [files]);
-  const store = useLabComments(base, String(lab.id), lab.comments);
+  const store = useLabStore(base, String(lab.id), lab.comments, { text: lab.notes, version: lab.notes_version });
   const perFile = useMemo(() => {
     const m = new Map<number, number>();
     for (const c of store.comments) m.set(c.file_id, (m.get(c.file_id) ?? 0) + 1);
@@ -108,10 +115,10 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
     return () => window.removeEventListener("keydown", onKey);
   }, [canEdit, save]);
 
-  // The first file opens by itself when none is chosen.
+  // The first file opens by itself when nothing is chosen.
   useEffect(() => {
-    if (!open && files.length) choose(files[0].path);
-  }, [open, files, choose]);
+    if (!open && !notesOpen && files.length) choose(files[0].path);
+  }, [open, notesOpen, files, choose]);
 
   const upload = useCallback(
     async (picked: Picked[]) => {
@@ -242,6 +249,10 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
 
       <div className="lab-body">
         <aside className="lab-tree" aria-label="File del laboratorio" data-testid="lab-tree">
+          <button type="button" className={`lab-tree-row lab-notes-entry ${notesOpen ? "on" : ""}`} onClick={showNotes} data-testid="lab-notes-open">
+            <Icon name="notebook" /> <span>Note del laboratorio</span>
+            {store.notes.trim() ? <span className="lab-count" title="Ci sono delle note">•</span> : null}
+          </button>
           {files.length === 0 ? (
             <p className="muted small lab-tree-empty">Nessun file.</p>
           ) : (
@@ -249,7 +260,9 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
           )}
         </aside>
         <main className="lab-main">
-          {open ? (
+          {notesOpen ? (
+            <NotesView text={store.notes} onChange={store.setNotes} canEdit={canEdit} />
+          ) : open ? (
             <FileView key={`${open.id}:${open.version}`} file={open} base={base} store={store} canEdit={canEdit} />
           ) : (
             <div className="lab-empty">
@@ -324,7 +337,7 @@ function FolderView({ folder, depth, open, choose, canEdit, counts, onRename, on
   );
 }
 
-function FileView({ file, base, store, canEdit }: { file: LabFile; base: string; store: Comments; canEdit: boolean }) {
+function FileView({ file, base, store, canEdit }: { file: LabFile; base: string; store: Store; canEdit: boolean }) {
   const raw = `${base}/lab/files/${file.id}/raw`;
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -430,6 +443,32 @@ function FileView({ file, base, store, canEdit }: { file: LabFile; base: string;
             ))
           )}
         </aside>
+      </div>
+    </div>
+  );
+}
+
+function NotesView({ text, onChange, canEdit }: { text: string; onChange: (t: string) => void; canEdit: boolean }) {
+  const [preview, setPreview] = useState(!canEdit);
+  return (
+    <div className="lab-file-view">
+      <div className="lab-file-head">
+        <Icon name="notebook" />
+        <span className="lab-file-path">Note del laboratorio</span>
+        <span className="muted small">non legate a un file: avvisi, consegne, cosa chiede all’esame</span>
+        <span className="grow" />
+        {canEdit && (
+          <button type="button" className={`btn ghost icon sm ${preview ? "active" : ""}`} aria-pressed={preview} onClick={() => setPreview(!preview)} aria-label="Anteprima delle note" title="Anteprima delle note (Markdown)">
+            <Icon name="eye" />
+          </button>
+        )}
+      </div>
+      <div className="lab-file-body lab-notes" data-testid="lab-notes">
+        {preview ? (
+          text.trim() ? <div className="lab-comment-text"><Markdown text={text} /></div> : <p className="muted">Nessuna nota.</p>
+        ) : (
+          <NotesField value={text} onChange={onChange} minHeight={320} label="Note del laboratorio" placeholder="Le note del laboratorio, in Markdown: elenchi con -, **grassetto**, `codice`, formule con $…$" />
+        )}
       </div>
     </div>
   );
