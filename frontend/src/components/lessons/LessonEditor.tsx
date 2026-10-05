@@ -7,6 +7,7 @@ import { Icon } from "../icons";
 import Pop from "../workspace/Pop";
 import { Confirm, Seg, toastError, useLocalStorage } from "../ui";
 import GenerateDialog from "./GenerateDialog";
+import { useGestures, type GestureOptions } from "./gestures";
 import ShareDialog from "./ShareDialog";
 import { COLORS, HL_COLORS, HL_WIDTHS, PEN_WIDTHS, type Tool } from "./ink";
 import LessonStatusPill, { type LessonStatus } from "./LessonStatus";
@@ -132,7 +133,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
     };
     const root = scroller.current;
     root?.addEventListener("wheel", stop, { passive: true });
-    root?.addEventListener("pointerdown", stop, { passive: true });
+    root?.addEventListener("pointerdown", stop, { passive: true, capture: true }); // the gestures keep a finger's to themselves
     const go = () => !moved && reveal(target.id);
     const timers = [0, 120, 400, 1000].map((ms) => window.setTimeout(go, ms));
     const done = window.setTimeout(() => {
@@ -142,7 +143,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
       timers.forEach(clearTimeout);
       clearTimeout(done);
       root?.removeEventListener("wheel", stop);
-      root?.removeEventListener("pointerdown", stop);
+      root?.removeEventListener("pointerdown", stop, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -175,6 +176,9 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
     () => ({ tool: readOnly ? "hand" : tool, color: COLORS[colorIdx], hlColor: HL_COLORS[hlIdx], penWidth: PEN_WIDTHS[Math.min(penSize, PEN_WIDTHS.length - 1)], hlWidth: HL_WIDTHS[Math.min(hlSize, HL_WIDTHS.length - 1)], fingerDraws, shapes }),
     [tool, readOnly, colorIdx, hlIdx, penSize, hlSize, fingerDraws, shapes],
   );
+  const gestureOpts = useRef<GestureOptions>({ tool: draw.tool, fingerDraws });
+  gestureOpts.current = { tool: draw.tool, fingerDraws };
+  useGestures(scroller, gestureOpts);
 
   const { setNotes, addStroke, eraseStrokes, addBlankAfter, removePage, undo, redo, flushAll } = store;
   const save = useCallback(async () => {

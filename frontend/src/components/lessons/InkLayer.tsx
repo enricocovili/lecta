@@ -1,19 +1,8 @@
 // The drawing surface over one page: pen, highlighter and stroke eraser, for mouse, pen and finger.
-// A finger scrolls the page unless "finger draws" is on; a resting palm is ignored while a pen is around.
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+// A finger only reaches it when "finger draws" is on: scrolling and palms are told apart before, by the gestures (gestures.ts).
+import { useCallback, useEffect, useRef } from "react";
 import { drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, roundStroke, strokeRect, unionRect, type Rect, type Stroke, type Tool } from "./ink";
 import { recognize } from "./shapes";
-
-// When a pen was last seen anywhere on the page: touches right after it are palms.
-let lastPenAt = 0;
-if (typeof window !== "undefined") {
-  const seen = (e: PointerEvent) => {
-    if (e.pointerType === "pen") lastPenAt = performance.now();
-  };
-  window.addEventListener("pointerdown", seen, true);
-  window.addEventListener("pointermove", seen, true);
-}
-const PALM_MS = 1200;
 
 interface Props {
   strokes: Stroke[];
@@ -30,17 +19,15 @@ interface Props {
   fingerDraws: boolean;
   /** A stroke that is a line, rectangle, triangle or ellipse is replaced by the clean shape (like Xournal++). */
   shapes: boolean;
-  scroller: RefObject<HTMLElement | null>;
   onAdd: (s: Stroke) => void;
   onErase: (indices: number[]) => void;
 }
 
 type Current =
-  | { kind: "pan"; id: number; x: number; y: number }
   | { kind: "draw"; id: number; stroke: Stroke }
   | { kind: "erase"; id: number; removed: Set<number>; dirty: Rect | null };
 
-export default function InkLayer({ strokes, width, height, active, tool, color, hlColor, penWidth, hlWidth, fingerDraws, shapes, scroller, onAdd, onErase }: Props) {
+export default function InkLayer({ strokes, width, height, active, tool, color, hlColor, penWidth, hlWidth, fingerDraws, shapes, onAdd, onErase }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLCanvasElement>(null);
   const live = useRef<HTMLCanvasElement>(null);
@@ -160,12 +147,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     if (p.tool === "hand" || cur.current) return;
     const type = e.pointerType;
     if (type === "mouse" && e.button !== 0) return;
-    if (type === "touch" && performance.now() - lastPenAt < PALM_MS) return; // a palm
-    if (type === "touch" && !p.fingerDraws) {
-      cur.current = { kind: "pan", id: e.pointerId, x: e.clientX, y: e.clientY };
-      capture(e.pointerId);
-      return;
-    }
+    if (type === "touch" && !p.fingerDraws) return;
     e.preventDefault();
     capture(e.pointerId);
     const pt = point(e);
@@ -193,12 +175,6 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       return;
     }
     if (e.pointerId !== c.id) return;
-    if (c.kind === "pan") {
-      scroller.current?.scrollBy(c.x - e.clientX, c.y - e.clientY);
-      c.x = e.clientX;
-      c.y = e.clientY;
-      return;
-    }
     const events = (e.nativeEvent as PointerEvent).getCoalescedEvents?.() ?? [];
     let last = { x: 0, y: 0 };
     for (const ev of events.length ? events : [e.nativeEvent as PointerEvent]) {
@@ -244,7 +220,6 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     <div
       ref={wrap}
       className={`les-ink tool-${t}`}
-      style={{ touchAction: t === "hand" ? "pan-x pan-y pinch-zoom" : "none" }}
       data-testid="ink-surface"
       onPointerDown={onDown}
       onPointerMove={onMove}

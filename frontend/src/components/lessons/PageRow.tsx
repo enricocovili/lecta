@@ -90,7 +90,6 @@ function PageRow({ page, index, doc, draw, layout, preview, readOnly = false, sc
           hlWidth={draw.hlWidth}
           fingerDraws={draw.fingerDraws}
           shapes={draw.shapes}
-          scroller={scroller}
           onAdd={(s) => actions.addStroke(page.id, s)}
           onErase={(idx) => actions.eraseStrokes(page.id, idx)}
         />

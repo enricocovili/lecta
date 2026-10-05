@@ -152,6 +152,11 @@ body.ws-page .les {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
+/* Fingers are handled by the editor (gestures.ts): the browser's own panning and zooming would steal the pen's strokes. */
+.les-scroll,
+.les-scroll * {
+  touch-action: none;
+}
 .les-pages {
   width: calc(100% * var(--zoom, 1));
   margin: 0 auto;

@@ -356,8 +356,13 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
     replaces only the fields sent). Failures are kept in memory, retried with backoff, and restored on the next
     visit if the server's page did not change (its `version`). Last write wins (one user).
 83. **Finger scrolls, pen writes.** On touch screens `touch-action: none` is needed for the pen to draw, so the
-    surface scrolls by hand when a finger drags (unless "Dito scrive"), and ignores touches for ~1 s after a
-    pen was seen (palm rejection). The stylus' eraser end erases whatever tool is selected.
+    editor scrolls by hand when a finger drags (unless "Dito scrive"), for the whole scroller in one place
+    (`lessons/gestures.ts`, which keeps the finger's events from the drawing surface). Palm rejection first ignored touches
+    for ~1.2 s after a pen was *seen*, hovering included: with the pen held near the screen the finger did nothing, and
+    switching to scroll felt slow. Now a touch is a palm only while the pen touches the screen, 0.3 s after it lifted, or
+    when the contact is wide; a palm that lands first and scrolls is caught when the pen lands (the scroll is undone), and
+    a finger has to move 8 px before the page follows, so a palm settling down does not scroll. The stylus' eraser end
+    erases whatever tool is selected.
 84. **Guidelines are per subject and asked at generation time.** `courses.guidelines` (empty = automatic). Every
     generation into a chosen subject shows them (prefilled) with a notice when there are none, so the choice is
     conscious but never blocks; «ricorda» keeps them. They travel in the job's payload (so a run is

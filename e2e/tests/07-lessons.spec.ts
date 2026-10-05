@@ -40,6 +40,42 @@ async function scribble(page: Page, index: number, from: [number, number], to: [
   await page.mouse.up();
 }
 
+/** A finger dragged upwards by `dy` px over a page's drawing surface, all at once; returns how far the lesson scrolled.
+ *  The pen (its events on the page, outside the slides) meanwhile: `hover` it is just above the screen, `writing` it touches
+ *  the screen, `lifted` it has just left it, `after` it lands while the finger is already scrolling. */
+async function fingerDrag(page: Page, index: number, dy: number, pen: "hover" | "writing" | "lifted" | "after"): Promise<number> {
+  return page
+    .getByTestId("ink-surface")
+    .nth(index)
+    .evaluate(
+      async (el, [dy, pen]) => {
+        const scroller = el.closest(".les-scroll")!;
+        const before = scroller.scrollTop;
+        const r = el.getBoundingClientRect();
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height * 0.7;
+        const fire = (on: Element, type: string, pointerType: string, cy: number) =>
+          on.dispatchEvent(
+            new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: pointerType === "pen" ? 52 : 51, pointerType, isPrimary: true, clientX: x, clientY: cy, button: 0, buttons: type === "pointerup" ? 0 : 1, pressure: 0.5 }),
+          );
+        const body = document.body;
+        if (pen === "hover") fire(body, "pointermove", "pen", 5);
+        if (pen === "writing" || pen === "lifted") fire(body, "pointerdown", "pen", 5);
+        if (pen === "lifted") fire(body, "pointerup", "pen", 5);
+        fire(el, "pointerdown", "touch", y);
+        for (let i = 1; i <= 10; i++) fire(el, "pointermove", "touch", y - (dy * i) / 10);
+        if (pen === "after") fire(body, "pointerdown", "pen", 5);
+        fire(el, "pointerup", "touch", y - dy);
+        if (pen === "writing" || pen === "after") fire(body, "pointerup", "pen", 5);
+        // Measured before the glide that follows a flick starts (at the next frame).
+        const moved = scroller.scrollTop - before;
+        await new Promise((ok) => setTimeout(ok, 50));
+        return moved;
+      },
+      [dy, pen] as const,
+    );
+}
+
 test.describe.serial("Lezioni", () => {
   let courseId = "";
 
@@ -135,6 +171,22 @@ test.describe.serial("Lezioni", () => {
     }
     await save(page);
     await expect.poll(async () => (await stored(page)).pages[1].ink.length, { timeout: 15_000 }).toBe(1);
+
+    // The finger scrolls at once, also with the pen hovering just above the screen; a touch while the pen writes, or right
+    // after a stroke, is the palm; the pen landing while a finger scrolls takes that scroll back (it was the palm too).
+    await page.getByTestId("ink-surface").nth(1).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400); // the last pen stroke is long gone
+    expect(await fingerDrag(page, 1, 60, "hover")).toBeGreaterThan(40);
+    expect(await fingerDrag(page, 1, 60, "writing")).toBe(0);
+    expect(await fingerDrag(page, 1, 60, "lifted")).toBe(0);
+    expect(await fingerDrag(page, 1, 60, "after")).toBe(0);
+    await page.waitForTimeout(400);
+    expect(await fingerDrag(page, 1, -60, "hover")).toBeLessThan(-40);
+    expect((await stored(page)).pages[1].ink.length).toBe(1);
+    // The synthetic drag is instantaneous, so its glide is long: once it is over, the second page goes back in the middle.
+    await page.waitForTimeout(2500);
+    await page.getByTestId("lesson-page").nth(1).evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await expect(page.getByTestId("page-number")).toContainText("2 /");
 
     // A blank page after the slide, to write more than it has room for.
     await page.getByTestId("add-page").click();
