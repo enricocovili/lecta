@@ -7,7 +7,7 @@ import { Icon } from "../icons";
 import Pop from "../workspace/Pop";
 import { Confirm, Seg, toastError, useLocalStorage } from "../ui";
 import GenerateDialog from "./GenerateDialog";
-import { useGestures, type GestureOptions } from "./gestures";
+import { clampZoom, stepZoom, useGestures, ZOOM_MAX, ZOOM_MIN, type GestureOptions } from "./gestures";
 import ShareDialog from "./ShareDialog";
 import { COLORS, HL_COLORS, HL_WIDTHS, PEN_WIDTHS, type Tool } from "./ink";
 import LessonStatusPill, { type LessonStatus } from "./LessonStatus";
@@ -37,7 +37,6 @@ export interface LessonData {
 /** owner: the signed-in author; write: a share link that can edit; read: a share link that only looks. */
 export type Access = "owner" | "write" | "read";
 
-const ZOOMS = [0.7, 0.85, 1, 1.25, 1.5, 2];
 const SAVE_LABEL: Record<SaveState, string> = { saved: "Salvato", pending: "Da salvare", saving: "Salvataggio…", offline: "Non salvato · riprovo" };
 
 export default function LessonEditor({ courseId, number }: { courseId: number; number: number }) {
@@ -106,7 +105,8 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   const [fingerDraws, setFingerDraws] = useLocalStorage("lecta:lesson:finger", false);
   const [shapes, setShapes] = useLocalStorage("lecta:lesson:shapes", true);
   const [layout, setLayout] = useLocalStorage<"side" | "stack" | "slides">("lecta:lesson:layout", "side");
-  const [zoomIdx, setZoomIdx] = useLocalStorage("lecta:lesson:zoom", 2);
+  const [zoomSaved, setZoom] = useLocalStorage("lecta:lesson:scale", 1);
+  const zoom = clampZoom(Number(zoomSaved) || 1);
   const [awake, setAwake] = useLocalStorage("lecta:lesson:awake", true);
   const [preview, setPreview] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -176,9 +176,9 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
     () => ({ tool: readOnly ? "hand" : tool, color: COLORS[colorIdx], hlColor: HL_COLORS[hlIdx], penWidth: PEN_WIDTHS[Math.min(penSize, PEN_WIDTHS.length - 1)], hlWidth: HL_WIDTHS[Math.min(hlSize, HL_WIDTHS.length - 1)], fingerDraws, shapes }),
     [tool, readOnly, colorIdx, hlIdx, penSize, hlSize, fingerDraws, shapes],
   );
-  const gestureOpts = useRef<GestureOptions>({ tool: draw.tool, fingerDraws });
-  gestureOpts.current = { tool: draw.tool, fingerDraws };
-  useGestures(scroller, gestureOpts);
+  const gestureOpts = useRef<GestureOptions>({ tool: draw.tool, fingerDraws, zoom, setZoom });
+  gestureOpts.current = { tool: draw.tool, fingerDraws, zoom, setZoom };
+  const zoomTo = useGestures(scroller, gestureOpts);
 
   const { setNotes, addStroke, eraseStrokes, addBlankAfter, removePage, undo, redo, flushAll } = store;
   const save = useCallback(async () => {
@@ -309,7 +309,6 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   );
 
   const labels = useMemo(() => pages.map((_, i) => pageLabel(pages, i)), [pages]);
-  const zoom = ZOOMS[Math.min(zoomIdx, ZOOMS.length - 1)];
   const colors = tool === "hl" ? HL_COLORS : COLORS;
   const colorSel = tool === "hl" ? hlIdx : colorIdx;
 
@@ -553,10 +552,13 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
           </button>
         )}
         <div className="btn-group">
-          <button type="button" className="btn icon" onClick={() => setZoomIdx(Math.max(0, zoomIdx - 1))} disabled={zoomIdx <= 0} aria-label="Riduci" title="Riduci">
+          <button type="button" className="btn icon" onClick={() => zoomTo(stepZoom(zoom, -1))} disabled={zoom <= ZOOM_MIN} aria-label="Riduci" title="Riduci (anche con due dita, o Ctrl + rotella)">
             <Icon name="minus" />
           </button>
-          <button type="button" className="btn icon" onClick={() => setZoomIdx(Math.min(ZOOMS.length - 1, zoomIdx + 1))} disabled={zoomIdx >= ZOOMS.length - 1} aria-label="Ingrandisci" title="Ingrandisci">
+          <button type="button" className="btn les-zoom mono" onClick={() => zoomTo(1)} data-testid="zoom-level" title="Torna al 100%">
+            {Math.round(zoom * 100)}%
+          </button>
+          <button type="button" className="btn icon" onClick={() => zoomTo(stepZoom(zoom, 1))} disabled={zoom >= ZOOM_MAX} aria-label="Ingrandisci" title="Ingrandisci (anche con due dita, o Ctrl + rotella)">
             <Icon name="plus" />
           </button>
         </div>

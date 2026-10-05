@@ -1,7 +1,7 @@
-// Finger gestures of the lesson editor (palm or finger, the glide after a flick): run with `npm test`.
+// Finger gestures of the lesson editor (palm or finger, the glide after a flick, the pinch zoom): run with `npm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { glide, isPalm, PALM_AFTER_PEN_MS, releaseSpeed } from "../src/components/lessons/gestures.ts";
+import { clampZoom, glide, isPalm, PALM_AFTER_PEN_MS, pinchView, releaseSpeed, stepZoom, wheelZoom, ZOOM_MAX, ZOOM_MIN } from "../src/components/lessons/gestures.ts";
 
 const finger = { width: 12, height: 14 };
 
@@ -44,4 +44,45 @@ test("the glide slows down at every frame and stops", () => {
     assert.ok(frames < 1000);
   }
   assert.ok(moved > 200 && moved < 1000, `glided ${moved}px`);
+});
+
+const close = (a, b) => Math.abs(a - b) < 1e-9;
+
+test("a pinch keeps the point that was between the fingers under them, wherever they move, and scales with their distance", () => {
+  const origin = { x: 40, y: -300 };
+  const f0 = { x: 400, y: 300 };
+  const f = { x: 430, y: 250 };
+  const v = pinchView(f0, 100, f, 150, origin, 1);
+  assert.ok(close(v.s, 1.5));
+  // The transform is translate(tx, ty) scale(s) from the pages' corner: the point f0 is drawn at f.
+  assert.ok(close(origin.x + v.tx + v.s * (f0.x - origin.x), f.x));
+  assert.ok(close(origin.y + v.ty + v.s * (f0.y - origin.y), f.y));
+  // Fingers that only move together scroll the pages, without zooming.
+  const pan = pinchView(f0, 100, f, 100, origin, 1);
+  assert.ok(close(pan.s, 1) && close(pan.tx, 30) && close(pan.ty, -50));
+});
+
+test("the zoom stays within its limits, also when pinched beyond them", () => {
+  assert.ok(close(pinchView({ x: 0, y: 0 }, 100, { x: 0, y: 0 }, 1000, { x: 0, y: 0 }, 2).s * 2, ZOOM_MAX));
+  assert.ok(close(pinchView({ x: 0, y: 0 }, 100, { x: 0, y: 0 }, 1, { x: 0, y: 0 }, 1).s, ZOOM_MIN));
+  assert.equal(clampZoom(9), ZOOM_MAX);
+  assert.equal(clampZoom(0.1), ZOOM_MIN);
+});
+
+test("the − / + buttons go to the next step from any zoom, also one left between two steps by a pinch", () => {
+  assert.equal(stepZoom(1, 1), 1.25);
+  assert.equal(stepZoom(1, -1), 0.85);
+  assert.equal(stepZoom(1.37, 1), 1.5);
+  assert.equal(stepZoom(1.37, -1), 1.25);
+  assert.equal(stepZoom(ZOOM_MAX, 1), ZOOM_MAX);
+  assert.equal(stepZoom(ZOOM_MIN, -1), ZOOM_MIN);
+});
+
+test("a wheel notch zooms by a sensible step, a touchpad's small steps by a little, and up zooms in", () => {
+  const notch = wheelZoom(1, -100, 0);
+  assert.ok(notch > 1.2 && notch < 1.35, `notch ${notch}`);
+  assert.ok(close(wheelZoom(1, 100, 0) * notch, 1));
+  const pad = wheelZoom(1, 3, 0);
+  assert.ok(pad < 1 && pad > 0.96);
+  assert.ok(close(wheelZoom(1, -3, 1), notch)); // a wheel counting lines
 });

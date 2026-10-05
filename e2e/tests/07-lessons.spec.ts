@@ -76,6 +76,42 @@ async function fingerDrag(page: Page, index: number, dy: number, pen: "hover" | 
     );
 }
 
+/** Two fingers on a page's slide, `from` px apart around its middle, moved to `to` px apart; the first one draws a little
+ *  before the second lands. Returns how far (px) the point of the slide that was between them ended up from there. */
+async function pinch(page: Page, index: number, from: number, to: number): Promise<number> {
+  return page
+    .getByTestId("ink-surface")
+    .nth(index)
+    .evaluate(
+      async (el, [from, to]) => {
+        const r0 = el.getBoundingClientRect();
+        const cx = r0.left + r0.width / 2;
+        const cy = r0.top + r0.height / 2;
+        const fire = (type: string, id: number, x: number) =>
+          el.dispatchEvent(
+            new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: id, pointerType: "touch", isPrimary: id === 61, clientX: x, clientY: cy, button: 0, buttons: type === "pointerup" ? 0 : 1, pressure: 0.5 }),
+          );
+        fire("pointerdown", 61, cx - from / 2);
+        fire("pointermove", 61, cx - from / 2 - 6);
+        fire("pointermove", 61, cx - from / 2);
+        fire("pointerdown", 62, cx + from / 2);
+        for (let i = 1; i <= 5; i++) {
+          const d = from + ((to - from) * i) / 5;
+          fire("pointermove", 61, cx - d / 2);
+          fire("pointermove", 62, cx + d / 2);
+        }
+        fire("pointerup", 61, cx - to / 2);
+        fire("pointerup", 62, cx + to / 2);
+        await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+        const r = el.getBoundingClientRect();
+        const u = (cx - r0.left) / r0.width;
+        const v = (cy - r0.top) / r0.width;
+        return Math.hypot(r.left + u * r.width - cx, r.top + v * r.width - cy);
+      },
+      [from, to] as const,
+    );
+}
+
 test.describe.serial("Lezioni", () => {
   let courseId = "";
 
@@ -187,6 +223,26 @@ test.describe.serial("Lezioni", () => {
     await page.waitForTimeout(2500);
     await page.getByTestId("lesson-page").nth(1).evaluate((el) => el.scrollIntoView({ block: "center" }));
     await expect(page.getByTestId("page-number")).toContainText("2 /");
+
+    // Two fingers zoom around the point between them, which stays where it was; with «Dito scrive» on, the stroke the first
+    // finger began is dropped. Ctrl + wheel (a touchpad's pinch) zooms too, and the percentage brings it back to 100%.
+    const zoomLevel = page.getByTestId("zoom-level");
+    await expect(zoomLevel).toHaveText("100%");
+    await page.getByRole("button", { name: "Dito scrive" }).click();
+    expect(await pinch(page, 1, 100, 150)).toBeLessThan(3);
+    await expect(zoomLevel).toHaveText("150%");
+    await page.getByRole("button", { name: "Dito scrive" }).click();
+    await save(page);
+    expect((await stored(page)).pages[1].ink.length).toBe(1);
+    const zoomed = (await page.getByTestId("ink-surface").nth(1).boundingBox())!;
+    await page.mouse.move(zoomed.x + zoomed.width / 2, zoomed.y + zoomed.height / 2);
+    await page.keyboard.down("Control");
+    await page.mouse.wheel(0, 100);
+    await page.keyboard.up("Control");
+    await expect(zoomLevel).toHaveText("117%");
+    await zoomLevel.click();
+    await expect(zoomLevel).toHaveText("100%");
+    await page.getByTestId("lesson-page").nth(1).evaluate((el) => el.scrollIntoView({ block: "center" }));
 
     // A blank page after the slide, to write more than it has room for.
     await page.getByTestId("add-page").click();

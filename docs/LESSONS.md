@@ -19,7 +19,10 @@ pages added by hand (a slide never has enough room). Every page has:
   does not block the finger, so switching from writing to scrolling is immediate. Pressure changes the width of pen strokes. **Shape recognition** (toggle «Forme», on by default), as in Xournal++: when a stroke is let go and it is a straight line (an underline; a line within 3° of level or plumb is made exactly so), a rectangle (also tilted), a triangle or an ellipse (a circle when the axes differ by under 12 %), it is replaced by the clean shape (`components/lessons/shapes.ts`, tested with `npm test`). Anything small (under 5 % of the page width) is handwriting and is left alone, like scribbles and open arcs; undo takes the whole shape away.
 
 The screen is kept on (Wake Lock) while the editor is open, and the layout is chosen by the user: slide + notes side by
-side (automatic single column under ~860 px), notes below the slide, or slides only. Zoom, previous/next page (buttons, or the ← / → keys, also in a shared lesson; not while typing or in a dialog).
+side (automatic single column under ~860 px), notes below the slide, or slides only. **Zoom** from 50 % to 300 %: two
+fingers pinch around the point between them (and move the pages while they do), Ctrl + wheel and a touchpad's pinch zoom
+around the pointer, − / + step through 50–70–85–100–125–150–200–250–300 % and the percentage between them goes back to
+100 %; with «Dito scrive» a second finger landing drops the stroke the first one began and the two zoom. Previous/next page (buttons, or the ← / → keys, also in a shared lesson; not while typing or in a dialog).
 The top bar leads to the lesson's **laboratory** («Laboratorio», [LABS.md](LABS.md)).
 The page being looked at (the first one too, when the lesson opens) is centred vertically in the editor, unless the slide and its notes are taller than it: then it starts at the top.
 

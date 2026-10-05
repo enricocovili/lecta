@@ -135,6 +135,12 @@ body.ws-page .les {
   color: var(--fg-muted);
   padding: 0 0.3rem;
 }
+.les-zoom {
+  min-width: 3.6rem;
+  justify-content: center;
+  font-size: 0.8rem;
+  padding-inline: 0.3rem;
+}
 
 /* ------------------------------------------------------------------ body */
 
@@ -202,6 +208,9 @@ body.ws-page .les {
   position: absolute;
   left: 0;
   top: 0;
+  /* Sized by the box, not by the pixels: after a zoom the old picture stretches until the new one is drawn. */
+  width: 100%;
+  height: 100%;
 }
 .les-tag {
   position: absolute;
@@ -231,6 +240,8 @@ body.ws-page .les {
   position: absolute;
   left: 0;
   top: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
 }
 .les-ink.tool-pen,

@@ -20,6 +20,15 @@ export const HL_WIDTHS = [0.014, 0.026];
 export const ERASER_RADIUS = 0.011;
 export const COLORS = ["#1c1b17", "#1e4fd8", "#d32f2f", "#2e7d32", "#ef6c00", "#7b1fa2"];
 export const HL_COLORS = ["#ffeb3b", "#69f0ae", "#ff80ab", "#80d8ff"];
+/** A canvas never gets more pixels than this: zoomed in, a slide would otherwise take hundreds of MB. */
+const MAX_CANVAS_PX = 8_000_000;
+
+/** Canvas pixels per CSS pixel for a page of this size: the screen's density (at most 2), less when the page is huge. */
+export function canvasScale(width: number, height: number): number {
+  const dpr = typeof window === "undefined" ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  return Math.min(dpr, Math.sqrt(MAX_CANVAS_PX / Math.max(1, width * height)));
+}
+
 /** Points closer than this (in page widths) to the previous one are dropped. */
 const MIN_STEP = 0.0005;
 

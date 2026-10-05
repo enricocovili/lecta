@@ -2,6 +2,7 @@
 import * as pdfjs from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useEffect, useRef, useState } from "react";
+import { canvasScale } from "./ink";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -29,7 +30,7 @@ export function usePdfDoc(url: string | null): { doc: PdfDoc | null; error: stri
 export default function SlideView({ doc, pageNo, width, height, active }: { doc: PdfDoc; pageNo: number; width: number; height: number; active: boolean }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const done = useRef("");
-  const dpr = typeof window === "undefined" ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = canvasScale(width, height);
 
   useEffect(() => {
     const c = canvas.current;
@@ -39,7 +40,7 @@ export default function SlideView({ doc, pageNo, width, height, active }: { doc:
       done.current = "";
       return;
     }
-    const key = `${Math.round(width)}@${dpr}`;
+    const key = `${Math.round(width)}@${dpr.toFixed(3)}`;
     if (done.current === key && c.width > 0) return;
     let cancelled = false;
     let task: { cancel: () => void; promise: Promise<unknown> } | null = null;
@@ -66,5 +67,5 @@ export default function SlideView({ doc, pageNo, width, height, active }: { doc:
     };
   }, [doc, pageNo, width, active, dpr]);
 
-  return <canvas ref={canvas} className="les-slide-canvas" style={{ width, height }} aria-label={`Slide ${pageNo}`} />;
+  return <canvas ref={canvas} className="les-slide-canvas" aria-label={`Slide ${pageNo}`} />;
 }

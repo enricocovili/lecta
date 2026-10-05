@@ -507,4 +507,11 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      the theory lesson and its chapter, edits only the lab's text files, and adds comments only when the user asks. Its
      conversations belong to the lab (`chat_sessions.lab_id`) and a lab turn does not block the course's assistant. *Why:*
      a lab needs explanations of code next to the code, and the student's comments are theirs unless they ask for help.
-
+106. **Zooming the lesson previews with a transform and applies it once.** The zoom is the width of the pages (`--zoom`), so
+     changing it lays out every row again and redraws the slides: at every frame of a pinch that would stutter. While two
+     fingers (or Ctrl + wheel) move, the pages are only scaled and moved on screen (`transform` on `.les-pages`); when they
+     are lifted the zoom is applied (React, synchronously) and the scroll is set so that the point of the slide that was under
+     the fingers is under them again (anchored to that slide, since gaps and notes do not scale). Canvases are sized by their
+     box (CSS), so the old picture stretches until the new one is drawn, and never get more than 8 M pixels, which at 300 %
+     lowers their density instead of taking hundreds of MB per page. The zoom is continuous now (`lecta:lesson:scale`), the
+     buttons step from wherever a pinch left it.

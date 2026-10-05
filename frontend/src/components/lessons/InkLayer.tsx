@@ -1,7 +1,8 @@
 // The drawing surface over one page: pen, highlighter and stroke eraser, for mouse, pen and finger.
 // A finger only reaches it when "finger draws" is on: scrolling and palms are told apart before, by the gestures (gestures.ts).
 import { useCallback, useEffect, useRef } from "react";
-import { drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, roundStroke, strokeRect, unionRect, type Rect, type Stroke, type Tool } from "./ink";
+import { fingerInk } from "./gestures";
+import { canvasScale, drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, roundStroke, strokeRect, unionRect, type Rect, type Stroke, type Tool } from "./ink";
 import { recognize } from "./shapes";
 
 interface Props {
@@ -37,7 +38,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
   const justErased = useRef<{ gone: Set<Stroke>; len: number } | null>(null);
   const props = useRef({ strokes, tool, color, hlColor, penWidth, hlWidth, fingerDraws, shapes, width });
   props.current = { strokes, tool, color, hlColor, penWidth, hlWidth, fingerDraws, shapes, width };
-  const dpr = typeof window === "undefined" ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = canvasScale(width, height);
 
   const paintBase = useCallback(
     (skip?: Set<number>) => {
@@ -150,6 +151,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     if (type === "touch" && !p.fingerDraws) return;
     e.preventDefault();
     capture(e.pointerId);
+    if (type === "touch") fingerInk.cancel = cancelFinger.current;
     const pt = point(e);
     // The eraser end of a pen (button 32) erases whatever tool is chosen.
     const tool: Tool = e.buttons & 32 ? "eraser" : p.tool;
@@ -186,12 +188,13 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     else cursorAt(last.x, last.y);
   };
 
-  const finish = (e: React.PointerEvent, cancelled: boolean) => {
+  const finish = (id: number, cancelled: boolean) => {
     const c = cur.current;
-    if (!c || e.pointerId !== c.id) return;
+    if (!c || id !== c.id) return;
     cur.current = null;
+    if (fingerInk.cancel === cancelFinger.current) fingerInk.cancel = null;
     try {
-      wrap.current?.releasePointerCapture(e.pointerId);
+      wrap.current?.releasePointerCapture(id);
     } catch {
       /* already released, or never captured */
     }
@@ -215,6 +218,14 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     }
   };
 
+  // A second finger landing turns the writing one into a pinch: what it was drawing or erasing is dropped.
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  const cancelFinger = useRef(() => {
+    const c = cur.current;
+    if (c) finishRef.current(c.id, true);
+  });
+
   const t = props.current.tool;
   return (
     <div
@@ -223,13 +234,13 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       data-testid="ink-surface"
       onPointerDown={onDown}
       onPointerMove={onMove}
-      onPointerUp={(e) => finish(e, false)}
-      onPointerCancel={(e) => finish(e, true)}
+      onPointerUp={(e) => finish(e.pointerId, false)}
+      onPointerCancel={(e) => finish(e.pointerId, true)}
       onPointerLeave={() => cursorAt(null, null)}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <canvas ref={base} style={{ width, height }} />
-      <canvas ref={live} style={{ width, height }} />
+      <canvas ref={base} />
+      <canvas ref={live} />
     </div>
   );
 }
