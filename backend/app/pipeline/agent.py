@@ -418,67 +418,105 @@ async def _save(reply_id: int, **fields: Any) -> None:
         await db.commit()
 
 
+@dataclass
+class Bench:
+    """What a turn works with: the prompt and the conversation so far, the tools and how to run them, and what to do at the end.
+    The course assistant makes one in `_prepare` (and the lab's in lab_agent.py); `_drive` runs the turn on it."""
+
+    system: str
+    messages: list[Message]
+    meta: dict[str, Any]
+    mode: str
+    specs: list[Any]
+    run_tool: Any  # async (name, args) -> tools.ToolResult
+    label_for: Any  # (name, args) -> str
+    gctx: gate.GateContext
+    max_steps: int
+    max_tokens: int
+    # async () -> None, after the reply is saved
+    on_changed: Any = None
+
+
+async def _prepare(turn: Turn, user_msg_id: int) -> Bench:
+    reply_id = turn.reply_id
+    state: dict[str, Any] = {"pre": None}
+    async with SessionLocal() as db:
+        user_msg = await db.get(ChatMessage, user_msg_id)
+        session = await db.get(ChatSession, user_msg.session_id)
+        course = await db.get(Course, session.course_id)
+        scope = user_msg.scope or {}
+        mode = scope.get("mode") if scope.get("mode") in MODE_NOTES else "ask"
+        chapter = await db.get(Chapter, int(scope["chapter_id"])) if scope.get("chapter_id") else None
+        if chapter is not None and chapter.course_id != course.id:
+            chapter = None
+        ai = await settings_svc.get_section(db, "ai")
+        nonce = gate.new_nonce()
+        ctx = tools.ToolContext(course_id=course.id, nonce=nonce, mode=mode)
+        system = await _system(db, ctx, course, mode)
+        messages = await _history(db, session.id, user_msg.id)
+        first_chapter = (await projects.chapters_of(db, course.id))[:1]
+        meta = {"agent": True, "mode": mode, "user_message": user_msg.content, "selection": scope.get("selection"),
+                "chapter_path": chapter.path if chapter else None, "first_chapter_path": first_chapter[0].path if first_chapter else None}
+        attachments = await _attachments(db, ctx, scope)
+        messages.append(Message(role="user", parts=_user_parts(ctx, user_msg.content, scope, chapter, attachments)))
+        course_id, session_id = course.id, session.id
+
+    async def before_write(db: AsyncSession, course: Course) -> None:
+        if state["pre"] is None:
+            state["pre"] = await snapshot_state(db, course)
+
+    async def after_write() -> None:
+        async with SessionLocal() as db:
+            course = await db.get(Course, course_id)
+            cur = await snapshot_state(db, course)
+        summary = summarize(state["pre"], cur)
+        state["cur"] = cur
+        await _save(reply_id, change={"status": "applied", **summary, "pre": state["pre"], "post": {
+            "files": {p: v["blob"] for p, v in cur["files"].items()}, "chapters": cur["chapters"], "preamble": cur["preamble"]}})
+        await turn.emit("change", {"files": summary["files"]})
+
+    async def on_changed() -> None:
+        if state["pre"] is not None and state.get("cur") is not None:
+            focus = next((f["path"] for f in summarize(state["pre"], state["cur"])["files"] if f["path"].startswith("chapters/")), None)
+            prop.recompile_later(course_id, focus)
+
+    ctx.before_write, ctx.after_write = before_write, after_write
+    return Bench(
+        system=system, messages=messages, meta=meta, mode=mode, specs=tools.specs_for(mode),
+        run_tool=lambda name, args: tools.run_tool(ctx, name, args), label_for=tools.label_for,
+        gctx=gate.GateContext(chat_session_id=session_id, course_id=course_id, title="Assistente"),
+        max_steps=ai.agent_max_steps, max_tokens=ai.max_output_tokens, on_changed=on_changed,
+    )
+
+
 async def _run(turn: Turn, user_msg_id: int) -> None:
+    await _drive(turn, lambda: _prepare(turn, user_msg_id))
+
+
+async def _drive(turn: Turn, prepare: Any) -> None:
+    """Run a turn: ask the model, run the tools it calls, stream text and activity, save the reply, until it answers."""
     reply_id = turn.reply_id
     text_total = ""
     steps: list[dict[str, Any]] = []
     tokens_in = tokens_out = 0
     cost = 0.0
-    state: dict[str, Any] = {"pre": None}
     try:
-        async with SessionLocal() as db:
-            user_msg = await db.get(ChatMessage, user_msg_id)
-            session = await db.get(ChatSession, user_msg.session_id)
-            course = await db.get(Course, session.course_id)
-            scope = user_msg.scope or {}
-            mode = scope.get("mode") if scope.get("mode") in MODE_NOTES else "ask"
-            chapter = await db.get(Chapter, int(scope["chapter_id"])) if scope.get("chapter_id") else None
-            if chapter is not None and chapter.course_id != course.id:
-                chapter = None
-            ai = await settings_svc.get_section(db, "ai")
-            nonce = gate.new_nonce()
-            ctx = tools.ToolContext(course_id=course.id, nonce=nonce, mode=mode)
-            system = await _system(db, ctx, course, mode)
-            messages = await _history(db, session.id, user_msg.id)
-            first_chapter = (await projects.chapters_of(db, course.id))[:1]
-            meta = {"agent": True, "mode": mode, "user_message": user_msg.content, "selection": scope.get("selection"),
-                    "chapter_path": chapter.path if chapter else None, "first_chapter_path": first_chapter[0].path if first_chapter else None}
-            attachments = await _attachments(db, ctx, scope)
-            messages.append(Message(role="user", parts=_user_parts(ctx, user_msg.content, scope, chapter, attachments)))
-            course_id, session_id = course.id, session.id
-            max_steps, max_tokens = ai.agent_max_steps, ai.max_output_tokens
-
-        async def before_write(db: AsyncSession, course: Course) -> None:
-            if state["pre"] is None:
-                state["pre"] = await snapshot_state(db, course)
-
-        async def after_write() -> None:
-            async with SessionLocal() as db:
-                course = await db.get(Course, course_id)
-                cur = await snapshot_state(db, course)
-            summary = summarize(state["pre"], cur)
-            state["cur"] = cur
-            await _save(reply_id, change={"status": "applied", **summary, "pre": state["pre"], "post": {
-                "files": {p: v["blob"] for p, v in cur["files"].items()}, "chapters": cur["chapters"], "preamble": cur["preamble"]}})
-            await turn.emit("change", {"files": summary["files"]})
-
-        ctx.before_write, ctx.after_write = before_write, after_write
-        gctx = gate.GateContext(chat_session_id=session_id, course_id=course_id, title="Assistente")
-        specs = tools.specs_for(mode)
+        bench: Bench = await prepare()
+        messages, meta, mode, max_steps = bench.messages, bench.meta, bench.mode, bench.max_steps
         finished_cleanly = False
 
         for step in range(max_steps):
             if turn.cancel:
                 break
             _prune(messages)
-            req = EgressRequest(role="chat", task="chat.agent", request_key=f"agent:{reply_id}:{step}", system=system, messages=list(messages),
-                                max_tokens=max_tokens, temperature=0.3, tools=specs, meta={**meta, "step": step})
+            req = EgressRequest(role="chat", task="chat.agent", request_key=f"agent:{reply_id}:{step}", system=bench.system, messages=list(messages),
+                                max_tokens=bench.max_tokens, temperature=0.3, tools=bench.specs, meta={**meta, "step": step})
             step_text, result = "", None
             sep = "\n\n" if text_total.strip() and not text_total.endswith("\n\n") else ""
             for attempt in range(3):
                 step_text, result = "", None
                 try:
-                    stream = await gate.stream(req, gctx)
+                    stream = await gate.stream(req, bench.gctx)
                     async for chunk in stream:
                         if isinstance(chunk, EgressResult):
                             result = chunk
@@ -517,7 +555,7 @@ async def _run(turn: Turn, user_msg_id: int) -> None:
             truncated = result.finish_reason == "length"
             for c in calls:
                 sid = f"{step}-{c.id}"[:60]
-                label = tools.label_for(c.name, c.args)
+                label = bench.label_for(c.name, c.args)
                 entry = {"id": sid, "name": c.name, "label": label, "status": "running", "summary": ""}
                 steps.append(entry)
                 await turn.emit("tool", {"id": sid, "name": c.name, "label": label, "status": "running"})
@@ -527,7 +565,7 @@ async def _run(turn: Turn, user_msg_id: int) -> None:
                 elif turn.cancel:
                     res = tools.ToolResult("Cancelled by the user.", "annullato", ok=False)
                 else:
-                    res = await tools.run_tool(ctx, c.name, c.args)
+                    res = await bench.run_tool(c.name, c.args)
                 entry["status"], entry["summary"] = ("ok" if res.ok else "error"), res.summary
                 await turn.emit("tool_done", {"id": sid, "ok": res.ok, "summary": res.summary})
                 r_parts.append(Part(type="tool_result", tool_id=c.id, tool_name=c.name, text=res.text, is_error=not res.ok))
@@ -543,9 +581,8 @@ async def _run(turn: Turn, user_msg_id: int) -> None:
                                   "status": "done" if finished_cleanly and not turn.cancel else "cancelled",
                                   "suggestions": parse_suggestions(text_total), "review": parse_review(text_total) if mode == "review" else None}
         await _save(reply_id, **fields)
-        if state["pre"] is not None and state.get("cur") is not None:
-            focus = next((f["path"] for f in summarize(state["pre"], state["cur"])["files"] if f["path"].startswith("chapters/")), None)
-            prop.recompile_later(course_id, focus)
+        if bench.on_changed is not None:
+            await bench.on_changed()
         async with SessionLocal() as db:
             final = await db.get(ChatMessage, reply_id)
             await turn.emit("done", {"reply": message_out(final)})
