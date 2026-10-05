@@ -204,6 +204,22 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
     [setNotes, addStroke, eraseStrokes, addBlankAfter],
   );
 
+  // Keyboard: ← / → go to the previous / next page (also in the read-only share view; not while typing or in a dialog).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key !== "ArrowLeft" && e.key !== "ArrowRight") || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (document.querySelector(".modal-backdrop")) return;
+      const next = e.key === "ArrowRight" ? current + 1 : current - 1;
+      if (next < 0 || next >= pagesRef.current.length) return;
+      e.preventDefault();
+      goTo(next);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [current, goTo]);
+
   // Keyboard: undo/redo (also in a note: one history) and tool letters (not while typing).
   useEffect(() => {
     if (readOnly) return;
