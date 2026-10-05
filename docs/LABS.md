@@ -31,6 +31,23 @@ assistant.
 `application/octet-stream` (an uploaded `.html` or `.svg` is source to read, never a page), and only PDFs and pictures
 recognised by their bytes keep their own type, so the viewer can draw them.
 
+## The page
+
+`/admin/courses/{course}/lessons/{n}/lab` (the lesson's address plus `/lab`); the lesson's top bar has «Laboratorio», the
+lab's has «Lezione teorica». A lesson without a lab offers «Crea il laboratorio» there. On the left the **tree** of the
+files (folders from the names, folders first), on the right the open file, remembered in the address (`?file=src/main.c`):
+
+* text and notebooks in a read-only **CodeMirror** view (`components/labs/CodeView.tsx`): line numbers, folding, the
+  colours of the language found from the file name (`@codemirror/language-data`, each language loaded on demand; a few
+  lab extensions such as `.h`, `.m`, `.v`, `.asm` are mapped by hand), colours from the `--syn-*` tokens for both themes;
+* pictures as pictures; PDFs and other files with a download link.
+
+**Uploading**: «Carica file» (several at once), the folder button (a whole folder with its sub-folders: the names keep the
+folders) or a **drop** of files and folders anywhere on the page. Files over 20 MB are refused before sending; hidden files
+and `__pycache__`, `node_modules`, `__MACOSX` are left out of a folder; a file with a name that exists replaces it (a
+notice says so). Each file has «Rinomina» (also into a folder: `src/main.c`) and «Elimina». The top bar shows
+«Pubblicazione: in sviluppo»: labs are private for now (#59).
+
 ## API (admin only, like the rest)
 
 The routes hang off the lesson, so a share link of the lesson can reach the same lab.

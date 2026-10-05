@@ -28,6 +28,8 @@ export interface LessonData {
   chapter_id: number | null;
   last_page_id: number | null;
   last_result: { chapters?: { chapter_id: number | null; title: string | null }[] } | null;
+  /** the lesson's laboratory, if it has one */
+  lab?: { files: number } | null;
   pages: PageState[];
 }
 
@@ -354,6 +356,17 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
               Appunti (.md)
             </a>
           </Pop>
+          {owner && (
+            <a
+              className="btn ghost"
+              href={`/admin/courses/${lesson.course_id}/lessons/${lesson.number}/lab`}
+              data-testid="lesson-lab"
+              title={lesson.lab ? `Apri il laboratorio di questa lezione (${lesson.lab.files} file)` : "Crea il laboratorio di questa lezione: i file spiegati in classe, da commentare"}
+            >
+              <Icon name="flask" />
+              <span className="wsb-lbl">Laboratorio</span>
+            </a>
+          )}
           {owner && (
             <button type="button" className="btn les-wide" onClick={() => setShowShare(true)} data-testid="share-open" title="Condividi la lezione con un link, in sola lettura o modificabile">
               <Icon name="link" />

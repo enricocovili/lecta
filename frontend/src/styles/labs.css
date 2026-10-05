@@ -1,0 +1,279 @@
+/* Laboratories: the files of a lesson's lab (tree on the left, the open file in the middle) and the code viewer.
+ * Classes: `.lab*`. The top bar reuses `.wsb*`; code colours are the `--syn-*` tokens below. */
+
+:root {
+  --paper-code: #fffefa;
+  --code-active: rgb(44 79 163 / 6%);
+  --code-selection: rgb(44 79 163 / 18%);
+  --syn-keyword: #8a3ffc;
+  --syn-string: #2f7d49;
+  --syn-comment: #8a857a;
+  --syn-number: #b5530b;
+  --syn-type: #0f6e8c;
+  --syn-function: #2c4fa3;
+  --syn-meta: #a1356b;
+  --syn-property: #6f5407;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper-code: #1a1916;
+    --code-active: rgb(147 173 240 / 7%);
+    --code-selection: rgb(147 173 240 / 24%);
+    --syn-keyword: #c4a5ff;
+    --syn-string: #8fd6a6;
+    --syn-comment: #8c877b;
+    --syn-number: #f0a868;
+    --syn-type: #6fcbe3;
+    --syn-function: #93adf0;
+    --syn-meta: #f09bc4;
+    --syn-property: #ecc766;
+  }
+}
+:root[data-theme="dark"] {
+  --paper-code: #1a1916;
+  --code-active: rgb(147 173 240 / 7%);
+  --code-selection: rgb(147 173 240 / 24%);
+  --syn-keyword: #c4a5ff;
+  --syn-string: #8fd6a6;
+  --syn-comment: #8c877b;
+  --syn-number: #f0a868;
+  --syn-type: #6fcbe3;
+  --syn-function: #93adf0;
+  --syn-meta: #f09bc4;
+  --syn-property: #ecc766;
+}
+
+body.ws-page .lab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg);
+}
+.lab-loading {
+  align-items: center;
+  justify-content: center;
+}
+.lab-create {
+  max-width: 34rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  padding: 2rem;
+}
+.lab-create h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ top bar */
+
+.lab-heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-left: 0.35rem;
+  line-height: 1.15;
+}
+.lab-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.lab-kicker .icon {
+  width: 13px;
+  height: 13px;
+}
+.lab-title {
+  font-family: var(--serif);
+  font-size: 1.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab .les-course {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 0.5rem;
+}
+.lab-publish {
+  color: var(--fg-muted);
+  cursor: default;
+}
+
+.lab-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+}
+.lab-progress-bar {
+  flex: 0 0 10rem;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+.lab-progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+/* ------------------------------------------------------------------ body: tree + file */
+
+.lab-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+}
+.lab-tree {
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-elev);
+  padding: 0.5rem 0;
+}
+.lab-tree-empty {
+  padding: 0 0.9rem;
+}
+.lab-tree-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lab-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 1.9rem;
+  padding-right: 0.35rem;
+  font-size: 0.88rem;
+}
+.lab-folder {
+  cursor: pointer;
+  color: var(--fg-muted);
+  list-style: none;
+}
+.lab-folder::-webkit-details-marker {
+  display: none;
+}
+.lab-file:hover {
+  background: var(--bg-hover);
+}
+.lab-file.on {
+  background: var(--accent-soft);
+}
+.lab-file-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lab-file-name span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab-tree-row .icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+.lab-file-actions {
+  display: none;
+  gap: 0.1rem;
+}
+.lab-file:hover .lab-file-actions,
+.lab-file:focus-within .lab-file-actions {
+  display: flex;
+}
+
+.lab-main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lab-file-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lab-file-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.lab-file-path {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab-file-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.lab-code {
+  height: 100%;
+}
+.lab-image {
+  padding: 1.5rem;
+  text-align: center;
+}
+.lab-image img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  background: #fff;
+}
+.lab-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.lab-drop {
+  position: absolute;
+  inset: var(--ws-top-h) 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 550;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 85%, transparent);
+  border: 2px dashed var(--accent-line);
+  pointer-events: none;
+}

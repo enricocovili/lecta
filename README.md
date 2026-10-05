@@ -83,7 +83,7 @@ real compile service.
 **A course** opens on its page (`/admin/courses/{id}`): its **lessons** (with the «Completata» switch and
 «Nuova lezione»), the **chapters** of its text (one click opens the text at that chapter), publishing ON/OFF,
 the PDF and LaTeX downloads and the course settings. **Apri il testo** leads into the text. A
-**Laboratorio** section, tied to a chapter or a lesson, is announced there and still in development.
+**Laboratorio** section, tied to a chapter or a lesson, is announced there (the labs themselves open from their lessons).
 
 The text of a course opens at `/admin/courses/{id}/testo`: the centre is the **draft**, the left
 rail is the outline (chapters and sections, sources, structure actions), the right panel is the
@@ -152,6 +152,11 @@ none, a notice says the text will be generated automatically. Downloads: the sli
 **Condividi** gives links that open the lesson without signing in: read-only (slides, notes and strokes, following the lecture as you
 write) or editable (the same editor, minus what is yours alone). Revoke or replace them whenever you want.
 Details: [docs/LESSONS.md](docs/LESSONS.md).
+
+**Laboratorio**: every lesson can have a lab, opened from its top bar («Laboratorio»; the lab leads back with «Lezione
+teorica»). Load the files explained in class (sources of any language, notebooks, PDFs, pictures; several at once, whole
+folders too, by picker or drag and drop, up to 20 MB each) and read them in a file tree with the colours of their language.
+Files are never executed. The lab stays apart from the study text and is private for now. Details: [docs/LABS.md](docs/LABS.md).
 
 ## From a lesson to the study text (import)
 
