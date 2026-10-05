@@ -313,4 +313,66 @@ test.describe.serial("Laboratorio", () => {
     expect(sessions).toEqual([]);
     con.assertClean(EXPECTED);
   });
+
+  test("the lab is shared with the lesson's links: a classmate with the write link comments, a reader follows", async ({ page, browser, baseURL }) => {
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(lessonPath);
+    await page.getByTestId("share-open").click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByTestId("share-make-read").click();
+    await dialog.getByTestId("share-make-write").click();
+    const readUrl = new URL(await dialog.getByTestId("share-url-read").inputValue());
+    const writeUrl = new URL(await dialog.getByTestId("share-url-write").inputValue());
+    await dialog.getByRole("button", { name: "Fatto" }).click();
+    await page.goto(`${lessonPath}/lab?file=main.c`);
+    const before = await page.getByTestId("lab-comment").count();
+
+    // A classmate with the write link: from the lesson to its lab; comments, but can't upload, rename or ask the assistant.
+    const writer = await browser.newContext({ baseURL });
+    const w = await writer.newPage();
+    const wcon = watchConsole(w);
+    await w.goto(writeUrl.pathname);
+    await w.getByTestId("lesson-lab").click();
+    await w.waitForURL(/\/s\/[\w-]+\/lab$/);
+    await expect(w.getByTestId("lab-file")).toHaveCount(5);
+    await expect(w.getByTestId("lab-upload")).toHaveCount(0);
+    await expect(w.getByTestId("lab-ai-toggle")).toHaveCount(0);
+    await w.getByTestId("lab-file").filter({ hasText: "main.c" }).click();
+    const code = w.getByTestId("lab-code");
+    await code.locator(".cm-line").nth(2).click({ position: { x: 2, y: 5 } });
+    await code.locator(".cm-line").nth(2).click({ modifiers: ["Shift"], position: { x: 60, y: 5 } });
+    await w.getByTestId("lab-comment-selection").click();
+    await w.keyboard.type("Il compagno: qui si include la libreria");
+    await w.keyboard.press("Escape");
+    await w.keyboard.press("Control+s");
+    await expect(w.getByTestId("lab-save-state")).toHaveClass(/saved/);
+
+    // The owner's page brings it in by itself (the lesson has links: it follows what the others save).
+    await expect(page.getByTestId("lab-comment")).toHaveCount(before + 1, { timeout: 20_000 });
+    await expect(page.getByTestId("lab-comments")).toContainText("Il compagno");
+
+    // A reader sees files and comments, writes nothing.
+    const reader = await browser.newContext({ baseURL });
+    const r = await reader.newPage();
+    const rcon = watchConsole(r);
+    await r.goto(`${readUrl.pathname}/lab?file=main.c`);
+    await expect(r.getByTestId("lab-comments")).toContainText("Il compagno");
+    await expect(r.getByTestId("lab-comment-file")).toHaveCount(0);
+    await expect(r.getByTestId("lab-edit")).toHaveCount(0);
+    await expect(r.getByTestId("lab-save-state")).toHaveCount(0);
+    await r.getByTestId("lab-code").locator(".cm-line").nth(2).dblclick();
+    await expect(r.getByTestId("lab-comment-selection")).toHaveCount(0);
+
+    // Revoking the write link closes the lab to it too.
+    await page.goto(lessonPath);
+    await page.getByTestId("share-open").click();
+    await page.getByRole("dialog").getByTestId("share-revoke-write").click();
+    await page.getByRole("dialog").getByRole("button", { name: "Fatto" }).click();
+    await w.goto(`${writeUrl.pathname}/lab`);
+    await expect(w.getByText("Questo link non è valido")).toBeVisible();
+    for (const c of [con, wcon, rcon]) c.assertClean([...EXPECTED, /status of 403/]);
+    await writer.close();
+    await reader.close();
+  });
 });

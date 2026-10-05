@@ -1,0 +1,9 @@
+---
+// The lab of a lesson shared with a link: opens without signing in, like the lesson (noindex, same-origin referrer).
+import Workspace from "../../../layouts/Workspace.astro";
+import SharedLab from "../../../components/labs/SharedLab";
+const token = Astro.params.token ?? "";
+---
+<Workspace title="Laboratorio condiviso">
+  <SharedLab client:only="react" token={token} />
+</Workspace>

@@ -160,7 +160,8 @@ Notebooks show their cells and saved outputs (never run, no HTML), PDFs their pa
 Select lines, a cell or a page and **comment** them while the lecturer explains (Markdown and maths, saved like the lesson's notes), or comment
 a whole file; **edit** a text file by hand (the comments follow their lines); free **notes** of the lab sit next to the files.
 The lab's **assistant** explains the lines you pick («Chiedi»), the files and their link to the theory lesson, edits them
-and comments them when you ask (one click undoes a reply). Files are never executed. The lab stays apart from the study text and is private for now. Details: [docs/LABS.md](docs/LABS.md).
+and comments them when you ask (one click undoes a reply). The lesson's share links open its lab too (a write link
+comments and edits, a read link follows). Files are never executed. The lab stays apart from the study text and is private for now. Details: [docs/LABS.md](docs/LABS.md).
 
 ## From a lesson to the study text (import)
 

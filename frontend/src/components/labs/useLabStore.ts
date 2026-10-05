@@ -395,6 +395,41 @@ export function useLabStore(
     [persist, refresh, update],
   );
 
+  /** What others saved (the lab is shared): their comments, notes and file versions come in; what is being written here stays. */
+  const merge = useCallback(
+    (server: LabComment[], serverNotes: { text: string; version: number }, serverFiles: { id: number; version: number }[]) => {
+      const mine = (id: string) => dirty.current.has(id) || inflight.current.has(id) || deleted.current.has(id);
+      update((cur) => {
+        const ids = new Set(server.map((c) => c.id));
+        let changed = false;
+        // A saved comment missing on the server was deleted by someone else; one never sent stays.
+        const next = cur.filter((c) => {
+          const keep = mine(c.id) || c.version === 0 || ids.has(c.id);
+          if (!keep) changed = true;
+          return keep;
+        });
+        const at = new Map(next.map((c, i) => [c.id, i]));
+        for (const c of server) {
+          if (mine(c.id)) continue;
+          const i = at.get(c.id);
+          if (i === undefined) next.push(c);
+          else if (next[i].version !== c.version) next[i] = c;
+          else continue;
+          versions.current.set(c.id, c.version);
+          changed = true;
+        }
+        return changed ? next : cur;
+      });
+      if (!mine(NOTES) && serverNotes.version !== versions.current.get(NOTES)) {
+        versions.current.set(NOTES, serverNotes.version);
+        notesRef.current = serverNotes.text;
+        setNotesState(serverNotes.text);
+      }
+      for (const f of serverFiles) if (!mine(fileKey(f.id))) versions.current.set(fileKey(f.id), f.version);
+    },
+    [update],
+  );
+
   /** The comments of a file that is gone leave with it (the server already dropped them). */
   const forgetFile = useCallback(
     (fileId: number) => {
@@ -409,7 +444,7 @@ export function useLabStore(
   );
 
   return useMemo(
-    () => ({ comments, notes, saveState, create, setBody, setAnchor, remove, setNotes, setFileContent, pendingContent, adopt, forgetFile, flushAll }),
-    [comments, notes, saveState, create, setBody, setAnchor, remove, setNotes, setFileContent, pendingContent, adopt, forgetFile, flushAll],
+    () => ({ comments, notes, saveState, create, setBody, setAnchor, remove, setNotes, setFileContent, pendingContent, adopt, merge, forgetFile, flushAll }),
+    [comments, notes, saveState, create, setBody, setAnchor, remove, setNotes, setFileContent, pendingContent, adopt, merge, forgetFile, flushAll],
   );
 }

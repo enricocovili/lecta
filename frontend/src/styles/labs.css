@@ -603,3 +603,6 @@ body.ws-page .lab {
   display: flex;
   gap: 0.3rem;
 }
+.lab-gone {
+  margin: 0.5rem 0.9rem;
+}

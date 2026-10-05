@@ -79,7 +79,7 @@ function pageLabel(pages: PageState[], index: number): string {
   return after ? `Pagina aggiunta dopo la slide ${after}` : "Pagina aggiunta";
 }
 
-export function Editor({ lesson, access, source }: { lesson: LessonData; access: Access; source: LessonSource }) {
+export function Editor({ lesson, access, source, labHref }: { lesson: LessonData; access: Access; source: LessonSource; labHref?: string | null }) {
   const owner = access === "owner";
   const readOnly = access === "read";
   const [title, setTitle] = useState(lesson.title);
@@ -356,12 +356,18 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
               Appunti (.md)
             </a>
           </Pop>
-          {owner && (
+          {(owner || labHref) && (
             <a
               className="btn ghost"
-              href={`/admin/courses/${lesson.course_id}/lessons/${lesson.number}/lab`}
+              href={owner ? `/admin/courses/${lesson.course_id}/lessons/${lesson.number}/lab` : labHref!}
               data-testid="lesson-lab"
-              title={lesson.lab ? `Apri il laboratorio di questa lezione (${lesson.lab.files} file)` : "Crea il laboratorio di questa lezione: i file spiegati in classe, da commentare"}
+              title={
+                !owner
+                  ? "Apri il laboratorio di questa lezione"
+                  : lesson.lab
+                    ? `Apri il laboratorio di questa lezione (${lesson.lab.files} file)`
+                    : "Crea il laboratorio di questa lezione: i file spiegati in classe, da commentare"
+              }
             >
               <Icon name="flask" />
               <span className="wsb-lbl">Laboratorio</span>

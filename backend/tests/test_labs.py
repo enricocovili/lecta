@@ -265,3 +265,38 @@ async def test_comments_follow_a_file_uploaded_again(admin):
     await upload(admin, lid, "main.c", "int z;\n")
     gone = next(c for c in (await admin.get(f"/api/lessons/{lid}/lab")).json()["comments"] if c["id"] == on_b)
     assert gone["anchor"]["gone"] is True and gone["anchor"]["text"] == "int b;"
+
+
+async def test_the_lab_is_shared_with_the_lesson_links(admin, anon):
+    _, lesson, _ = await new_lab(admin)
+    lid = lesson["id"]
+    f = (await upload(admin, lid, "main.c", "int a;\nint b;\n")).json()
+    read = (await admin.post(f"/api/lessons/{lid}/shares", json={"mode": "read"})).json()["token"]
+    write = (await admin.post(f"/api/lessons/{lid}/shares", json={"mode": "write"})).json()["token"]
+    assert (await anon.get(f"/api/public/lesson/{read}")).json()["has_lab"] is True
+
+    # A read link sees the lab, without the owner's ids, and can't write.
+    lab = (await anon.get(f"/api/public/lesson/{read}/lab")).json()
+    assert lab["mode"] == "read" and lab["id"] == 0 and lab["lesson"]["id"] == 0 and lab["lesson"]["chapter"] is None
+    assert [x["path"] for x in lab["files"]] == ["main.c"]
+    assert (await anon.get(f"/api/public/lesson/{read}/lab/files/{f['id']}")).json()["content"] == "int a;\nint b;\n"
+    assert (await anon.get(f"/api/public/lesson/{read}/lab/files/{f['id']}/raw")).headers["content-disposition"].startswith("attachment;")
+    cid = str(uuid.uuid4())
+    body = {"file_id": f["id"], "anchor": {"from": 1, "to": 1, "text": "int a;"}, "body": "dal compagno"}
+    assert (await anon.put(f"/api/public/lesson/{read}/lab/comments/{cid}", json=body)).status_code == 403
+    assert (await anon.put(f"/api/public/lesson/{read}/lab/notes", json={"notes": "x"})).status_code == 403
+    assert (await anon.put(f"/api/public/lesson/{read}/lab/files/{f['id']}/content", json={"content": "x", "base_version": 1})).status_code == 403
+
+    # A write link comments, writes the notes and edits text files; the owner sees it all.
+    assert (await anon.put(f"/api/public/lesson/{write}/lab/comments/{cid}", json=body)).status_code == 200
+    assert (await anon.put(f"/api/public/lesson/{write}/lab/notes", json={"notes": "consegna venerdì"})).status_code == 200
+    assert (await anon.put(f"/api/public/lesson/{write}/lab/files/{f['id']}/content", json={"content": "int z;\n", "base_version": 1})).status_code == 200
+    mine = (await admin.get(f"/api/lessons/{lid}/lab")).json()
+    assert [c["body"] for c in mine["comments"]] == ["dal compagno"] and mine["notes"] == "consegna venerdì"
+    assert (await anon.delete(f"/api/public/lesson/{write}/lab/comments/{cid}")).status_code == 200
+    # No uploads, renames or deletions of files through a link (those routes don't exist there).
+    r = await anon.post(f"/api/public/lesson/{write}/lab/files", params={"path": "x.c"}, content=b"x", headers={"content-type": "application/octet-stream"})
+    assert r.status_code in (404, 405)
+    # A revoked link sees nothing.
+    await admin.delete(f"/api/lessons/{lid}/shares/write")
+    assert (await anon.get(f"/api/public/lesson/{write}/lab")).status_code == 404

@@ -74,13 +74,13 @@ classmate can follow the lecture; downloads of the annotated PDF and the notes. 
 (notes, pen, highlighter, eraser, undo, added and removed pages) without what is the owner's alone (generating the text, the title,
 sharing, moving or deleting the lesson). Edits of different people are merged page by page (the polling brings in the pages others saved;
 a page one is editing is not replaced until it has been saved, and saving replaces that page's notes or strokes: the last save wins).
-The owner manages the links in «Condividi»: create, copy, replace (the old link stops working) or revoke. A link dies with its lesson.
+The owner manages the links in «Condividi»: create, copy, replace (the old link stops working) or revoke. A link dies with its lesson. A link also opens the lesson's **laboratory** (`/s/<token>/lab`, [LABS.md](LABS.md#sharing)).
 
 | call | |
 |------|-|
 | `GET/POST /api/lessons/{id}/shares` `{mode: read\|write, new_link?}` · `DELETE /api/lessons/{id}/shares/{mode}` | the owner's links |
 | `POST /api/lessons/{id}/sync` `{known: {page_id: version}}` | the order of the pages and the pages whose version differs (the owner's editor uses it while the lesson has links) |
-| `GET /api/public/lesson/{token}` · `/pdf` · `/annotated.pdf` · `/notes.md` | what a link shows (no guidelines, chapter or ids of the owner's side) |
+| `GET /api/public/lesson/{token}` · `/pdf` · `/annotated.pdf` · `/notes.md` | what a link shows (no guidelines, chapter or ids of the owner's side; `has_lab`) |
 | `POST …/sync` · `PUT …/pages/{pid}` · `POST …/pages` · `POST …/pages/restore` · `DELETE …/pages/{pid}` | the same as the owner's, **write links only** (403 on a read link) |
 
 ## From the lesson to the text

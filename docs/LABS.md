@@ -120,9 +120,20 @@ the ids of the comments) and the change card's **Annulla** puts back the files i
 added, and moves the comments back; it is refused (409) when a file it changed has been changed again since. After a turn
 (or its undo) the page reads the touched files and their comments again; the card's file names open the file.
 
+## Sharing
+
+A lab is shared with its **lesson's links** (`docs/LESSONS.md`, «Condividi»): the shared lesson has «Laboratorio» when it has
+one, and the lab opens at `/s/<token>/lab` («Lezione teorica» leads back). A **read** link sees files, comments and notes;
+a **write** link also comments, writes the notes and edits text files. Uploading, renaming and deleting files, and the
+assistant, are the owner's only. What a link shows hides the owner's side (ids of the lab, lesson and course, the chapter).
+While the lesson has links, every page of the lab (the owner's too) brings in what the others saved every few seconds
+(5 s read, 6 s write, 8 s owner): comments, notes and the versions of the files; what is being written on a page stays, a
+file changed by someone else is read again unless it has unsaved edits here (saving them then meets the conflict). Revoking
+a link closes the lab to it too.
+
 ## API (admin only, like the rest)
 
-The routes hang off the lesson, so a share link of the lesson can reach the same lab.
+The routes hang off the lesson, so a share link of the lesson reaches the same lab.
 
 | call | |
 |------|-|
@@ -141,5 +152,9 @@ The routes hang off the lesson, so a share link of the lesson can reach the same
 The assistant uses the chat API (`docs/AI-WORKSPACE.md`): `POST /api/chat/sessions {course_id, lab_id}`,
 `GET /api/chat/sessions?course_id=&lab_id=`, and messages with `scope: {file_id, selection: {from_line, to_line, text}, mode}`
 (`ask` | `edit` | `explain`; no `review`).
+
+Through a link the same calls live under `/api/public/lesson/{token}/lab…`: `GET lab` (with `mode`), `GET files/{fid}`,
+`GET files/{fid}/raw`, and for write links only `PUT files/{fid}/content`, `PUT notes`, `PUT`/`DELETE comments/{uuid}`
+(403 on a read link). `GET /api/public/lesson/{token}` says `has_lab`.
 
 `GET /api/lessons/{id}` tells whether the lesson has a lab: `lab: {files, comments}` (counts) or `null`.

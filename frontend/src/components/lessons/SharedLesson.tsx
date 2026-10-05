@@ -13,6 +13,7 @@ interface Shared {
   has_pdf: boolean;
   pdf_pages: number;
   pages: PageState[];
+  has_lab: boolean;
 }
 
 export default function SharedLesson({ token }: { token: string }) {
@@ -45,5 +46,12 @@ export default function SharedLesson({ token }: { token: string }) {
     generated_at: null, chapter_id: null, last_page_id: null, last_result: null, pages: data.pages,
   };
   const access: Access = data.mode;
-  return <Editor lesson={lesson} access={access} source={{ base: `/api/public/lesson/${encodeURIComponent(token)}`, key: `share:${token}` }} />;
+  return (
+    <Editor
+      lesson={lesson}
+      access={access}
+      source={{ base: `/api/public/lesson/${encodeURIComponent(token)}`, key: `share:${token}` }}
+      labHref={data.has_lab ? `/s/${encodeURIComponent(token)}/lab` : null}
+    />
+  );
 }

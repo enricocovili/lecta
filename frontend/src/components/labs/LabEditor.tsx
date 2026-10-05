@@ -84,9 +84,24 @@ function useOpenFile(files: LabFile[]) {
   return { open, notes: where.notes, choose, showNotes };
 }
 
-export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; access: LabAccess; base: string; lessonHref: string | null }) {
+export function LabEditor({
+  lab,
+  access,
+  base,
+  lessonHref,
+  storeKey = String(lab.id),
+}: {
+  lab: LabData;
+  access: LabAccess;
+  base: string;
+  lessonHref: string | null;
+  /** names the lab's unsaved work in localStorage */
+  storeKey?: string;
+}) {
   const owner = access === "owner";
+  // Comments, notes and editing text: the owner and a write link. Uploading, renaming, deleting files: the owner only.
   const canEdit = access !== "read";
+  const canManage = owner;
   const [files, setFiles] = useState<LabFile[]>(lab.files);
   const { open, notes: notesOpen, choose, showNotes } = useOpenFile(files);
   const [uploading, setUploading] = useState<{ name: string; done: number; total: number; fraction: number } | null>(null);
@@ -122,7 +137,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
   useEffect(() => {
     if (showAi) setAiMounted(true);
   }, [showAi]);
-  const store = useLabStore(base, String(lab.id), lab.comments, { text: lab.notes, version: lab.notes_version }, lab.files, {
+  const store = useLabStore(base, storeKey, lab.comments, { text: lab.notes, version: lab.notes_version }, lab.files, {
     onFileSaved: (f) => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, version: f.version, size: f.size } : x))),
     onFileConflict: (id) => void reloadFile(id),
   });
@@ -153,6 +168,39 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
     for (const c of store.comments) m.set(c.file_id, (m.get(c.file_id) ?? 0) + 1);
     return m;
   }, [store.comments]);
+  // While the lab is shared, what the others save comes in every few seconds (a reader's page follows the class).
+  const [hasShares, setHasShares] = useState(false);
+  const [gone, setGone] = useState(false);
+  useEffect(() => {
+    if (owner) get<unknown[]>(`/api/lessons/${lab.lesson.id}/shares`).then((l) => setHasShares(l.length > 0)).catch(() => undefined);
+  }, [owner, lab.lesson.id]);
+  const poll = access === "read" ? 5000 : access === "write" ? 6000 : hasShares ? 8000 : null;
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  useEffect(() => {
+    if (!poll || gone) return;
+    let busy = false;
+    const tick = async () => {
+      if (busy || document.visibilityState !== "visible") return;
+      busy = true;
+      try {
+        const fresh = await get<LabData>(`${base}/lab`);
+        const known = new Map(filesRef.current.map((f) => [f.id, f.version]));
+        // A file someone else changed is read again, unless it is being edited here (saving it will tell).
+        const newer = fresh.files.filter((f) => (known.get(f.id) ?? f.version) < f.version && storeRef.current?.pendingContent(f.id) === undefined).map((f) => f.id);
+        setFiles(fresh.files);
+        storeRef.current?.merge(fresh.comments, { text: fresh.notes, version: fresh.notes_version }, fresh.files);
+        if (newer.length) setReloads((r) => Object.fromEntries([...Object.entries(r), ...newer.map((id) => [id, (r[id] ?? 0) + 1])]));
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 403)) setGone(true);
+      } finally {
+        busy = false;
+      }
+    };
+    const id = window.setInterval(() => void tick(), poll);
+    return () => window.clearInterval(id);
+  }, [poll, gone, base]);
+
   const save = useCallback(async () => {
     if (!(await store.flushAll())) toastError(new Error("Non riesco a salvare: riprovo appena torna la connessione"));
   }, [store]);
@@ -211,7 +259,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
   const onDrop = async (e: DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    if (!canEdit) return;
+    if (!canManage) return;
     void upload(await fromDrop(e.dataTransfer));
   };
 
@@ -238,7 +286,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
       className={`lab ${dragging ? "dragging" : ""}`}
       data-testid="lab-editor"
       onDragOver={(e) => {
-        if (!canEdit || !e.dataTransfer.types.includes("Files")) return;
+        if (!canManage || !e.dataTransfer.types.includes("Files")) return;
         e.preventDefault();
         setDragging(true);
       }}
@@ -280,7 +328,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
               <Icon name="globe" /> Pubblicazione: in sviluppo
             </span>
           )}
-          {canEdit && (
+          {canManage && (
             <>
               <button type="button" className="btn" onClick={() => fileInput.current?.click()} disabled={!!uploading} data-testid="lab-upload">
                 <Icon name="upload" />
@@ -314,6 +362,11 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
         </div>
       )}
 
+      {gone && (
+        <div className="alert danger lab-gone" role="alert">
+          Questo link non è più valido: chi l’ha condiviso l’ha revocato o ne ha fatto uno nuovo.
+        </div>
+      )}
       <div className={`lab-body ${showAi ? "ai-on" : ""}`}>
         <aside className="lab-tree" aria-label="File del laboratorio" data-testid="lab-tree">
           <button type="button" className={`lab-tree-row lab-notes-entry ${notesOpen ? "on" : ""}`} onClick={showNotes} data-testid="lab-notes-open">
@@ -323,7 +376,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
           {files.length === 0 ? (
             <p className="muted small lab-tree-empty">Nessun file.</p>
           ) : (
-            <FolderView folder={root} depth={0} open={open} choose={choose} canEdit={canEdit} counts={perFile} onRename={setRenaming} onRemove={setRemoving} />
+            <FolderView folder={root} depth={0} open={open} choose={choose} canEdit={canManage} counts={perFile} onRename={setRenaming} onRemove={setRemoving} />
           )}
         </aside>
         <main className="lab-main">
@@ -349,7 +402,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
           ) : (
             <div className="lab-empty">
               <Empty icon="flask">
-                {canEdit ? (
+                {canManage ? (
                   <>
                     Trascina qui i file del laboratorio (anche intere cartelle) oppure{" "}
                     <button type="button" className="link" onClick={() => fileInput.current?.click()}>scegline qualcuno</button>. Fino a 20 MB l’uno; non vengono mai eseguiti.
