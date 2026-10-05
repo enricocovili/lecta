@@ -147,6 +147,14 @@ test.describe.serial("Lezioni", () => {
     await expect(page.getByTestId("page-number")).toContainText("2 /");
     await page.getByRole("button", { name: "Pagina successiva" }).click();
     await expect(page.getByTestId("page-number")).toContainText("3 /");
+    // The page being looked at sits in the middle of the editor (once the scroll has ended).
+    await expect
+      .poll(async () => {
+        const row = (await page.locator("#lesson-page-" + (await stored(page)).pages[2].id).boundingBox())!;
+        const area = (await page.getByTestId("lesson-scroll").boundingBox())!;
+        return Math.abs(row.y + row.height / 2 - (area.y + area.height / 2));
+      }, { timeout: 5_000 })
+      .toBeLessThan(30);
     const third = (await stored(page)).pages[2].id;
     await expect.poll(async () => (await stored(page)).last_page_id, { timeout: 10_000 }).toBe(third);
     await save(page);

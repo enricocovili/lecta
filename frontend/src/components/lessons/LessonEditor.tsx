@@ -62,6 +62,14 @@ export default function LessonEditor({ courseId, number }: { courseId: number; n
   return <Editor lesson={data} access="owner" source={{ base: `/api/lessons/${data.id}`, key: String(data.id) }} />;
 }
 
+/** Brings a page (the slide and its notes) to the middle of the editor; one taller than the editor starts at the top instead. */
+function reveal(pageId: number, smooth = false) {
+  const el = document.getElementById(`lesson-page-${pageId}`);
+  if (!el) return;
+  const room = el.closest(".les-scroll")?.clientHeight ?? window.innerHeight;
+  el.scrollIntoView({ block: el.getBoundingClientRect().height < room ? "center" : "start", behavior: smooth ? "smooth" : "auto" });
+}
+
 function pageLabel(pages: PageState[], index: number): string {
   const p = pages[index];
   if (p.kind === "slide") return `Slide ${p.slide_page}`;
@@ -107,12 +115,12 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
     if (owner) get<unknown[]>(`/api/lessons/${lesson.id}/shares`).then((l) => setHasShares(l.length > 0)).catch(() => undefined);
   }, [owner, lesson.id]);
 
-  // Coming back to the lesson lands on the page that was open last (the rows take their height while they measure
+  // Opening the lesson lands on the page that was open last, or the first one (the rows take their height while they measure
   // themselves, so the scroll is repeated a few times unless the user already moved).
   const restored = useRef(false);
   useEffect(() => {
-    const target = pagesRef.current.find((p) => p.id === lesson.last_page_id);
-    if (!target || pagesRef.current[0]?.id === target.id) {
+    const target = pagesRef.current.find((p) => p.id === lesson.last_page_id) ?? pagesRef.current[0];
+    if (!target) {
       restored.current = true;
       return;
     }
@@ -123,7 +131,7 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
     const root = scroller.current;
     root?.addEventListener("wheel", stop, { passive: true });
     root?.addEventListener("pointerdown", stop, { passive: true });
-    const go = () => !moved && document.getElementById(`lesson-page-${target.id}`)?.scrollIntoView({ block: "start" });
+    const go = () => !moved && reveal(target.id);
     const timers = [0, 120, 400, 1000].map((ms) => window.setTimeout(go, ms));
     const done = window.setTimeout(() => {
       restored.current = true;
@@ -174,7 +182,7 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
   pagesRef.current = pages;
   const goTo = useCallback((index: number) => {
     const p = pagesRef.current[index];
-    if (p) document.getElementById(`lesson-page-${p.id}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    if (p) reveal(p.id, true);
   }, []);
 
   const actions = useMemo<Actions>(
@@ -185,7 +193,7 @@ export function Editor({ lesson, access, source }: { lesson: LessonData; access:
       visible: setCurrent,
       addBlankAfter: (pid) => {
         addBlankAfter(pid)
-          .then((id) => setTimeout(() => document.getElementById(`lesson-page-${id}`)?.scrollIntoView({ block: "start", behavior: "smooth" }), 80))
+          .then((id) => setTimeout(() => reveal(id, true), 80))
           .catch(toastError);
       },
       removePage: setAskRemove,

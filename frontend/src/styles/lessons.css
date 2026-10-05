@@ -158,7 +158,8 @@ body.ws-page .les {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  padding-bottom: 5rem;
+  /* Room above the first page and below the last one, so that they too can be centred. */
+  padding-block: 20vh max(5rem, 20vh);
 }
 .les-add-end {
   align-self: center;

@@ -16,6 +16,7 @@ pages added by hand (a slide never has enough room). Every page has:
 
 The screen is kept on (Wake Lock) while the editor is open, and the layout is chosen by the user: slide + notes side by
 side (automatic single column under ~860 px), notes below the slide, or slides only. Zoom, previous/next page (buttons, or the ← / → keys, also in a shared lesson; not while typing or in a dialog).
+The page being looked at (the first one too, when the lesson opens) is centred vertically in the editor, unless the slide and its notes are taller than it: then it starts at the top.
 
 Everything is **saved once a minute and on Ctrl+S** (which replaces the browser's "save page", also while typing in a note; the
 state next to the title is one icon (da salvare, in salvataggio, salvata, or a warning while it keeps retrying), with its
