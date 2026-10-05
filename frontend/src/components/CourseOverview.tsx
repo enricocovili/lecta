@@ -22,6 +22,7 @@ interface LessonRow {
   page_count: number;
   generated_at: string | null;
   updated_at: string;
+  lab: { files: number; comments: number } | null;
 }
 
 export default function CourseOverview({ courseId }: { courseId: number }) {
@@ -35,6 +36,7 @@ export default function CourseOverview({ courseId }: { courseId: number }) {
   const c = course.data;
   if (!c) return <Loading />;
   const chapters = [...(c.chapters ?? [])].sort((a, b) => a.position - b.position);
+  const labs = [...(lessons.data ?? [])].filter((l) => l.lab).sort((a, b) => a.number - b.number);
   const newLesson = `/admin/lessons?new=1&course=${courseId}`;
 
   const downloadPdf = async () => {
@@ -159,19 +161,36 @@ export default function CourseOverview({ courseId }: { courseId: number }) {
 
       <section aria-labelledby="co-lab" data-testid="overview-lab">
         <div className="section-label">
-          <span id="co-lab">Laboratorio</span>
+          <span id="co-lab">Laboratori</span>
         </div>
-        <div className="card co-lab">
-          <span className="status-ico pg-kind-ico">
-            <Icon name="flask" />
-          </span>
-          <div className="grow">
-            <div className="pg-row-title">
-              In sviluppo <span className="pill sm">presto</span>
-            </div>
-            <div className="pg-row-sub">Qui arriverà il laboratorio di ogni capitolo e di ogni lezione.</div>
+        {lessons.data === null ? (
+          <Loading />
+        ) : labs.length === 0 ? (
+          <Empty icon="flask">
+            Ancora nessun laboratorio. Ogni lezione può averne uno: aprilo con «Laboratorio» dalla lezione, carica i file spiegati in classe e commentali.
+          </Empty>
+        ) : (
+          <div className="card flush rows">
+            {labs.map((l) => (
+              <div key={l.id} className="pg-row co-row" data-testid="overview-lab-row">
+                <span className="status-ico pg-kind-ico">
+                  <Icon name="flask" />
+                </span>
+                <div className="grow">
+                  <a className="pg-row-title" href={`/admin/courses/${courseId}/lessons/${l.number}/lab`}>
+                    Laboratorio · {l.title}
+                  </a>
+                  <div className="pg-row-sub">
+                    {l.lab!.files === 1 ? "1 file" : `${l.lab!.files} file`} · {l.lab!.comments === 1 ? "1 commento" : `${l.lab!.comments} commenti`}
+                  </div>
+                </div>
+                <a className="link small" href={`/admin/courses/${courseId}/lessons/${l.number}`} title="Apri la lezione teorica">
+                  <Icon name="notebook" /> Lezione {l.number}
+                </a>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
       </section>
 
       {settings && (

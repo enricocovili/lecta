@@ -34,7 +34,8 @@ recognised by their bytes keep their own type, so the viewer can draw them.
 ## The page
 
 `/admin/courses/{course}/lessons/{n}/lab` (the lesson's address plus `/lab`); the lesson's top bar has «Laboratorio», the
-lab's has «Lezione teorica». A lesson without a lab offers «Crea il laboratorio» there. On the left the **tree** of the
+lab's has «Lezione teorica», and the course page lists the labs of its lessons in «Laboratori» (with their files and
+comments, a link to the lab and one to the lesson; `GET /api/lessons` carries `lab: {files, comments} | null` per lesson). A lesson without a lab offers «Crea il laboratorio» there. On the left the **tree** of the
 files (folders from the names, folders first), on the right the open file, remembered in the address (`?file=src/main.c`):
 
 * text in a read-only **CodeMirror** view (`components/labs/CodeView.tsx`): line numbers, folding, the colours of the

@@ -98,6 +98,10 @@ async def test_a_lab_belongs_to_its_lesson(admin):
     assert by_number["id"] == first["id"]
     await upload(admin, lid, "a.c", "int x;")
     assert (await admin.get(f"/api/lessons/{lid}")).json()["lab"] == {"files": 1, "comments": 0}
+    # The list of the course's lessons says which have a lab (the course page lists the labs from it).
+    other = (await admin.post("/api/lessons", json={"course_id": course["id"], "title": "Senza laboratorio"})).json()
+    listed = {l["id"]: l["lab"] for l in (await admin.get("/api/lessons", params={"course_id": course["id"]})).json()}
+    assert listed == {lid: {"files": 1, "comments": 0}, other["id"]: None}
 
     # The lab goes with its lesson.
     assert (await admin.delete(f"/api/lessons/{lid}")).status_code == 200

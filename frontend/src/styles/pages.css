@@ -712,13 +712,6 @@ a.pg-row-title:hover {
     width: 100%;
   }
 }
-.co-lab {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.4rem;
-  border-style: dashed;
-}
 .co-grid + section {
   margin-top: 2.25rem;
 }

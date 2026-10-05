@@ -256,4 +256,22 @@ test.describe.serial("Laboratorio", () => {
     await page.screenshot({ path: "/e2e/.results/lab-notebook.png" });
     con.assertClean(EXPECTED);
   });
+
+  test("the course page lists the labs, each one click away from its lab and its lesson", async ({ page }) => {
+    const con = watchConsole(page);
+    await login(page);
+    const course = /\/admin\/courses\/(\d+)/.exec(lessonPath)![1];
+    await page.goto(`/admin/courses/${course}`);
+    const row = page.getByTestId("overview-lab-row");
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText("Laboratorio · Lezione 3 - Cicli");
+    await expect(row).toContainText("5 file · 3 commenti");
+    await row.getByRole("link", { name: "Laboratorio · Lezione 3 - Cicli" }).click();
+    await page.waitForURL(new RegExp(`${lessonPath}/lab$`));
+    await expect(page.getByTestId("lab-editor")).toBeVisible();
+    await page.goto(`/admin/courses/${course}`);
+    await page.getByTestId("overview-lab-row").getByRole("link", { name: "Lezione 1" }).click();
+    await page.waitForURL(new RegExp(`${lessonPath}$`));
+    con.assertClean(EXPECTED);
+  });
 });

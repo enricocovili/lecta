@@ -118,7 +118,11 @@ async def list_lessons(course_id: int | None = None, db: AsyncSession = Depends(
             )
         ).all()
     }
-    return [lesson_out(l, name, stats.get(l.id, {"page_count": 0, "notes_pages": 0, "ink_pages": 0})) for l, name in rows]
+    labs_of = await labs.lab_counts(db, [l.id for l, _ in rows])
+    return [
+        {**lesson_out(l, name, stats.get(l.id, {"page_count": 0, "notes_pages": 0, "ink_pages": 0})), "lab": labs_of.get(l.id)}
+        for l, name in rows
+    ]
 
 
 @router.post("/lessons", status_code=201)
