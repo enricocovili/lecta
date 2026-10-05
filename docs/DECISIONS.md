@@ -485,3 +485,15 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      JavaScript; `Public.astro` closes it on an outside click, Escape and a pick.
 102. **No «Scarica tutto (ZIP)».** The public Home loses the link and `/api/public/courses.zip` is gone (it served only
      that link): every course downloads from its own «Scarica» menu.
+
+## Laboratories (#24)
+
+103. **A laboratory is a section of its lesson, apart from the course text.** One lab per lesson (`labs.lesson_id` unique,
+     deleted with the lesson); every lab has its theory lesson, and the lesson leads to its lab. What is written in the lab
+     (comments, notes, edited files) never goes into the chapters by default: it is a different kind of material, read next
+     to the code. Bringing chosen comments into the notes is an idea for later (#60), as is publishing labs (#59): for now a
+     lab is always private. *Why:* the student wants the code and its explanations together, not scattered through prose.
+104. **Lab files are never executed.** There is no runner of any kind; text is shown as text and every download is an
+     attachment with `nosniff` and a sandbox CSP, typed from the file's bytes (only PDFs and pictures keep their own type).
+     An uploaded HTML or SVG page is source code. *Why:* the files come from anywhere (the lecturer, classmates) and Lecta
+     sits on a public host; showing them must never be a way to run them.

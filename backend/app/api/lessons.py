@@ -27,6 +27,7 @@ from ..services import jobs as jobs_svc
 from ..services import lessons as ls
 from ..services import settings as settings_svc
 from ..services.texttools import slugify
+from . import labs
 from .courses import GUIDELINES_MAX
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -140,6 +141,7 @@ async def get_lesson(lesson_id: int, pages: bool = True, db: AsyncSession = Depe
     out["course_guidelines"] = (course.guidelines or "") if course else ""
     chapter = await db.get(Chapter, lesson.chapter_id) if lesson.chapter_id else None
     out["chapter"] = {"id": chapter.id, "title": chapter.title, "position": chapter.position} if chapter else None
+    out["lab"] = (await labs.lab_counts(db, [lesson.id])).get(lesson.id)
     if pages:
         out["pages"] = [page_out(p) for p in await _pages(db, lesson.id)]
     return out

@@ -217,6 +217,38 @@ class LessonShare(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class Lab(Base):
+    """The laboratory of a lesson: the files explained in class (sources, notebooks, PDFs…), read and commented live.
+    One per lesson, a section of it; it stays apart from the course text."""
+
+    __tablename__ = "labs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lesson_id: Mapped[int] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"), unique=True)
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = _now()
+
+
+class LabFile(Base):
+    """A file of a laboratory. Text (sources, notebooks) lives in `content`, so it can be edited; anything else in the blob store.
+    Never executed: it is shown as text and downloaded as an attachment."""
+
+    __tablename__ = "lab_files"
+    __table_args__ = (UniqueConstraint("lab_id", "path", name="ux_lab_files_path"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lab_id: Mapped[int] = mapped_column(ForeignKey("labs.id", ondelete="CASCADE"), index=True)
+    path: Mapped[str] = mapped_column(String(300))  # "src/main.c": folders are part of the name
+    kind: Mapped[str] = mapped_column(String(10))  # text | notebook | pdf | image | binary
+    language: Mapped[str | None] = mapped_column(String(30))  # "c", "python"… from the name (text and notebooks)
+    size: Mapped[int] = mapped_column(Integer)  # bytes as uploaded
+    content: Mapped[str | None] = mapped_column(Text)  # text and notebooks, UTF-8
+    blob: Mapped[str | None] = mapped_column(String(64))  # pdf, image, binary
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = _now()
+
+
 # --------------------------------------------------------------------------- jobs
 
 
