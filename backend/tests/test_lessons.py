@@ -412,6 +412,21 @@ async def test_generating_a_lesson_writes_the_course_text(admin, worker, monkeyp
     assert (await admin.get(f"/api/lessons/{lid}")).json()["chapter"]["id"] == j5["result"]["groups"][0]["chapter_id"]
 
 
+async def test_a_generation_can_leave_the_lesson_in_progress(admin, worker):
+    """«Segna la lezione come completata» off: the text is written but the lesson stays «In corso»; on (the default) completes it."""
+    await setup_fake(admin)
+    _, lesson = await new_lesson(admin, n=1)
+    lid = lesson["id"]
+    await admin.put(f"/api/lessons/{lid}/pages/{lesson['pages'][0]['id']}", json={"notes": "- un punto"})
+    j = await wait_job(admin, (await admin.post(f"/api/lessons/{lid}/generate", json={"mark_completed": False})).json()["job_id"], timeout=300)
+    assert j["status"] == "succeeded" and j["result"]["groups"][0]["type"] == "new_chapter"
+    done = (await admin.get(f"/api/lessons/{lid}")).json()
+    assert done["generated_at"] and done["chapter"] and done["status"] == "working"
+    j = await wait_job(admin, (await admin.post(f"/api/lessons/{lid}/generate", json={})).json()["job_id"], timeout=300)
+    assert j["status"] == "succeeded"
+    assert (await admin.get(f"/api/lessons/{lid}")).json()["status"] == "completed"
+
+
 async def test_editing_a_lesson_updates_its_section_of_the_chapter(admin, worker):
     """A lesson already in the course text is updated in place: the rest of the chapter stays and the section isn't duplicated."""
     await setup_fake(admin)

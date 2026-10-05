@@ -28,7 +28,8 @@ and comes back on the next visit if the server has not changed that page meanwhi
 
 Every lesson has a `status`: **working** («In corso») while it is being written, **completed** («Completata») once its
 text is merged into the subject's notes. A generation that writes into a chapter (`new_chapter`, `append`)
-sets it. It then stays completed, also when the lesson is edited again:
+sets it, unless «Segna la lezione come completata» is off in the «Integra appunti» dialog (on by default; `generate` takes
+`mark_completed`). It then stays completed, also when the lesson is edited again:
 only the user moves it back. The owner sees a «Completata» switch (on = completed) in the list and in the editor's top
 bar, and can turn it on or off at any time without a generation (`PATCH … {status}`); the shared read-only view shows
 the state as a pill.
@@ -62,7 +63,7 @@ points per page, sane coordinates, colour and width.
 | `GET /api/lessons/{id}/pdf` | the slides |
 | `GET /api/lessons/{id}/annotated.pdf` | slides and added pages in order with the strokes drawn on them |
 | `GET /api/lessons/{id}/notes.md` | the typed notes as the import receives them |
-| `POST /api/lessons/{id}/generate` `{guidelines?, save_guidelines, chapter_id?, placement?}` | starts the import → `{job_id}`; `placement`: `update` (default when the lesson has a chapter), `new_chapter` (default otherwise), `auto` |
+| `POST /api/lessons/{id}/generate` `{guidelines?, save_guidelines, chapter_id?, placement?, mark_completed=true}` | starts the import → `{job_id}`; `placement`: `update` (default when the lesson has a chapter), `new_chapter` (default otherwise), `auto` |
 
 ## Sharing a lesson
 
@@ -125,7 +126,7 @@ Each course has `guidelines` (text, up to 8000 characters; empty = the AI decide
 generated** from a lesson (`GenerateDialog`).
 The dialog is prefilled with the saved guidelines; when the box is empty a notice says
 *«Non hai inserito linee guida: genererò il testo in automatico…»* and the button reads «Integra appunti» («Integra con queste linee guida» with some). A checkbox keeps
-the text as the course's guidelines (also editable in the course settings). They reach the writing step as an instruction
+the text as the course's guidelines (also editable in the course settings), and another one, on by default, marks the lesson «Completata» when the text is written. They reach the writing step as an instruction
 (`compose.GUIDELINES_INTRO`) and the assistant's system prompt, and never override the reply format or the rules about
 formulas, pictures and not inventing content. An import started without saying anything about guidelines falls back to the
 course's saved ones.

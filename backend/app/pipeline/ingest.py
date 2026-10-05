@@ -337,7 +337,7 @@ async def ingest_job(ctx: JobContext) -> dict[str, Any]:
         await db.commit()
     cleanup_job_dirs(ctx.job_id)
     if ctx.payload.get("lesson_id"):
-        await lesson_pipeline.finish(int(ctx.payload["lesson_id"]), ctx.job_id, results)
+        await lesson_pipeline.finish(int(ctx.payload["lesson_id"]), ctx.job_id, results, mark_completed=ctx.payload.get("mark_completed", True))
     n_written = sum(1 for r in results if r.get("type") in ("new_chapter", "append"))
     await ctx.log(f"done: {len(groups)} group(s), {n_written} written into the course", stage="placement")
     return {"groups": results, "summary": summary}

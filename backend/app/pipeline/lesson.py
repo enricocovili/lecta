@@ -115,7 +115,7 @@ async def prepare(ctx: JobContext, upload_id: int, snapshot_blob: str) -> dict[s
     return summary
 
 
-async def finish(lesson_id: int, job_id: int, results: list[dict[str, Any]]) -> None:
+async def finish(lesson_id: int, job_id: int, results: list[dict[str, Any]], mark_completed: bool = True) -> None:
     """Remember what the latest generation produced, for the lesson's page."""
     async with SessionLocal() as db:
         lesson = (await db.execute(select(Lesson).where(Lesson.id == lesson_id))).scalar_one_or_none()
@@ -134,7 +134,7 @@ async def finish(lesson_id: int, job_id: int, results: list[dict[str, Any]]) -> 
         written = [r for r in results if r.get("type") in ("new_chapter", "append") and r.get("chapter_id")]
         if written and lesson.course_id == written[0].get("course_id"):
             lesson.chapter_id = int(written[0]["chapter_id"])
-        # Merged into the notes: the lesson is done.
-        if written:
+        # Merged into the notes: the lesson is done (unless the user asked to keep it in progress; a completed one stays so).
+        if written and mark_completed:
             lesson.status = "completed"
         await db.commit()

@@ -24,6 +24,7 @@ const pages = (n: number) => (n === 1 ? "1 pagina" : `${n} pagine`);
 export default function GenerateDialog({ lesson, beforeSend, onClose }: { lesson: LessonSummary; beforeSend?: () => Promise<unknown>; onClose: () => void }) {
   const [guidelines, setGuidelines] = useState(lesson.course_guidelines);
   const [save, setSave] = useState(true);
+  const [complete, setComplete] = useState(true);
   // "update" = the chapter the lesson already lives in, integrated with what is there; "new" = a chapter of its own (one lesson,
   // one chapter); "auto" = Lecta compares with the chapters of the subject; else a chapter id.
   const [where, setWhere] = useState(lesson.chapter_id ? "update" : "new");
@@ -41,6 +42,7 @@ export default function GenerateDialog({ lesson, beforeSend, onClose }: { lesson
       const r = await post<{ job_id: number }>(`/api/lessons/${lesson.id}/generate`, {
         guidelines: guidelines.trim(),
         save_guidelines: save,
+        mark_completed: complete,
         chapter_id: /^\d+$/.test(where) ? Number(where) : null,
         placement: where === "auto" ? "auto" : where === "update" ? "update" : "new_chapter",
       });
@@ -91,6 +93,10 @@ export default function GenerateDialog({ lesson, beforeSend, onClose }: { lesson
         <label className="check small">
           <input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} />
           Ricorda queste linee guida per la materia (si cambiano anche nelle impostazioni)
+        </label>
+        <label className="check small">
+          <input type="checkbox" checked={complete} onChange={(e) => setComplete(e.target.checked)} data-testid="generate-complete" />
+          Segna la lezione come completata
         </label>
         <label className="field">
           Dove

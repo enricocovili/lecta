@@ -205,6 +205,7 @@ test.describe.serial("Lezioni", () => {
     // No guidelines yet: the notice says the text will be generated automatically.
     await expect(dialog.getByTestId("guidelines-notice")).toContainText("genererò il testo in automatico");
     await expect(dialog.getByTestId("generate-go")).toContainText("Integra appunti");
+    await expect(dialog.getByTestId("generate-complete")).toBeChecked(); // «Segna la lezione come completata», on by default
     await dialog.getByTestId("guidelines").fill("Scrivi in modo discorsivo, con un esempio per ogni definizione.");
     await expect(dialog.getByTestId("guidelines-notice")).toHaveCount(0);
     await expect(dialog.getByTestId("generate-go")).toContainText("Integra con queste linee guida");

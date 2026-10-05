@@ -469,6 +469,8 @@ class GenerateIn(BaseModel):
     # "new_chapter" (one lesson, one chapter) or "auto" (Lecta compares with the existing chapters).
     # Left out: "update" when the lesson has a chapter, else "new_chapter".
     placement: Literal["update", "new_chapter", "auto"] | None = None
+    # Set the lesson «Completata» once its text is written into a chapter (the dialog's tick, on by default).
+    mark_completed: bool = True
 
 
 @router.post("/lessons/{lesson_id}/generate")
@@ -515,7 +517,7 @@ async def generate(lesson_id: int, body: GenerateIn, db: AsyncSession = Depends(
     (config.data_dir / "uploads" / str(up.id)).mkdir(parents=True, exist_ok=True)
     job = await jobs_svc.enqueue(
         db, "ingest", {"upload_id": up.id, "lesson_id": lesson.id, "lesson_snapshot": snap_blob, "guidelines": text,
-         **({"placement": placement} if chapter_id is None else {})},
+         "mark_completed": body.mark_completed, **({"placement": placement} if chapter_id is None else {})},
         title=f"Lezione: {lesson.title}"[:200], priority="ingest", course_id=course.id, commit=False,
     )
     up.job_id = job.id
