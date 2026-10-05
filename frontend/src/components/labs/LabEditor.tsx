@@ -4,9 +4,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { ApiError, api, del, fmtSize, get, patch, post, uploadRaw } from "../../lib/api";
 import { Icon } from "../icons";
+import NotesField from "../lessons/NotesField";
+import { Markdown } from "../workspace/Markdown";
 import { Confirm, Empty, Loading, Modal, toast, toastError } from "../ui";
-import CodeView from "./CodeView";
+import CodeView, { type Lines, type Mark } from "./CodeView";
 import { MAX_FILE_BYTES, baseName, fileIcon, fromDrop, fromInput, tree, worthUploading, type Folder, type LabAccess, type LabData, type LabFile, type Picked } from "./files";
+import { isLines, useLabComments, type LabComment, type SaveState } from "./useLabComments";
+
+type Comments = ReturnType<typeof useLabComments>;
+
+const SAVE_LABEL: Record<SaveState, string> = { saved: "Salvato", pending: "Da salvare", saving: "Salvataggio…", offline: "Non salvato · riprovo" };
 
 export default function LabPage({ courseId, number }: { courseId: number; number: number }) {
   const [lab, setLab] = useState<LabData | null>(null);
@@ -78,6 +85,28 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const root = useMemo(() => tree(files), [files]);
+  const store = useLabComments(base, String(lab.id), lab.comments);
+  const perFile = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const c of store.comments) m.set(c.file_id, (m.get(c.file_id) ?? 0) + 1);
+    return m;
+  }, [store.comments]);
+  const save = useCallback(async () => {
+    if (!(await store.flushAll())) toastError(new Error("Non riesco a salvare: riprovo appena torna la connessione"));
+  }, [store]);
+
+  // Ctrl+S saves the comments everywhere, also while typing, instead of the browser's "save page".
+  useEffect(() => {
+    if (!canEdit) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void save();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [canEdit, save]);
 
   // The first file opens by itself when none is chosen.
   useEffect(() => {
@@ -132,6 +161,7 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
   const remove = async (f: LabFile) => {
     await del(`${base}/lab/files/${f.id}`).catch(toastError);
     setFiles((cur) => cur.filter((x) => x.id !== f.id));
+    store.forgetFile(f.id);
     if (open?.id === f.id) choose(null);
   };
 
@@ -159,6 +189,12 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
         </div>
         <span className="les-course muted small">{lab.lesson.course_name}</span>
         <div className="wsb-actions">
+          {canEdit && (
+            <button type="button" className={`btn ghost icon les-save ${store.saveState}`} data-testid="lab-save-state" role="status" aria-live="polite" onClick={() => void save()} title={`${SAVE_LABEL[store.saveState]}. Salva ora (Ctrl+S); il salvataggio automatico avviene ogni minuto.`}>
+              <Icon name={store.saveState === "saved" ? "check" : store.saveState === "saving" ? "loader" : store.saveState === "pending" ? "save" : "alert-triangle"} className={store.saveState === "saving" ? "spin" : ""} />
+              <span className="sr-only">{SAVE_LABEL[store.saveState]}</span>
+            </button>
+          )}
           {lessonHref && (
             <a className="btn ghost" href={lessonHref} data-testid="lab-lesson" title="Apri la lezione teorica di questo laboratorio">
               <Icon name="notebook" />
@@ -209,12 +245,12 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
           {files.length === 0 ? (
             <p className="muted small lab-tree-empty">Nessun file.</p>
           ) : (
-            <FolderView folder={root} depth={0} open={open} choose={choose} canEdit={canEdit} onRename={setRenaming} onRemove={setRemoving} />
+            <FolderView folder={root} depth={0} open={open} choose={choose} canEdit={canEdit} counts={perFile} onRename={setRenaming} onRemove={setRemoving} />
           )}
         </aside>
         <main className="lab-main">
           {open ? (
-            <FileView key={`${open.id}:${open.version}`} file={open} base={base} />
+            <FileView key={`${open.id}:${open.version}`} file={open} base={base} store={store} canEdit={canEdit} />
           ) : (
             <div className="lab-empty">
               <Empty icon="flask">
@@ -248,8 +284,8 @@ export function LabEditor({ lab, access, base, lessonHref }: { lab: LabData; acc
   );
 }
 
-function FolderView({ folder, depth, open, choose, canEdit, onRename, onRemove }: {
-  folder: Folder; depth: number; open: LabFile | null; choose: (p: string) => void; canEdit: boolean;
+function FolderView({ folder, depth, open, choose, canEdit, counts, onRename, onRemove }: {
+  folder: Folder; depth: number; open: LabFile | null; choose: (p: string) => void; canEdit: boolean; counts: Map<number, number>;
   onRename: (f: LabFile) => void; onRemove: (f: LabFile) => void;
 }) {
   return (
@@ -260,7 +296,7 @@ function FolderView({ folder, depth, open, choose, canEdit, onRename, onRemove }
             <summary className="lab-tree-row lab-folder" style={{ paddingLeft: `${0.5 + depth * 0.85}rem` }}>
               <Icon name="folder" /> {d.name}
             </summary>
-            <FolderView folder={d} depth={depth + 1} open={open} choose={choose} canEdit={canEdit} onRename={onRename} onRemove={onRemove} />
+            <FolderView folder={d} depth={depth + 1} open={open} choose={choose} canEdit={canEdit} counts={counts} onRename={onRename} onRemove={onRemove} />
           </details>
         </li>
       ))}
@@ -269,6 +305,7 @@ function FolderView({ folder, depth, open, choose, canEdit, onRename, onRemove }
           <div className={`lab-tree-row lab-file ${open?.id === f.id ? "on" : ""}`} style={{ paddingLeft: `${0.5 + depth * 0.85}rem` }}>
             <button type="button" className="lab-file-name" onClick={() => choose(f.path)} title={f.path} data-testid="lab-file">
               <Icon name={fileIcon(f)} /> <span>{baseName(f.path)}</span>
+              {counts.get(f.id) ? <span className="lab-count" title={`${counts.get(f.id)} commenti`}>{counts.get(f.id)}</span> : null}
             </button>
             {canEdit && (
               <span className="lab-file-actions">
@@ -287,10 +324,13 @@ function FolderView({ folder, depth, open, choose, canEdit, onRename, onRemove }
   );
 }
 
-function FileView({ file, base }: { file: LabFile; base: string }) {
+function FileView({ file, base, store, canEdit }: { file: LabFile; base: string; store: Comments; canEdit: boolean }) {
   const raw = `${base}/lab/files/${file.id}/raw`;
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [active, setActive] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [reveal, setReveal] = useState<{ line: number } | null>(null);
   const isText = file.kind === "text" || file.kind === "notebook";
   useEffect(() => {
     if (!isText) return;
@@ -299,6 +339,19 @@ function FileView({ file, base }: { file: LabFile; base: string }) {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [base, file.id, isText]);
 
+  const mine = useMemo(() => sortComments(store.comments.filter((c) => c.file_id === file.id)), [store.comments, file.id]);
+  const marks = useMemo<Mark[]>(() => mine.flatMap((c) => (isLines(c.anchor) ? [{ id: c.id, from: c.anchor.from, to: c.anchor.to }] : [])), [mine]);
+
+  const start = (anchor: LabComment["anchor"]) => {
+    const id = store.create(file.id, anchor);
+    setActive(id);
+    setEditing(id);
+  };
+  const focus = (id: string) => {
+    setActive(id);
+    document.getElementById(`lab-comment-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  };
+
   return (
     <div className="lab-file-view">
       <div className="lab-file-head">
@@ -306,27 +359,131 @@ function FileView({ file, base }: { file: LabFile; base: string }) {
         <span className="mono lab-file-path" data-testid="lab-open-path">{file.path}</span>
         <span className="muted small">{[file.language && file.language !== "text" ? file.language : null, fmtSize(file.size)].filter(Boolean).join(" · ")}</span>
         <span className="grow" />
+        {isText && canEdit && <span className="muted small hide-mobile">Seleziona delle righe per commentarle</span>}
         <a className="btn ghost icon sm" href={raw} download aria-label="Scarica il file" title="Scarica il file">
           <Icon name="download" />
         </a>
       </div>
-      <div className="lab-file-body">
-        {error ? (
-          <div className="alert danger">{error}</div>
-        ) : isText ? (
-          content === null ? <Loading /> : <CodeView content={content} filename={file.path} />
-        ) : file.kind === "image" ? (
-          <div className="lab-image"><img src={raw} alt={file.path} /></div>
-        ) : (
-          <div className="lab-empty">
-            <Empty icon={fileIcon(file)}>
-              {file.kind === "pdf" ? "I PDF si leggono qui a breve: per ora scaricalo." : "Questo file non è testo: si può solo scaricare (non viene mai eseguito)."}{" "}
-              <a href={raw} download>Scarica {baseName(file.path)}</a>
-            </Empty>
+      <div className="lab-file-split">
+        <div className="lab-file-body">
+          {error ? (
+            <div className="alert danger">{error}</div>
+          ) : isText ? (
+            content === null ? (
+              <Loading />
+            ) : (
+              <CodeView
+                content={content}
+                filename={file.path}
+                marks={marks}
+                active={active}
+                reveal={reveal}
+                onMark={focus}
+                onComment={canEdit ? (lines: Lines) => start(lines) : undefined}
+              />
+            )
+          ) : file.kind === "image" ? (
+            <div className="lab-image"><img src={raw} alt={file.path} /></div>
+          ) : (
+            <div className="lab-empty">
+              <Empty icon={fileIcon(file)}>
+                {file.kind === "pdf" ? "I PDF si leggono qui a breve: per ora scaricalo." : "Questo file non è testo: si può solo scaricare (non viene mai eseguito)."}{" "}
+                <a href={raw} download>Scarica {baseName(file.path)}</a>
+              </Empty>
+            </div>
+          )}
+        </div>
+        <aside className="lab-comments" aria-label="Commenti del file" data-testid="lab-comments">
+          <div className="lab-comments-head">
+            <span className="section-label">Commenti</span>
+            {canEdit && (
+              <button type="button" className="btn ghost sm" onClick={() => start({})} data-testid="lab-comment-file" title="Un commento su tutto il file">
+                <Icon name="plus" /> Sul file
+              </button>
+            )}
           </div>
-        )}
+          {mine.length === 0 ? (
+            <p className="muted small lab-comments-empty">
+              {canEdit ? (isText ? "Seleziona delle righe del codice e premi «Commenta» (Ctrl+Alt+M), oppure commenta tutto il file." : "Commenta tutto il file con «Sul file».") : "Nessun commento."}
+            </p>
+          ) : (
+            mine.map((c) => (
+              <CommentCard
+                key={c.id}
+                comment={c}
+                active={active === c.id}
+                editing={editing === c.id}
+                canEdit={canEdit}
+                onPick={() => {
+                  if (editing === c.id) return;
+                  setActive(c.id);
+                  if (isLines(c.anchor)) setReveal({ line: c.anchor.from });
+                }}
+                onEdit={() => setEditing(c.id)}
+                onDone={() => {
+                  setEditing(null);
+                  if (!c.body.trim()) store.remove(c.id);
+                }}
+                onBody={(b) => store.setBody(c.id, b)}
+                onRemove={() => store.remove(c.id)}
+              />
+            ))
+          )}
+        </aside>
       </div>
     </div>
+  );
+}
+
+function sortComments(list: LabComment[]): LabComment[] {
+  const line = (c: LabComment) => (isLines(c.anchor) ? c.anchor.from : 0);
+  return [...list].sort((a, b) => line(a) - line(b) || a.created_at.localeCompare(b.created_at));
+}
+
+function where(c: LabComment): string {
+  if (!isLines(c.anchor)) return "Tutto il file";
+  return c.anchor.from === c.anchor.to ? `Riga ${c.anchor.from}` : `Righe ${c.anchor.from}–${c.anchor.to}`;
+}
+
+function CommentCard({ comment, active, editing, canEdit, onPick, onEdit, onDone, onBody, onRemove }: {
+  comment: LabComment; active: boolean; editing: boolean; canEdit: boolean;
+  onPick: () => void; onEdit: () => void; onDone: () => void; onBody: (b: string) => void; onRemove: () => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editing) box.current?.querySelector("textarea")?.focus();
+  }, [editing]);
+  const snippet = isLines(comment.anchor) ? comment.anchor.text.split("\n").find((l) => l.trim())?.trim() : null;
+  return (
+    <article id={`lab-comment-${comment.id}`} className={`lab-comment ${active ? "on" : ""}`} data-testid="lab-comment" onClick={onPick}>
+      <header className="lab-comment-head">
+        <span className="lab-comment-where">{where(comment)}</span>
+        {snippet && <code className="lab-comment-snippet">{snippet}</code>}
+        <span className="grow" />
+        {canEdit && (
+          <button type="button" className="btn ghost icon sm" onClick={(e) => { e.stopPropagation(); onRemove(); }} aria-label="Elimina il commento" title="Elimina il commento">
+            <Icon name="trash" />
+          </button>
+        )}
+      </header>
+      <div
+        ref={box}
+        className="lab-comment-body"
+        onBlur={(e) => {
+          if (editing && !e.currentTarget.contains(e.relatedTarget as Node | null)) onDone();
+        }}
+      >
+        {editing ? (
+          <NotesField value={comment.body} onChange={onBody} minHeight={72} label="Commento" placeholder="Il commento, in Markdown: elenchi con -, **grassetto**, `codice`, formule con $…$" />
+        ) : comment.body.trim() ? (
+          <div onClick={canEdit ? onEdit : undefined} className={canEdit ? "lab-comment-text editable" : "lab-comment-text"} title={canEdit ? "Clicca per modificare" : undefined}>
+            <Markdown text={comment.body} />
+          </div>
+        ) : (
+          canEdit && <button type="button" className="link muted small" onClick={onEdit}>Scrivi il commento…</button>
+        )}
+      </div>
+    </article>
   );
 }
 

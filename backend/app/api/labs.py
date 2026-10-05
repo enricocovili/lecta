@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import config
 from ..db import get_db
-from ..models import Chapter, Course, Lab, LabFile, Lesson
+from ..models import Chapter, Course, Lab, LabComment, LabFile, Lesson
 from ..security.auth import require_admin
 from ..services import blobs
 from ..services import labs as lb
@@ -34,6 +34,14 @@ def _now() -> datetime:
 
 def file_out(f: LabFile) -> dict[str, Any]:
     return {"id": f.id, "path": f.path, "kind": f.kind, "language": f.language, "size": f.size, "version": f.version, "updated_at": f.updated_at}
+
+
+def comment_out(c: LabComment) -> dict[str, Any]:
+    return {"id": c.id, "file_id": c.file_id, "anchor": c.anchor, "body": c.body, "version": c.version, "created_at": c.created_at, "updated_at": c.updated_at}
+
+
+async def _comments(db: AsyncSession, lab_id: int) -> list[LabComment]:
+    return list((await db.execute(select(LabComment).where(LabComment.lab_id == lab_id).order_by(LabComment.created_at, LabComment.id))).scalars())
 
 
 async def _files(db: AsyncSession, lab_id: int) -> list[LabFile]:
@@ -72,18 +80,16 @@ async def lab_out(db: AsyncSession, lab: Lab) -> dict[str, Any]:
             "course_name": course.name if course else "", "chapter": {"id": chapter.id, "title": chapter.title} if chapter else None,
         },
         "files": [file_out(f) for f in await _files(db, lab.id)],
+        "comments": [comment_out(c) for c in await _comments(db, lab.id)],
     }
 
 
 async def lab_counts(db: AsyncSession, lesson_ids: list[int]) -> dict[int, dict[str, int]]:
-    """lesson id -> {files} for the lessons that have a lab."""
-    rows = (
-        await db.execute(
-            select(Lab.lesson_id, func.count(LabFile.id)).outerjoin(LabFile, LabFile.lab_id == Lab.id)
-            .where(Lab.lesson_id.in_(lesson_ids)).group_by(Lab.lesson_id)
-        )
-    ).all()
-    return {lid: {"files": n} for lid, n in rows}
+    """lesson id -> {files, comments} for the lessons that have a lab."""
+    files = select(func.count(LabFile.id)).where(LabFile.lab_id == Lab.id).scalar_subquery()
+    comments = select(func.count(LabComment.id)).where(LabComment.lab_id == Lab.id).scalar_subquery()
+    rows = (await db.execute(select(Lab.lesson_id, files, comments).where(Lab.lesson_id.in_(lesson_ids)))).all()
+    return {lid: {"files": nf, "comments": nc} for lid, nf, nc in rows}
 
 
 # --------------------------------------------------------------------------- the lab
@@ -221,3 +227,53 @@ async def raw_file(lesson_id: int, file_id: int, db: AsyncSession = Depends(get_
         head = fh.read(16)
     return FileResponse(path, media_type=lb.media_type(f.kind, head), headers={**SAFE_HEADERS, "Content-Disposition": disposition})
 
+
+
+# --------------------------------------------------------------------------- comments
+
+
+class CommentSave(BaseModel):
+    file_id: int
+    anchor: dict[str, Any] = Field(default_factory=dict)
+    body: str = Field("", max_length=lb.MAX_COMMENT_CHARS)
+
+
+@router.put("/lessons/{lesson_id}/lab/comments/{comment_id}")
+async def save_comment(lesson_id: int, comment_id: str, body: CommentSave, db: AsyncSession = Depends(get_db)) -> dict:
+    """Create or replace a comment (the id comes from the page: sending the same comment twice never doubles it). A comment
+    stays on the file it was made on."""
+    if not lb.COMMENT_ID.match(comment_id):
+        raise HTTPException(status_code=422, detail="Id del commento non valido")
+    lab = await _lab(db, lesson_id)
+    try:
+        anchor = lb.clean_anchor(body.anchor)
+    except lb.AnchorError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    c = await db.get(LabComment, comment_id)
+    if c is not None and (c.lab_id != lab.id or c.file_id != body.file_id):
+        raise HTTPException(status_code=404, detail="Not Found")
+    if c is None:
+        await _file(db, lab, body.file_id)
+        if (await db.execute(select(func.count(LabComment.id)).where(LabComment.lab_id == lab.id))).scalar_one() >= lb.MAX_COMMENTS:
+            raise HTTPException(status_code=409, detail="Troppi commenti in questo laboratorio")
+        c = LabComment(id=comment_id, lab_id=lab.id, file_id=body.file_id, anchor=anchor, body=body.body.replace("\x00", ""))
+        db.add(c)
+    else:
+        c.anchor, c.body = anchor, body.body.replace("\x00", "")
+        c.version += 1
+        c.updated_at = _now()
+    lab.updated_at = _now()
+    await db.commit()
+    return comment_out(c)
+
+
+@router.delete("/lessons/{lesson_id}/lab/comments/{comment_id}")
+async def delete_comment(lesson_id: int, comment_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    """Remove a comment; one that is already gone is fine (a retried delete)."""
+    lab = await _lab(db, lesson_id)
+    c = await db.get(LabComment, comment_id) if lb.COMMENT_ID.match(comment_id) else None
+    if c is not None and c.lab_id == lab.id:
+        await db.delete(c)
+        lab.updated_at = _now()
+        await db.commit()
+    return {"ok": True}

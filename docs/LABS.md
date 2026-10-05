@@ -48,18 +48,39 @@ and `__pycache__`, `node_modules`, `__MACOSX` are left out of a folder; a file w
 notice says so). Each file has «Rinomina» (also into a folder: `src/main.c`) and «Elimina». The top bar shows
 «Pubblicazione: in sviluppo»: labs are private for now (#59).
 
+## Comments, written live
+
+`lab_comments`: Markdown with `$…$` maths (KaTeX), on a file. A comment sits on **lines** (anchor `{from, to, text}`,
+1-based, with the text of those lines so it can find them again after an edit) or on the **whole file** (`{}`). Its id is a
+UUID made by the page (`crypto.randomUUID`, or `getRandomValues` on a plain-HTTP page): `PUT` creates or replaces it, so a
+comment written offline and sent twice is never doubled. A comment stays on its file and goes with it.
+
+On the page: select lines of the code and press the **«Commenta»** bubble over the selection (or Ctrl+Alt+M); «Sul file»
+comments the whole file. The comments of the open file are listed on the right, whole-file ones first, then by line; the
+commented lines are tinted in the code with a dot in the gutter (the number of comments when several start there), and the
+dot, the card and the code point at each other. A card is written in the notes field of the lessons (lists go on with
+Enter, Ctrl+B / Ctrl+I) and shown rendered when it loses the focus (Escape); an empty comment that loses the focus goes away.
+The tree shows how many comments each file has.
+
+Saving works as in the lessons (`components/labs/useLabComments.ts`): edits apply at once, are sent **once a minute, on
+Ctrl+S** and when the tab is hidden; what is unsaved is mirrored in `localStorage` (`lecta:lab:<id>:unsaved`, also deletes)
+and retried with a growing delay, and comes back on the next visit if the server has not changed that comment meanwhile.
+The save state is the same icon as in the lesson editor. A comment is sent once it says something.
+
 ## API (admin only, like the rest)
 
 The routes hang off the lesson, so a share link of the lesson can reach the same lab.
 
 | call | |
 |------|-|
-| `GET /api/lessons/{id}/lab` · `GET /api/courses/{course_id}/lessons/{n}/lab` | the lab: `lesson` (id, number, title, course, chapter) and `files` (no content) · 404 when the lesson has none |
+| `GET /api/lessons/{id}/lab` · `GET /api/courses/{course_id}/lessons/{n}/lab` | the lab: `lesson` (id, number, title, course, chapter), `files` (no content) and `comments` · 404 when the lesson has none |
 | `POST /api/lessons/{id}/lab` | makes the lab if the lesson has none, else returns it |
 | `DELETE /api/lessons/{id}/lab` | the lab and its files |
 | `POST /api/lessons/{id}/lab/files?path=` | raw body: one file (the page sends several in a row); same path = replace → the file with `replaced` |
 | `GET /api/lessons/{id}/lab/files/{fid}` | the file with `content` (text and notebooks; `null` for the others) |
 | `PATCH /api/lessons/{id}/lab/files/{fid}` `{path}` · `DELETE` | rename (a text file takes the new name's language; a taken name is 409) · remove |
 | `GET /api/lessons/{id}/lab/files/{fid}/raw` | the file to download (text in UTF-8), always as an attachment |
+| `PUT /api/lessons/{id}/lab/comments/{uuid}` `{file_id, anchor, body}` | create or replace a comment → the comment with its `version`; another file or lab's comment is 404 |
+| `DELETE /api/lessons/{id}/lab/comments/{uuid}` | remove it (already gone is fine) |
 
-`GET /api/lessons/{id}` tells whether the lesson has a lab: `lab: {files}` or `null`.
+`GET /api/lessons/{id}` tells whether the lesson has a lab: `lab: {files, comments}` (counts) or `null`.

@@ -120,3 +120,32 @@ def media_type(kind: str, blob_head: bytes | None) -> str:
         if sniffed in IMAGES:
             return IMAGES[sniffed]
     return "application/octet-stream"
+
+
+# --------------------------------------------------------------------------- comments
+
+MAX_COMMENT_CHARS = 20_000
+MAX_COMMENTS = 5000
+MAX_ANCHOR_TEXT = 4000
+COMMENT_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+class AnchorError(ValueError):
+    pass
+
+
+def clean_anchor(raw: object) -> dict:
+    """Where a comment sits: `{}` (the whole file) or `{from, to, text}` (lines, 1-based, with their text)."""
+    if raw in (None, {}):
+        return {}
+    if not isinstance(raw, dict):
+        raise AnchorError("Posizione del commento non valida")
+    if "from" in raw:
+        a, b = raw.get("from"), raw.get("to", raw.get("from"))
+        if not all(isinstance(x, int) and not isinstance(x, bool) for x in (a, b)) or not 1 <= a <= b <= 10_000_000:
+            raise AnchorError("Righe del commento non valide")
+        text = raw.get("text", "")
+        if not isinstance(text, str):
+            raise AnchorError("Testo delle righe non valido")
+        return {"from": a, "to": b, "text": text[:MAX_ANCHOR_TEXT]}
+    raise AnchorError("Posizione del commento non valida")

@@ -249,6 +249,23 @@ class LabFile(Base):
     updated_at: Mapped[datetime] = _now()
 
 
+class LabComment(Base):
+    """A comment on a lab file, written live: on some lines (anchor `{from, to, text}`, 1-based, with the text of those lines so
+    it can find them again after an edit) or on the whole file (`{}`). The id is made by the page, so a comment written
+    offline is saved later without ever being doubled."""
+
+    __tablename__ = "lab_comments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    lab_id: Mapped[int] = mapped_column(ForeignKey("labs.id", ondelete="CASCADE"), index=True)
+    file_id: Mapped[int] = mapped_column(ForeignKey("lab_files.id", ondelete="CASCADE"), index=True)
+    anchor: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
+    body: Mapped[str] = mapped_column(Text, default="", server_default="")  # Markdown with $…$ maths
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = _now()
+
+
 # --------------------------------------------------------------------------- jobs
 
 

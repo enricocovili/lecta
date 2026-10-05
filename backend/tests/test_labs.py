@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 
 import pytest
 
@@ -55,6 +56,15 @@ def test_files_are_recognised_by_their_bytes_and_names():
     assert lb.classify("draw.svg", b"<svg onload='x()'/>").language == "xml"
 
 
+def test_comment_anchors_are_validated():
+    assert lb.clean_anchor({}) == {} and lb.clean_anchor(None) == {}
+    assert lb.clean_anchor({"from": 3, "to": 5, "text": "int x;", "extra": 1}) == {"from": 3, "to": 5, "text": "int x;"}
+    assert lb.clean_anchor({"from": 2}) == {"from": 2, "to": 2, "text": ""}
+    for bad in ([], "x", {"from": 0}, {"from": 5, "to": 3}, {"from": "1"}, {"from": True}, {"from": 1, "text": 3}, {"page": 1}):
+        with pytest.raises(lb.AnchorError):
+            lb.clean_anchor(bad)
+
+
 # --------------------------------------------------------------------------- the API
 
 
@@ -72,7 +82,7 @@ async def test_a_lab_belongs_to_its_lesson(admin):
     by_number = (await admin.get(f"/api/courses/{course['id']}/lessons/{lesson['number']}/lab")).json()
     assert by_number["id"] == first["id"]
     await upload(admin, lid, "a.c", "int x;")
-    assert (await admin.get(f"/api/lessons/{lid}")).json()["lab"] == {"files": 1}
+    assert (await admin.get(f"/api/lessons/{lid}")).json()["lab"] == {"files": 1, "comments": 0}
 
     # The lab goes with its lesson.
     assert (await admin.delete(f"/api/lessons/{lid}")).status_code == 200
@@ -149,3 +159,48 @@ async def test_another_lessons_file_is_not_reachable(admin):
     assert (await admin.get(f"/api/lessons/{b['id']}/lab/files/{f['id']}")).status_code == 404
     assert (await admin.get(f"/api/lessons/{b['id']}/lab/files/{f['id']}/raw")).status_code == 404
     assert (await admin.delete(f"/api/lessons/{b['id']}/lab/files/{f['id']}")).status_code == 404
+
+
+async def test_comments_are_written_live_and_never_doubled(admin):
+    _, lesson, _ = await new_lab(admin)
+    lid = lesson["id"]
+    f = (await upload(admin, lid, "main.c", "int a;\nint b;\nint c;\n")).json()
+    other = (await upload(admin, lid, "other.c", "x")).json()
+    cid = str(uuid.uuid4())
+    url = f"/api/lessons/{lid}/lab/comments/{cid}"
+
+    r = await admin.put(url, json={"file_id": f["id"], "anchor": {"from": 2, "to": 3, "text": "int b;\nint c;"}, "body": "Due variabili $x^2$"})
+    assert r.status_code == 200, r.text
+    assert r.json()["version"] == 1 and r.json()["anchor"]["from"] == 2
+    # The same comment sent again (a retry, an edit) is the same comment.
+    r = await admin.put(url, json={"file_id": f["id"], "anchor": {"from": 2, "to": 3, "text": "int b;\nint c;"}, "body": "Due variabili, poi una terza"})
+    assert r.json()["version"] == 2
+    whole = str(uuid.uuid4())
+    await admin.put(f"/api/lessons/{lid}/lab/comments/{whole}", json={"file_id": f["id"], "body": "Il file del primo esercizio"})
+    lab = (await admin.get(f"/api/lessons/{lid}/lab")).json()
+    assert [(c["id"], c["body"]) for c in lab["comments"]] == [(cid, "Due variabili, poi una terza"), (whole, "Il file del primo esercizio")]
+    assert (await admin.get(f"/api/lessons/{lid}")).json()["lab"] == {"files": 2, "comments": 2}
+
+    # A comment stays on its file, its id must be an id, its lines must make sense.
+    assert (await admin.put(url, json={"file_id": other["id"], "body": "x"})).status_code == 404
+    assert (await admin.put(f"/api/lessons/{lid}/lab/comments/not-an-id", json={"file_id": f["id"]})).status_code == 422
+    assert (await admin.put(f"/api/lessons/{lid}/lab/comments/{uuid.uuid4()}", json={"file_id": f["id"], "anchor": {"from": 4, "to": 1}})).status_code == 422
+    assert (await admin.put(f"/api/lessons/{lid}/lab/comments/{uuid.uuid4()}", json={"file_id": 999999})).status_code == 404
+
+    # Deleting twice is fine; deleting the file takes its comments away.
+    assert (await admin.delete(url)).status_code == 200
+    assert (await admin.delete(url)).status_code == 200
+    await admin.delete(f"/api/lessons/{lid}/lab/files/{f['id']}")
+    assert (await admin.get(f"/api/lessons/{lid}/lab")).json()["comments"] == []
+
+
+async def test_another_labs_comment_is_not_reachable(admin):
+    _, a, _ = await new_lab(admin)
+    _, b, _ = await new_lab(admin)
+    fa = (await upload(admin, a["id"], "a.c", "int a;")).json()
+    fb = (await upload(admin, b["id"], "b.c", "int b;")).json()
+    cid = str(uuid.uuid4())
+    await admin.put(f"/api/lessons/{a['id']}/lab/comments/{cid}", json={"file_id": fa["id"], "body": "mio"})
+    assert (await admin.put(f"/api/lessons/{b['id']}/lab/comments/{cid}", json={"file_id": fb["id"], "body": "rubato"})).status_code == 404
+    await admin.delete(f"/api/lessons/{b['id']}/lab/comments/{cid}")
+    assert [c["body"] for c in (await admin.get(f"/api/lessons/{a['id']}/lab")).json()["comments"]] == ["mio"]

@@ -277,3 +277,141 @@ body.ws-page .lab {
   border: 2px dashed var(--accent-line);
   pointer-events: none;
 }
+
+/* ------------------------------------------------------------------ comments */
+
+.lab-count {
+  flex: none;
+  margin-left: auto;
+  min-width: 1.2rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.lab-file-split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+}
+.lab-comments {
+  overflow: auto;
+  border-left: 1px solid var(--border);
+  background: var(--bg-elev);
+  padding: 0.6rem 0.7rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.lab-comments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lab-comments-head .section-label {
+  margin: 0;
+}
+.lab-comments-empty {
+  margin: 0.25rem 0;
+}
+.lab-comment {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: 0.45rem 0.55rem 0.55rem;
+  scroll-margin: 0.6rem;
+}
+.lab-comment.on {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.lab-comment-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.6rem;
+  font-size: 0.8rem;
+}
+.lab-comment-where {
+  flex: none;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.lab-comment-snippet {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  color: var(--fg-faint);
+}
+.lab-comment-body {
+  margin-top: 0.25rem;
+}
+.lab-comment .les-notes-field {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.92rem;
+  background: var(--bg-elev);
+  color: var(--fg);
+}
+.lab-comment-text {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.lab-comment-text > :first-child {
+  margin-top: 0;
+}
+.lab-comment-text > :last-child {
+  margin-bottom: 0;
+}
+.lab-comment-text.editable {
+  cursor: text;
+}
+
+/* In the code: commented lines, the dots in their gutter, the «Commenta» bubble over a selection. */
+.lab-code .cm-lab-mark {
+  background: color-mix(in srgb, var(--warn-soft) 70%, transparent);
+}
+.lab-code .cm-lab-mark.cm-lab-on {
+  background: color-mix(in srgb, var(--warn) 28%, transparent);
+}
+.lab-code .cm-lab-gutter {
+  width: 1.1rem;
+  cursor: pointer;
+}
+.lab-code .cm-lab-gutter .cm-gutterElement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cm-lab-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--warn);
+  color: #fff;
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.cm-lab-dot.on {
+  background: var(--accent);
+}
+.lab-code .cm-tooltip:has(.cm-lab-ask) {
+  border: 0;
+  background: none;
+}
+.cm-lab-ask {
+  box-shadow: var(--shadow-pop);
+  background: var(--primary);
+  color: var(--primary-fg);
+  border-color: var(--primary);
+}
