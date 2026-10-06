@@ -23,7 +23,7 @@ Arguments (`$ARGUMENTS`):
    **stop**: don't work around the board.
 2. `git status` must be clean and the branch `main`. If the tree is dirty, stop and report; never fold someone
    else's changes into an issue's commits.
-3. Check the stack for the tests (`docker compose ps`; see README "Tests"). If Docker isn't available, say
+3. Check the stack for the tests (`docker compose ps`; see `docs/DEVELOPMENT.md` "Tests"). If Docker isn't available, say
    which checks you could not run and continue only with issues you can verify another way.
 
 ## 1. Read the board
@@ -72,7 +72,7 @@ For each step (the issue itself, or each sub-issue):
 1. Implement the smallest change that satisfies the issue as written. Match the surrounding code; no drive-by
    refactors. Something unrelated found on the way → `board.sh new …` (see "Recording new work" in `CLAUDE.md`),
    not part of this commit.
-2. Update the docs that describe it (README, `docs/`) in the same commit.
+2. Update the docs that describe it (`docs/`, and the README when the presentation changes) in the same commit.
 3. Add or adjust tests: a bug gets a test that failed before the fix.
 4. Run the checks, narrowest first:
    * `scripts/test.sh` (add `DEV=1` to run against `./backend`), for any backend change;

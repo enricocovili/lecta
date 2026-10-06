@@ -36,7 +36,7 @@ export default function BackupSettings() {
 scripts/restore.sh <archivio>  # ferma lo stack, ripristina DB e volumi, lo riavvia`}</pre>
         <p className="set-help">
           L'archivio contiene il dump di Postgres e i volumi <code>app-data</code> e <code>secrets</code> (lì c'è la chiave che cifra le tue chiavi API: conservalo
-          al sicuro). Le cartelle di build non servono: vengono ricreate alla prossima compilazione. Vedi README → Backup and restore.
+          al sicuro). Le cartelle di build non servono: vengono ricreate alla prossima compilazione. Vedi docs/DEPLOY.md → Backup and restore.
         </p>
       </SetCard>
     </div>

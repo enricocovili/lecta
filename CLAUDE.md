@@ -1,7 +1,7 @@
 # Lecta — working notes for Claude Code
 
-See `README.md` for running, testing and architecture, and `docs/` for the plan,
-decisions and status.
+See `README.md` for what Lecta is and `docs/` for everything else: running (`DEPLOY.md`), tests
+(`DEVELOPMENT.md`), architecture, the plan, decisions and status.
 
 ## Commits
 
@@ -11,7 +11,7 @@ decisions and status.
   the next one.
 * Split mixed work before committing: stage by file or hunk (`git add -p`) so a
   fix, a refactor and a feature end up in separate commits.
-* Keep code, tests and the docs that describe it (README, `docs/`) in the same
+* Keep code, tests and the docs that describe it (`docs/`, and the README when the presentation changes) in the same
   commit as the change they belong to.
 * Message style follows the history: a short imperative-free summary prefixed by
   the area (`Lessons: …`, `PDF: …`, `Draft: …`, `Writing prompt: …`), stating the

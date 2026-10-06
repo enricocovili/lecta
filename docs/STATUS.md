@@ -141,7 +141,7 @@ The app was called Appunti until 2026-10-02 (DECISIONS 91–92). What changed an
 | anonymous users reach only published listings/PDFs | `tests/test_boundary.py`: every route × every method (with and without bodies, forged cookies) → 404; public endpoints only expose published snapshots; admin pages 404 in the browser (`e2e 01`) |
 | a lesson → whole pipeline → compiling chapter | `tests/test_ingest_e2e.py::test_a_lesson_into_a_new_course_writes_a_compiling_chapter` (slides, notes with math and code, an annotated slide, a page written by hand: parallel reading, compile check, written directly, sources linked, full build ok), and the same flow in the browser (`e2e 03`) |
 | categorisation with embeddings on and off | `tests/test_categorization.py::test_placement_in_both_modes[embeddings-on / embeddings-off]`, plus the cross-lingual, incremental re-embedding and slow-model fallback tests |
-| README: running, service name + port, backup/restore, adding a provider, architecture | `README.md` |
+| docs: running, service name + port, backup/restore, adding a provider, architecture | `docs/DEPLOY.md`, `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md` |
 
 Test totals at the final commit: **83 backend tests** (`scripts/test.sh`),
 **11 browser tests** (`scripts/e2e.sh`, Playwright/Chromium), and
@@ -149,21 +149,10 @@ Test totals at the final commit: **83 backend tests** (`scripts/test.sh`),
 512 MB streaming upload through the proxy). The backup/restore scripts were
 tested with a full round trip on an isolated copy of the stack.
 
-## How to run
-
-```sh
-docker network inspect webnet >/dev/null 2>&1 || docker network create webnet
-docker compose up -d --build
-docker compose logs backend | grep "setup code"
-```
-
-Tests: `scripts/test.sh` (backend), `scripts/e2e.sh` (browser, isolated stack),
-`scripts/smoke.sh [--full]` (deployment). Details are in the README.
-
 ## Open work
 
 Open work, ideas and bugs are tracked on the [Features board](https://github.com/users/enricocovili/projects/1); see
-"Planning" in the README. Known gaps in what was built:
+"Planning" in `docs/DEVELOPMENT.md`. Known gaps in what was built:
 
 * **Real AI providers and models**: the Anthropic, OpenAI and Gemini adapters were never called against the real
   services; quality, cost and latency of the import, of the assistant and of lessons with strokes as pictures are
@@ -191,6 +180,7 @@ Open work, ideas and bugs are tracked on the [Features board](https://github.com
 
 ## Where things are
 
+* Running: `docs/DEPLOY.md` · tests: `docs/DEVELOPMENT.md` · architecture: `docs/ARCHITECTURE.md`
 * Design: `docs/PLAN.md` · decisions and alternatives: `docs/DECISIONS.md`
 * AI gateway: `backend/app/egress/` · pipelines: `backend/app/pipeline/`
 * Compile service: `latex/compile_server.py` · frontend proxy: `frontend/server.mjs`
