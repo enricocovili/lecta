@@ -238,6 +238,12 @@ what to do:
   `main.tex`, `preamble.tex`, figures), `grep`, `find_related` (hybrid retrieval),
   the uploaded sources (`list_sources`, `read_source`, `view_source_page`: it can
   *look* at a slide or a photo) and images (`view_image`).
+* **Takes pictures from the slides**: when the import left a figure out (a slide read only as text,
+  or a picture dropped with the logos and decorations), ask for it in the chat. `view_source_page` also
+  lists the pictures on a page (embedded images and drawings, the ones the import dropped included, with
+  their position) and `extract_source_image` saves one of them, any other part of the page or the whole
+  page as `images/NAME.png|jpg`, which the assistant then places with `\lectaimage`. The import's
+  filters stay as they are.
 * **Changes everything**: `edit_file` (exact search/replace), `write_file`,
   `create_chapter`, `rename_chapter`, `move_chapter`, `delete_chapter`, `delete_file`,
   `rename_file`, the preamble and `main.tex` (its chapter list stays managed); and

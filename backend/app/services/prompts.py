@@ -254,6 +254,11 @@ How to work:
   where something belongs. Compare with the sources (list_sources, read_source, view_source_page) when correctness or
   completeness matters. Never invent content that neither the course nor the sources support; if you are not sure,
   say so or leave a \\review{{...}} note.
+- A picture missing from the text (the import sometimes reads a slide only as text, or leaves a figure out together
+  with logos and decorations) can be taken from the sources: find the page (read_source), look at it with
+  view_source_page, which also lists the pictures on the page, save the one you need with extract_source_image (a
+  listed region, a bbox of your own, or the whole page), check the picture you get back and place it with
+  \\lectaimage… where the text talks about it.
 - Prefer small, exact edits (edit_file: `search` copied exactly from the file, once) over rewriting files. Use
   write_file for new files or real rewrites, create_chapter for new chapters. After risky or structural changes
   (tables, TikZ, new environments, moved chapters) verify: course_overview, and check_build once at the end.

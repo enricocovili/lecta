@@ -521,3 +521,13 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      The rectangle takes only the strokes it **encloses** (as in Xournal++), so selecting the writing inside a hand-drawn box
      does not take the box. Deleting the selection is an ordinary erase (one step). Moves are kept on the page, since the server
      draws the strokes on the slide and anything off it would be lost in the annotated PDF.
+
+## Assistant
+
+108. **A picture the import left out is taken back by the assistant, not by loosening the filters (#61).** The import's
+     decoration filters (logos, repeated theme graphics, header/footer pictures, pictures too small or too large) stay as
+     they are: they drop far more junk than figures. When a figure is missing, the course assistant looks at the page,
+     which lists every picture on it computed afresh from the PDF without those filters, and saves the one asked for (or
+     a region it chooses, or the whole page) into `images/`. The list is recomputed on demand rather than read from the
+     import's records, so it does not depend on what an import kept and numbers the same regions on every call. *Why:* only the student knows which dropped picture matters; a tool on request costs nothing when unused and
+     never puts a logo in the notes by itself.

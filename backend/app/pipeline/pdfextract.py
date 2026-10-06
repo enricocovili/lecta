@@ -399,6 +399,68 @@ def _render(page: fitz.Page, side: int) -> Image.Image:
     return _pix_image(page.get_pixmap(matrix=fitz.Matrix(s, s), alpha=False))
 
 
+# --------------------------------------------------------------------------- one page on demand (the assistant)
+
+REGION_MIN_AREA = 0.004
+MAX_REGIONS = 12
+NOT_PICTURES = {"empty", "rule", "rule or box", "text box", "table grid", "page frame/background"}
+
+
+def _page_regions(page: fitz.Page) -> list[dict[str, Any]]:
+    sc = _scan(page)
+    prect = sc["rect"]
+    found: list[dict[str, Any]] = []
+    for im in sc["images"]:
+        if im["area"] >= REGION_MIN_AREA:
+            found.append({"bbox": im["bbox"], "origin": "image", "xref": im["xref"] if im["axis"] and not im["clipped"] else None})
+    vectors, _info = _vector_regions(page, prect, sc["lines"], sc["drawings"])
+    for v in vectors:
+        if v["area"] >= REGION_MIN_AREA and v.get("reason") not in NOT_PICTURES:
+            found.append({"bbox": v["bbox"], "origin": "vector", "xref": None})
+    out: list[dict[str, Any]] = []
+    for r in sorted(found, key=lambda r: -_area(r["bbox"])):
+        if len(out) < MAX_REGIONS and all(o["bbox"] != r["bbox"] for o in out):
+            out.append(r)
+    out.sort(key=lambda r: (r["bbox"][1], r["bbox"][0]))
+    return [{"n": k, **r} for k, r in enumerate(out, start=1)]
+
+
+def page_regions(data: bytes, page_no: int) -> list[dict[str, Any]]:
+    """The pictures on one page of a PDF, without the import's decoration filters (logos, repeated graphics and
+    header/footer pictures are listed too): embedded images and clusters of vector drawings, in reading order, as
+    {n, bbox (fractions of the page, x0 y0 x1 y1 from the top left), origin, xref}."""
+    with _LOCK:
+        doc = fitz.open(stream=data, filetype="pdf")
+        try:
+            if not 1 <= page_no <= doc.page_count:
+                raise ValueError(f"the PDF has {doc.page_count} pages")
+            return _page_regions(doc[page_no - 1])
+        finally:
+            doc.close()
+
+
+def crop_page(data: bytes, page_no: int, bbox: list[float] | None = None, region: int | None = None) -> tuple[bytes, str, int, int]:
+    """(bytes, ext, width, height) of a picture on one page: region `n` of page_regions (the embedded image itself
+    when that is safe), a bbox in fractions of the page, or the whole page."""
+    with _LOCK:
+        doc = fitz.open(stream=data, filetype="pdf")
+        try:
+            if not 1 <= page_no <= doc.page_count:
+                raise ValueError(f"the PDF has {doc.page_count} pages")
+            page = doc[page_no - 1]
+            xref = None
+            if region is not None:
+                regions = _page_regions(page)
+                hit = next((r for r in regions if r["n"] == region), None)
+                if hit is None:
+                    raise ValueError(f"page {page_no} has {len(regions)} pictures" if regions else f"page {page_no} has no pictures: use a bbox")
+                bbox, xref = hit["bbox"], hit["xref"]
+            blob, ext, w, h = _crop(doc, page, bbox or [0.0, 0.0, 1.0, 1.0], xref)
+            return blobs.read_bytes(blob), ext, w, h
+        finally:
+            doc.close()
+
+
 # --------------------------------------------------------------------------- document
 
 

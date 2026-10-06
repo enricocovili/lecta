@@ -47,6 +47,14 @@ The assistant is an agent: it lists/reads/searches every file and source of the 
 renames and deletes files and chapters, edits `main.tex` and the preamble, and checks the build. Its changes are
 **applied immediately**; every turn can be **undone** with one click. There is no approval step.
 
+Pictures the import left out are taken from the sources on request. `view_source_page` on a PDF page also lists the
+pictures on it (`pdfextract.page_regions`: embedded images and clusters of vector drawings, without the import's
+decoration filters, numbered in reading order with their bbox in fractions of the page). `extract_source_image`
+(`source_file_id`, `page`, then `region` from that list, or `bbox` `[x0, y0, x1, y1]`, or neither for the whole page;
+optional `name`) saves it as `images/NAME.png|jpg` (the embedded image itself when it is safe, else a 200 DPI render;
+a photo is cropped), returns the saved picture so the model can check the crop, and is undone with the turn like any
+other write. It is a write tool: not available in `explain` and `review`.
+
 Sessions (unchanged paths):
 * `GET  /api/chat/sessions?course_id=` → list.
 * `POST /api/chat/sessions` `{course_id, chapter_id?}` → session.

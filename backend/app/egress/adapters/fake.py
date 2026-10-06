@@ -253,7 +253,11 @@ class FakeAdapter(Adapter):
             raise transport.ProviderReplyError("bad_request", "fake provider failure")
         path = m.get("chapter_path") or m.get("first_chapter_path")
         chap_match = re.search(r"nuovo capitolo:\s*(.+)", msg, re.I)
+        img_match = re.search(r"FAKE:IMAGE (\d+) (\d+) (\d+)", msg)
         if not results:
+            if img_match and mode not in ("explain", "review"):
+                sid, page, region = (int(g) for g in img_match.groups())
+                return done("Prendo la figura dalla slide. ", [call("extract_source_image", source_file_id=sid, page=page, region=region)])
             if chap_match and mode not in ("explain", "review"):
                 return done("Creo il capitolo. ", [call("create_chapter", title=chap_match.group(1).strip()[:80],
                                                           content="\\section{Introduzione}\nTesto iniziale del capitolo.\n")])
@@ -266,6 +270,10 @@ class FakeAdapter(Adapter):
         fenced = re.search(r"<<<UNTRUSTED-[0-9a-f]+>>>[^\n]*\n(.*)\n<<<END-[0-9a-f]+>>>", last.text or "", re.S)
         source = fenced.group(1) if fenced else ""
         suggestions = '\n\n```suggestions\n["Riassumi il capitolo", "Aggiungi un altro esempio"]\n```'
+        if last.tool_name == "extract_source_image":
+            saved = re.search(r"Salvata (images/\S+)", last.text or "")
+            return done(f"Ho salvato la figura in {saved.group(1)}." if saved and not last.is_error
+                        else "Non sono riuscito a prendere la figura: " + (last.text or "")[:120])
         if last.tool_name == "create_chapter":
             return done("Ho creato il capitolo con una prima sezione." + suggestions)
         if mode == "review":

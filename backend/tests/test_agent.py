@@ -173,3 +173,21 @@ async def test_no_model_assigned_is_a_clear_409(admin):
     await admin.put("/api/settings/roles", json={"chat": {"primary": {"provider_id": None, "model": None}}})
     r = await admin.post(f"/api/chat/sessions/{s['id']}/messages", json={"content": "ciao"})
     assert r.status_code == 409 and "Models" in r.json()["detail"]
+
+
+async def test_a_picture_taken_from_a_slide_is_undone_with_the_turn(admin):
+    from .test_agent_tools import _link_slides
+
+    await setup_fake(admin)
+    c, ch, s = await _course(admin, "Algebra figura")
+    sid = await _link_slides(c["id"], ch["id"])
+    reply, events = await _ask(admin, s, ch, f"Metti la figura della slide 2 FAKE:IMAGE {sid} 2 2")
+    tool = next(d for e, d in events if e == "tool")
+    assert tool["name"] == "extract_source_image" and tool["label"] == f"Prende un'immagine dalla pagina 2 della fonte n. {sid}"
+    final = next(d for e, d in events if e == "done")["reply"]
+    assert "images/lezione-3-p2.png" in final["content"]
+    assert final["change"]["files"] == [{"path": "images/lezione-3-p2.png", "chapter_id": None, "op": "create", "added": 0, "removed": 0, "hunks": []}]
+    files = lambda: admin.get(f"/api/courses/{c['id']}/files")  # noqa: E731
+    assert "images/lezione-3-p2.png" in {f["path"] for f in (await files()).json()["files"]}
+    assert (await admin.post(f"/api/chat/replies/{reply['id']}/undo")).status_code == 200
+    assert "images/lezione-3-p2.png" not in {f["path"] for f in (await files()).json()["files"]}

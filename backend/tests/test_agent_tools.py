@@ -99,3 +99,90 @@ async def test_sources_of_other_courses_are_not_readable(course):
     assert (await run_tool(ctx(course), "list_sources", {})).ok
     assert t.specs_for("review") and "write_file" not in {s.name for s in t.specs_for("review")}
     assert "write_file" in {s.name for s in t.specs_for("ask")}
+
+
+def _slides_with_logo() -> bytes:
+    """Three slides with the same logo in the corner (decoration the import drops); the second also has a figure."""
+    import io
+
+    import fitz
+    from PIL import Image
+
+    from tests.fixtures import block_diagram
+
+    logo = io.BytesIO()
+    Image.new("RGB", (120, 120), (200, 30, 30)).save(logo, "PNG")
+    fig = io.BytesIO()
+    block_diagram().save(fig, "PNG")
+    doc = fitz.open()
+    for n in range(3):
+        p = doc.new_page(width=842, height=595)
+        p.insert_text((60, 90), f"Slide {n + 1}", fontsize=32)
+        p.insert_image(fitz.Rect(740, 20, 820, 100), stream=logo.getvalue())
+        if n == 1:
+            p.insert_image(fitz.Rect(120, 170, 720, 420), stream=fig.getvalue())
+    return doc.tobytes()
+
+
+async def _link_slides(course_id: int, chapter_id: int) -> int:
+    """The slides of a lesson, as the import leaves them: a source of the course's chapter."""
+    from app.db import SessionLocal
+    from app.models import SourceFile, SourceLink, Upload
+    from app.services import blobs
+
+    data = _slides_with_logo()
+    async with SessionLocal() as db:
+        up = Upload(status="done", target_course_id=course_id, via="lesson")
+        db.add(up)
+        await db.flush()
+        sf = SourceFile(upload_id=up.id, name="Lezione 3.pdf", kind="pdf", size=len(data), blob=blobs.put_bytes(data), pages=3)
+        db.add(sf)
+        await db.flush()
+        db.add(SourceLink(source_file_id=sf.id, course_id=course_id, chapter_id=chapter_id))
+        await db.commit()
+        return sf.id
+
+
+@pytest.fixture
+async def slides(course):
+    return await _link_slides(course["id"], course["chapters"][0]["id"])
+
+
+async def test_pictures_are_taken_from_a_slide(course, slides, admin):
+    c = ctx(course)
+    v = await run_tool(c, "view_source_page", {"source_file_id": slides, "page": 2})
+    assert v.ok and v.images
+    # The figure and the logo the import leaves out are both listed, in reading order.
+    assert "1. immagine [0.88, 0.03, 0.97, 0.17]" in v.text and "2. immagine [0.15, 0.29, 0.85, 0.71]" in v.text
+    assert "extract_source_image" in v.text
+    assert "extract_source_image" not in (await run_tool(ctx(course, "explain"), "view_source_page", {"source_file_id": slides, "page": 2})).text
+
+    r = await run_tool(c, "extract_source_image", {"source_file_id": slides, "page": 2, "region": 2})
+    assert r.ok and r.wrote and r.images and "images/lezione-3-p2.png" in r.text and "\\lectaimage" in r.text
+    files = {f["path"] for f in (await admin.get(f"/api/courses/{course['id']}/files")).json()["files"]}
+    assert "images/lezione-3-p2.png" in files
+    # The embedded picture itself, at its own size, not a render of the page.
+    v = await run_tool(c, "view_image", {"path": "images/lezione-3-p2.png"})
+    assert v.ok and (v.images[0]["width"], v.images[0]["height"]) == block_diagram_size()
+
+    # Same name again: a new file next to it.
+    r = await run_tool(c, "extract_source_image", {"source_file_id": slides, "page": 2, "region": 2})
+    assert r.ok and "images/lezione-3-p2-2.png" in r.text
+    # A part of the page chosen by the model, with a name of its own; the bbox may come as text.
+    r = await run_tool(c, "extract_source_image", {"source_file_id": slides, "page": 1, "bbox": "[0.05, 0.05, 0.5, 0.25]", "name": "Titolo è"})
+    assert r.ok and "images/titolo-e.png" in r.text and "il riquadro" in r.text
+    r = await run_tool(c, "extract_source_image", {"source_file_id": slides, "page": 3})
+    assert r.ok and "la pagina intera" in r.text
+
+    assert "has 2 pictures" in (await run_tool(c, "extract_source_image", {"source_file_id": slides, "page": 2, "region": 5})).text
+    assert "has 3 pages" in (await run_tool(c, "extract_source_image", {"source_file_id": slides, "page": 9})).text
+    assert not (await run_tool(c, "extract_source_image", {"source_file_id": slides, "page": 1, "bbox": [0.5, 0.5, 0.2, 0.9]})).ok
+    assert not (await run_tool(c, "extract_source_image", {"source_file_id": 999999, "page": 1})).ok
+    r = await run_tool(ctx(course, "explain"), "extract_source_image", {"source_file_id": slides, "page": 2, "region": 2})
+    assert not r.ok and "unavailable" in r.text
+
+
+def block_diagram_size() -> tuple[int, int]:
+    from tests.fixtures import block_diagram
+
+    return block_diagram().size
