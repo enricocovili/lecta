@@ -3,13 +3,13 @@
 // Selecting: a click on a stroke picks it (and dragging moves it at once), a drag on an empty spot draws a rectangle that picks
 // what it encloses, a drag inside the selection's box moves it all; Shift adds to the selection. The selection itself is the
 // editor's (one for the whole lesson), so that deleting it and the keyboard work from the toolbar; the button that deletes it
-// is also attached to its box.
+// is also attached to its box, and the handles on its corners make it bigger or smaller.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "../icons";
 import { fingerInk } from "./gestures";
 import {
-  boundsOf, canvasScale, clampShift, drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, inside, moveStroke, pick, PICK_RADIUS, roundStroke, strokeRect, unionRect,
-  type Rect, type Stroke, type Tool,
+  boundsOf, canvasScale, clampShift, cornerPoints, drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, inside, moveStroke, pick, PICK_RADIUS, roundStroke, scaleFactor,
+  scaleStroke, strokeRect, unionRect, type Corner, type Rect, type Stroke, type Tool,
 } from "./ink";
 import { recognize } from "./shapes";
 
@@ -45,23 +45,49 @@ type Current =
   | { kind: "erase"; id: number; removed: Set<number>; dirty: Rect | null }
   /** dragging the selection: the strokes leave the base canvas (once it really moves) and follow on the live one */
   | { kind: "move"; id: number; x0: number; y0: number; dx: number; dy: number; box: Rect; strokes: Stroke[]; idx: Set<number>; hidden: boolean }
+  /** a corner handle of the selection dragged: the strokes are scaled by `f` around the opposite corner (ax, ay) */
+  | { kind: "scale"; id: number; corner: Corner; box: Rect; f: number; ax: number; ay: number; strokes: Stroke[]; idx: Set<number>; hidden: boolean }
   /** the selection rectangle being drawn; `add`: Shift, it adds to what is selected */
   | { kind: "rect"; id: number; x0: number; y0: number; x1: number; y1: number; add: boolean };
 
 const pad = (r: Rect, m: number): Rect => ({ x0: r.x0 - m, y0: r.y0 - m, x1: r.x1 + m, y1: r.y1 + m });
 const within = (r: Rect | null, x: number, y: number) => !!r && x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
 
-/** The buttons attached to the selection's box (`r`, padded, in page widths), in CSS px over the page: the delete button
- *  above the box, or below it when there is no room above, or inside it when there is none below either. */
-function SelectionControls({ r, width, height, onDelete }: { r: Rect; width: number; height: number; onDelete: () => void }) {
+const CORNERS: Corner[] = ["nw", "ne", "sw", "se"];
+/** The side of a corner handle, CSS px (as in lessons.css). */
+const HANDLE = 14;
+
+/** The buttons attached to the selection's box (`r`, padded, in page widths), in CSS px over the page: a handle on every corner
+ *  to scale it, and the delete button above the box, or below it when there is no room above, or inside it when there is none
+ *  below either. */
+function SelectionControls({ r, width, height, onDelete, onHandle }: { r: Rect; width: number; height: number; onDelete: () => void; onHandle: (e: React.PointerEvent, c: Corner) => void }) {
   const BTN = 36;
-  const GAP = 8;
+  const GAP = 28;
   const left = Math.min(Math.max(((r.x0 + r.x1) / 2) * width - BTN / 2, 4), width - BTN - 4);
   const above = r.y0 * width - BTN - GAP;
   const below = r.y1 * width + GAP;
   const top = above >= 4 ? above : below + BTN <= height - 4 ? below : Math.max(4, r.y0 * width + GAP);
   return (
     <div className="les-sel-ui" data-testid="selection-controls">
+      {CORNERS.map((c) => {
+        // Outside the box's corner (a press inside the box moves the selection), but kept on the page.
+        const { cx, cy } = cornerPoints(r, c);
+        const west = c[1] === "w";
+        const north = c[0] === "n";
+        return (
+          <span
+            key={c}
+            className={`les-sel-handle ${c}`}
+            style={{
+              left: Math.min(Math.max(cx * width, west ? HANDLE : 0), width - (west ? 0 : HANDLE)),
+              top: Math.min(Math.max(cy * width, north ? HANDLE : 0), height - (north ? 0 : HANDLE)),
+            }}
+            onPointerDown={(e) => onHandle(e, c)}
+            title="Trascina per ingrandire o rimpicciolire"
+            data-testid={`selection-handle-${c}`}
+          />
+        );
+      })}
       <button
         type="button"
         className="btn icon les-sel-delete"
@@ -157,8 +183,17 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       drawAll(ctx, c.strokes, scale);
       drawBox(ctx, pad(c.box, SEL_PAD), scale, dpr);
       ctx.restore();
+    } else if (c?.kind === "scale") {
+      ctx.save();
+      ctx.translate(c.ax * scale, c.ay * scale);
+      ctx.scale(c.f, c.f);
+      ctx.translate(-c.ax * scale, -c.ay * scale);
+      drawAll(ctx, c.strokes, scale);
+      ctx.restore();
+      const at = (v: number, a: number) => a + (v - a) * c.f;
+      drawBox(ctx, pad({ x0: at(c.box.x0, c.ax), y0: at(c.box.y0, c.ay), x1: at(c.box.x1, c.ax), y1: at(c.box.y1, c.ay) }, SEL_PAD), scale, dpr);
     } else if (c?.kind === "rect") drawBox(ctx, c, scale, dpr);
-    if (c?.kind === "move") return;
+    if (c?.kind === "move" || c?.kind === "scale") return;
     const box = boundsOf(props.current.selected ?? []);
     if (box) drawBox(ctx, pad(box, SEL_PAD), scale, dpr);
   }, [dpr]);
@@ -277,6 +312,21 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     schedule();
   };
 
+  /** A corner handle pressed: the selection is scaled while it is dragged (by any pointer, a finger too). */
+  const startScale = (e: React.PointerEvent, corner: Corner) => {
+    e.stopPropagation();
+    const p = props.current;
+    const sel = p.selected ?? [];
+    const box = boundsOf(sel);
+    if (cur.current || !box || (e.pointerType === "mouse" && e.button !== 0)) return;
+    e.preventDefault();
+    capture(e.pointerId);
+    const { ax, ay } = cornerPoints(box, corner);
+    const idx = new Set(sel.map((x) => p.strokes.indexOf(x)).filter((i) => i >= 0));
+    cur.current = { kind: "scale", id: e.pointerId, corner, box, f: 1, ax, ay, strokes: sel, idx, hidden: false };
+    setBusy(true);
+  };
+
   const onMove = (e: React.PointerEvent) => {
     const c = cur.current;
     if (!c) {
@@ -292,9 +342,15 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       return;
     }
     if (e.pointerId !== c.id) return;
-    if (c.kind === "move" || c.kind === "rect") {
+    if (c.kind === "move" || c.kind === "rect" || c.kind === "scale") {
       const pt = point(e);
-      if (c.kind === "rect") {
+      if (c.kind === "scale") {
+        c.f = scaleFactor(c.box, c.corner, pt.x, pt.y, props.current.height / props.current.width);
+        if (!c.hidden) {
+          c.hidden = true;
+          paintBase(c.idx);
+        }
+      } else if (c.kind === "rect") {
         c.x1 = pt.x;
         c.y1 = pt.y;
       } else {
@@ -341,6 +397,11 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     } else if (c.kind === "move") {
       if (!cancelled && Math.hypot(c.dx, c.dy) > 0.0005) {
         onMoveStrokes(c.strokes.map((from) => ({ from, to: moveStroke(from, c.dx, c.dy) })));
+      } else if (c.hidden) paintBase();
+      schedule();
+    } else if (c.kind === "scale") {
+      if (!cancelled && Math.abs(c.f - 1) > 0.002) {
+        onMoveStrokes(c.strokes.map((from) => ({ from, to: scaleStroke(from, c.ax, c.ay, c.f) })));
       } else if (c.hidden) paintBase();
       schedule();
     } else if (c.kind === "rect") {
@@ -395,7 +456,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     >
       <canvas ref={base} />
       <canvas ref={live} />
-      {selBox && <SelectionControls r={pad(selBox, SEL_PAD)} width={width} height={height} onDelete={deleteSelected} />}
+      {selBox && <SelectionControls r={pad(selBox, SEL_PAD)} width={width} height={height} onDelete={deleteSelected} onHandle={startScale} />}
     </div>
   );
 }

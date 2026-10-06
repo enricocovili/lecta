@@ -497,7 +497,7 @@ test.describe.serial("Lezioni", () => {
     await expect(pages).toHaveCount(count + 1);
     const last = count;
     const surface = page.getByTestId("ink-surface").nth(last);
-    const ink = async () => (await stored(page)).pages[last].ink as { p: number[] }[];
+    const ink = async () => (await stored(page)).pages[last].ink as { p: number[]; w: number }[];
     await page.getByTestId("tool-pen").click();
     await scribble(page, last, [0.1, 0.15], [0.3, 0.25]);
     await scribble(page, last, [0.6, 0.6], [0.8, 0.7]);
@@ -537,6 +537,27 @@ test.describe.serial("Lezioni", () => {
     await page.keyboard.press("Control+Shift+z");
     await save(page);
     expect((await ink())[0].p[0]).toBeCloseTo(drawn[0].p[0] + 0.1, 2);
+
+    // The handle on a corner of the selection makes it bigger, width included; undo takes it back.
+    const [sx, sy] = await at(0.2, 0.15);
+    await page.mouse.click(sx, sy);
+    await expect(count1).toHaveText("1 tratto selezionato");
+    const small = (await ink())[0];
+    const span = (s: { p: number[] }) => Math.max(...s.p.filter((_, i) => i % 3 === 0)) - Math.min(...s.p.filter((_, i) => i % 3 === 0));
+    const hb = (await page.getByTestId("selection-handle-se").boundingBox())!;
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hb.x + hb.width / 2 + width * 0.1, hb.y + hb.height / 2 + width * 0.05, { steps: 6 });
+    await page.mouse.up();
+    await save(page);
+    const big = (await ink())[0];
+    expect(span(big)).toBeGreaterThan(span(small) * 1.3);
+    expect(big.w).toBeGreaterThan(small.w);
+    expect(big.p[0]).toBeCloseTo(small.p[0], 2); // the opposite corner stays where it was
+    await expect(count1).toHaveText("1 tratto selezionato");
+    await page.keyboard.press("Control+z");
+    await save(page);
+    expect((await ink())[0]).toEqual(small);
 
     // A click on an empty spot lets go; a rectangle around both picks both; Canc deletes them, undo brings them back.
     const [ex, ey] = await at(0.5, 0.9);

@@ -356,6 +356,9 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
       }
       if (e.pointerType !== "touch" && !(o.tool === "hand" && onInk && e.button === 0)) return;
       const live = [...ptrs.entries()].filter(([, p]) => p.mode !== "palm");
+      // A finger on the selection's handles or buttons works them, also when fingers do not write (a palm is still a palm).
+      const onControls = !!(e.target as Element | null)?.closest?.(".les-sel-ui");
+      if (e.pointerType === "touch" && onControls && !live.length && !isPalm(pen, now, e)) return;
       let mode: Pointer["mode"] = "wait";
       if (e.pointerType === "touch" && isPalm(pen, now, e)) mode = "palm";
       else if (e.pointerType === "touch" && live.length === 1 && live[0][1].touch && live[0][1].mode !== "pinch" && !wheel) {

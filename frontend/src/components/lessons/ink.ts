@@ -226,6 +226,48 @@ export function moveStroke(s: Stroke, dx: number, dy: number): Stroke {
   return roundStroke({ ...s, p: s.p.map((v, i) => (i % 3 === 0 ? v + dx : i % 3 === 1 ? v + dy : v)) });
 }
 
+/** A corner of the selection's box, where a handle scales it from. */
+export type Corner = "nw" | "ne" | "sw" | "se";
+/** The smallest a selection can be scaled down to (its longer side, in page widths), and how much bigger at most at once. */
+const MIN_SELECTION = 0.01;
+const MAX_SCALE = 10;
+/** Stroke widths stay within what the server takes. */
+const MIN_WIDTH = 0.0003;
+const MAX_WIDTH = 0.2;
+
+/** The corner `c` of the box and the one opposite to it (which stays put while the box is scaled). */
+export function cornerPoints(box: Rect, c: Corner): { cx: number; cy: number; ax: number; ay: number } {
+  const west = c[1] === "w";
+  const north = c[0] === "n";
+  return { cx: west ? box.x0 : box.x1, cy: north ? box.y0 : box.y1, ax: west ? box.x1 : box.x0, ay: north ? box.y1 : box.y0 };
+}
+
+/** How much the box is scaled when its corner `c` is dragged to x, y: the drag along the box's diagonal, uniform (the strokes
+ *  keep their proportions). Kept so that the box stays on the page (`ratio` = height / width; a box already past an edge is
+ *  not shrunk for that) and does not vanish. */
+export function scaleFactor(box: Rect, c: Corner, x: number, y: number, ratio: number): number {
+  const { cx, cy, ax, ay } = cornerPoints(box, c);
+  const dx = cx - ax;
+  const dy = cy - ay;
+  const len2 = dx * dx + dy * dy;
+  if (!len2) return 1;
+  const f = ((x - ax) * dx + (y - ay) * dy) / len2;
+  const room = (a: number, d: number, end: number) => (d > 0 ? (end - a) / d : d < 0 ? a / -d : Infinity);
+  const hi = Math.min(MAX_SCALE, Math.max(1, room(ax, dx, 1)), Math.max(1, room(ay, dy, ratio)));
+  const lo = Math.min(1, MIN_SELECTION / Math.max(Math.abs(dx), Math.abs(dy)));
+  return Math.min(hi, Math.max(lo, f));
+}
+
+/** The stroke scaled by f around ax, ay, its width too (a new object: the history keeps the old one). The points are scaled,
+ *  not a picture of them: the stroke is drawn again as sharp as before at any size. */
+export function scaleStroke(s: Stroke, ax: number, ay: number, f: number): Stroke {
+  return roundStroke({
+    ...s,
+    w: Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, s.w * f)),
+    p: s.p.map((v, i) => (i % 3 === 0 ? ax + (v - ax) * f : i % 3 === 1 ? ay + (v - ay) * f : v)),
+  });
+}
+
 /** The move asked for, kept so that the box stays on the page (`ratio` = height / width); a box already past an edge is not
  *  pulled back, only kept from going further. */
 export function clampShift(box: Rect, dx: number, dy: number, ratio: number): { dx: number; dy: number } {

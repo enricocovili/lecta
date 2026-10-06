@@ -86,3 +86,33 @@ test("a selection dragged past an edge of the page stops at it", () => {
   assert.deepEqual(clampShift(out, -0.05, 0, 0.75), { dx: 0, dy: 0 });
   assert.deepEqual(clampShift(out, 0.05, 0, 0.75), { dx: 0.05, dy: 0 });
 });
+
+import { scaleFactor, scaleStroke } from "../src/components/lessons/ink.ts";
+
+test("a corner handle scales the selection around the opposite corner, by how far it is dragged along the diagonal", () => {
+  const box = { x0: 0.2, y0: 0.2, x1: 0.4, y1: 0.3 };
+  assert.equal(scaleFactor(box, "se", 0.4, 0.3, 0.75), 1);
+  assert.ok(Math.abs(scaleFactor(box, "se", 0.6, 0.4, 0.75) - 2) < 1e-9);
+  assert.ok(Math.abs(scaleFactor(box, "nw", 0.3, 0.25, 0.75) - 0.5) < 1e-9);
+  // Off the diagonal the drag counts for its part along it: the strokes keep their proportions.
+  assert.ok(Math.abs(scaleFactor(box, "se", 0.6, 0.3, 0.75) - scaleFactor(box, "se", 0.56, 0.38, 0.75)) < 1e-9);
+});
+
+test("a scaled selection stays on the page and never vanishes", () => {
+  const box = { x0: 0.6, y0: 0.1, x1: 0.8, y1: 0.2 };
+  assert.ok(Math.abs(scaleFactor(box, "se", 2, 2, 0.75) - 2) < 1e-9, "the right edge stops it at twice the size");
+  assert.ok(scaleFactor(box, "se", 0.6, 0.1, 0.75) > 0);
+  assert.ok(Math.abs(scaleFactor(box, "se", 0, 0, 0.75) - 0.05) < 1e-9, "its longer side at least 0.01");
+  // Already past an edge: it can still grow towards the others.
+  const out = { x0: -0.01, y0: 0.1, x1: 0.2, y1: 0.2 };
+  assert.ok(scaleFactor(out, "se", 0.41, 0.3, 0.75) > 1.9);
+});
+
+test("a scaled stroke is a new one with its points and width scaled, the pressure untouched", () => {
+  const s = { t: "pen", c: "#d32f2f", w: 0.003, p: [0.2, 0.2, 0.4, 0.3, 0.25, 0.9] };
+  const m = scaleStroke(s, 0.2, 0.2, 2);
+  assert.notEqual(m, s);
+  assert.deepEqual(s.p, [0.2, 0.2, 0.4, 0.3, 0.25, 0.9]);
+  assert.deepEqual(m, { t: "pen", c: "#d32f2f", w: 0.006, p: [0.2, 0.2, 0.4, 0.4, 0.3, 0.9] });
+  assert.equal(scaleStroke({ ...s, w: 0.15 }, 0, 0, 3).w, 0.2, "no wider than the server takes");
+});

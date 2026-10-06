@@ -530,7 +530,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      one's place; the history keeps the pairs (`move`: from → to), so undo swaps them back and nothing else on the page moves.
      The rectangle takes only the strokes it **encloses** (as in Xournal++), so selecting the writing inside a hand-drawn box
      does not take the box. Deleting the selection is an ordinary erase (one step). Moves are kept on the page, since the server
-     draws the strokes on the slide and anything off it would be lost in the annotated PDF.
+     draws the strokes on the slide and anything off it would be lost in the annotated PDF. Scaling with the corner handles is the same
+     replacement (`move` in the history): the points and the widths are multiplied, never a picture of them, so a stroke made
+     bigger is as sharp as one drawn at that size, and the PDF gets the same vectors.
 
 ## Assistant
 
