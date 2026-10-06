@@ -25,12 +25,15 @@ export default function NotesField({
   value,
   onChange,
   minHeight,
+  width,
   placeholder,
   label,
 }: {
   value: string;
   onChange: (v: string) => void;
   minHeight: number;
+  /** the width of the page: the text wraps again when it changes (a zoom) */
+  width?: number;
   placeholder: string;
   label: string;
 }) {
@@ -41,7 +44,7 @@ export default function NotesField({
     el.style.height = "auto";
     el.style.height = `${Math.max(el.scrollHeight + 2, minHeight)}px`;
   };
-  useLayoutEffect(fit, [value, minHeight]);
+  useLayoutEffect(fit, [value, minHeight, width]);
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof ResizeObserver === "undefined") return;

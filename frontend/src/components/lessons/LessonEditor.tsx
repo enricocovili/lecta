@@ -625,6 +625,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
                 doc={doc}
                 draw={draw}
                 layout={layout}
+                zoom={zoom}
                 preview={preview || readOnly}
                 readOnly={readOnly}
                 scroller={scroller}

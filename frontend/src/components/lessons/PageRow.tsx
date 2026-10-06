@@ -1,5 +1,5 @@
 // One page of the lesson: the slide with the drawing over it, and the Markdown notes next to it (or below).
-import { memo, useEffect, useRef, useState, type RefObject } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { Icon } from "../icons";
 import { Markdown } from "../workspace/Markdown";
 import InkLayer from "./InkLayer";
@@ -37,6 +37,8 @@ interface Props {
   doc: PdfDoc | null;
   draw: DrawSettings;
   layout: "side" | "stack" | "slides";
+  /** the zoom of the pages, to take the new size at once when it changes */
+  zoom: number;
   preview: boolean;
   /** a read-only share link: nothing here changes the lesson */
   readOnly?: boolean;
@@ -47,7 +49,7 @@ interface Props {
   selected: Stroke[] | null;
 }
 
-function PageRow({ page, index, doc, draw, layout, preview, readOnly = false, scroller, actions, label, selected }: Props) {
+function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = false, scroller, actions, label, selected }: Props) {
   const row = useRef<HTMLElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -58,9 +60,13 @@ function PageRow({ page, index, doc, draw, layout, preview, readOnly = false, sc
     if (!el) return;
     const ro = new ResizeObserver(() => setWidth(el.clientWidth));
     ro.observe(el);
-    setWidth(el.clientWidth);
     return () => ro.disconnect();
   }, []);
+  // A zoom or another layout is measured in the same commit (not a frame later, by the observer): the rows have their new
+  // height before the editor puts the point under the fingers back, so nothing moves afterwards.
+  useLayoutEffect(() => {
+    if (box.current) setWidth(box.current.clientWidth);
+  }, [zoom, layout]);
 
   // Near the viewport → the canvases exist; the band in the middle of the viewport → this is the current page.
   useEffect(() => {
@@ -122,6 +128,7 @@ function PageRow({ page, index, doc, draw, layout, preview, readOnly = false, sc
               value={page.notes}
               onChange={(v) => actions.setNotes(page.id, v)}
               minHeight={Math.max(120, layout === "side" ? height : 140)}
+              width={width}
               placeholder="Scrivi qui gli appunti in Markdown: elenchi con -, **grassetto**, formule con $…$"
               label={`Appunti di ${label}`}
             />

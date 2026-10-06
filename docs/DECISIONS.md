@@ -511,10 +511,11 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      changing it lays out every row again and redraws the slides: at every frame of a pinch that would stutter. While two
      fingers (or Ctrl + wheel) move, the pages are only scaled and moved on screen (`transform` on `.les-pages`); when they
      are lifted the zoom is applied (React, synchronously) and the scroll is set so that the point of the slide that was under
-     the fingers is under them again (anchored to that slide, since gaps and notes do not scale). The other rows reach their
-     new height a moment later (the notes beside a slide follow its measured width, their text wraps again), so the anchor is
-     put back at every change of a row's size (a `ResizeObserver`, after layout and before the frame is drawn) until the rows
-     settle or the user touches the pages; without it, zooming out pushed the page away by the shrinking rows above. Canvases are sized by their
+     the fingers is under them again (anchored to that slide, since gaps and notes do not scale). Every row takes its new
+     height in that same commit: the rows measure their width in a layout effect keyed on the zoom (not a frame later, from
+     their `ResizeObserver`) and the notes wrap again there, so the rows above cannot push the anchor away afterwards, not
+     even when the next pinch begins at once; the anchor is still put back at every later change of a row's size until the
+     rows settle or the user touches the pages. Canvases are sized by their
      box (CSS), so the old picture stretches until the new one is drawn, and never get more than 8 M pixels, which at 300 %
      lowers their density instead of taking hundreds of MB per page. The zoom is continuous now (`lecta:lesson:scale`), the
      buttons step from wherever a pinch left it.
