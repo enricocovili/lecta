@@ -2,8 +2,10 @@
 // A finger only reaches it when "finger draws" is on: scrolling and palms are told apart before, by the gestures (gestures.ts).
 // Selecting: a click on a stroke picks it (and dragging moves it at once), a drag on an empty spot draws a rectangle that picks
 // what it encloses, a drag inside the selection's box moves it all; Shift adds to the selection. The selection itself is the
-// editor's (one for the whole lesson), so that deleting it and the keyboard work from the toolbar.
-import { useCallback, useEffect, useRef } from "react";
+// editor's (one for the whole lesson), so that deleting it and the keyboard work from the toolbar; the button that deletes it
+// is also attached to its box.
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Icon } from "../icons";
 import { fingerInk } from "./gestures";
 import {
   boundsOf, canvasScale, clampShift, drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, inside, moveStroke, pick, PICK_RADIUS, roundStroke, strokeRect, unionRect,
@@ -49,6 +51,33 @@ type Current =
 const pad = (r: Rect, m: number): Rect => ({ x0: r.x0 - m, y0: r.y0 - m, x1: r.x1 + m, y1: r.y1 + m });
 const within = (r: Rect | null, x: number, y: number) => !!r && x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
 
+/** The buttons attached to the selection's box (`r`, padded, in page widths), in CSS px over the page: the delete button
+ *  above the box, or below it when there is no room above, or inside it when there is none below either. */
+function SelectionControls({ r, width, height, onDelete }: { r: Rect; width: number; height: number; onDelete: () => void }) {
+  const BTN = 36;
+  const GAP = 8;
+  const left = Math.min(Math.max(((r.x0 + r.x1) / 2) * width - BTN / 2, 4), width - BTN - 4);
+  const above = r.y0 * width - BTN - GAP;
+  const below = r.y1 * width + GAP;
+  const top = above >= 4 ? above : below + BTN <= height - 4 ? below : Math.max(4, r.y0 * width + GAP);
+  return (
+    <div className="les-sel-ui" data-testid="selection-controls">
+      <button
+        type="button"
+        className="btn icon les-sel-delete"
+        style={{ left, top }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={onDelete}
+        aria-label="Elimina la selezione"
+        title="Elimina la selezione (Canc)"
+        data-testid="selection-delete"
+      >
+        <Icon name="trash" />
+      </button>
+    </div>
+  );
+}
+
 /** The selection's box (dashed, lightly filled), or the rectangle being drawn. */
 function drawBox(ctx: CanvasRenderingContext2D, r: Rect, scale: number, dpr: number) {
   const x = Math.min(r.x0, r.x1) * scale;
@@ -73,6 +102,8 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
   const raf = useRef(0);
   const rafErase = useRef(0);
   const justErased = useRef<{ gone: Set<Stroke>; len: number } | null>(null);
+  // The selection is being moved, or a rectangle drawn: its buttons step aside.
+  const [busy, setBusy] = useState(false);
   const props = useRef({ strokes, tool, color, hlColor, penWidth, hlWidth, fingerDraws, shapes, width, height, selected });
   props.current = { strokes, tool, color, hlColor, penWidth, hlWidth, fingerDraws, shapes, width, height, selected };
   const dpr = canvasScale(width, height);
@@ -221,6 +252,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       const startMove = (picked: Stroke[]) => {
         const idx = new Set(picked.map((x) => p.strokes.indexOf(x)).filter((i) => i >= 0));
         cur.current = { kind: "move", id: e.pointerId, x0: pt.x, y0: pt.y, dx: 0, dy: 0, box: boundsOf(picked)!, strokes: picked, idx, hidden: false };
+        setBusy(true);
       };
       const box = boundsOf(sel);
       if (!add && box && within(pad(box, SEL_PAD), pt.x, pt.y)) return startMove(sel);
@@ -236,6 +268,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
         return;
       }
       cur.current = { kind: "rect", id: e.pointerId, x0: pt.x, y0: pt.y, x1: pt.x, y1: pt.y, add };
+      setBusy(true);
       schedule();
       return;
     }
@@ -291,6 +324,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     const c = cur.current;
     if (!c || id !== c.id) return;
     cur.current = null;
+    setBusy(false);
     if (fingerInk.cancel === cancelFinger.current) fingerInk.cancel = null;
     try {
       wrap.current?.releasePointerCapture(id);
@@ -341,6 +375,12 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
   });
 
   const t = props.current.tool;
+  const selBox = !busy && active && selected?.length ? boundsOf(selected) : null;
+  const deleteSelected = () => {
+    const idx = (selected ?? []).map((s) => strokes.indexOf(s)).filter((i) => i >= 0);
+    onSelect([]);
+    if (idx.length) onErase(idx);
+  };
   return (
     <div
       ref={wrap}
@@ -355,6 +395,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     >
       <canvas ref={base} />
       <canvas ref={live} />
+      {selBox && <SelectionControls r={pad(selBox, SEL_PAD)} width={width} height={height} onDelete={deleteSelected} />}
     </div>
   );
 }

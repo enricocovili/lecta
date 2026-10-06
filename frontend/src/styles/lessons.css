@@ -298,6 +298,31 @@ body.ws-page .les {
 .les-sel-hint {
   white-space: nowrap;
 }
+/* The buttons attached to the selection's box (InkLayer): only they take the pointer, the rest of the page draws. */
+.les-sel-ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  line-height: normal;
+}
+.les-sel-ui > * {
+  pointer-events: auto;
+}
+.les .les-sel-delete {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid #1e6fd8;
+  background: #fff;
+  color: #b3261e;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 18%);
+}
+.les .les-sel-delete:hover {
+  background: #b3261e;
+  border-color: #b3261e;
+  color: #fff;
+}
 
 .les-notes {
   display: flex;

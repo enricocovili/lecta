@@ -513,7 +513,7 @@ test.describe.serial("Lezioni", () => {
     await page.keyboard.press("s");
     await expect(page.getByTestId("tool-select")).toHaveAttribute("aria-pressed", "true");
     const count1 = page.getByTestId("selection-count");
-    await expect(count1).toContainText("Clic su un tratto");
+    await expect(count1).toHaveCount(0);
     const [ax, ay] = await at(0.1, 0.15);
     await page.mouse.click(ax, ay);
     await expect(count1).toHaveText("1 tratto selezionato");
@@ -541,7 +541,8 @@ test.describe.serial("Lezioni", () => {
     // A click on an empty spot lets go; a rectangle around both picks both; Canc deletes them, undo brings them back.
     const [ex, ey] = await at(0.5, 0.9);
     await page.mouse.click(ex, ey);
-    await expect(count1).toContainText("Clic su un tratto");
+    await expect(count1).toHaveCount(0);
+    await expect(page.getByTestId("selection-delete")).toHaveCount(0);
     const [rx0, ry0] = await at(0.02, 0.03);
     const [rx1, ry1] = await at(0.97, 0.95);
     await page.mouse.move(rx0, ry0);
@@ -550,19 +551,31 @@ test.describe.serial("Lezioni", () => {
     await page.mouse.up();
     await expect(count1).toHaveText("2 tratti selezionati");
     await page.keyboard.press("Delete");
-    await expect(count1).toContainText("Clic su un tratto");
+    await expect(count1).toHaveCount(0);
     await save(page);
     expect(await ink()).toHaveLength(0);
     await page.keyboard.press("Control+z");
     await save(page);
     expect(await ink()).toHaveLength(2);
 
-    // The toolbar's button deletes too.
-    await page.mouse.move(rx0, ry0);
-    await page.mouse.down();
-    await page.mouse.move(rx1, ry1, { steps: 8 });
-    await page.mouse.up();
+    // The toolbar's button deletes too, and so does the one attached to the selection's box.
+    const selectAll = async () => {
+      await page.mouse.move(rx0, ry0);
+      await page.mouse.down();
+      await page.mouse.move(rx1, ry1, { steps: 8 });
+      await page.mouse.up();
+      await expect(count1).toHaveText("2 tratti selezionati");
+    };
+    await selectAll();
     await page.getByTestId("delete-selection").click();
+    await save(page);
+    expect(await ink()).toHaveLength(0);
+    await page.keyboard.press("Control+z");
+    await save(page);
+    expect(await ink()).toHaveLength(2);
+    await selectAll();
+    await page.getByTestId("selection-delete").click();
+    await expect(count1).toHaveCount(0);
     await save(page);
     expect(await ink()).toHaveLength(0);
 

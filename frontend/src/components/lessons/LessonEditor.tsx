@@ -520,9 +520,11 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
         )}
         {tool === "select" && (
           <>
-            <span className="les-sel-hint muted small" data-testid="selection-count">
-              {selection ? `${selection.strokes.length} ${selection.strokes.length === 1 ? "tratto selezionato" : "tratti selezionati"}` : "Clic su un tratto, o trascina un rettangolo"}
-            </span>
+            {selection && (
+              <span className="les-sel-hint muted small" data-testid="selection-count">
+                {selection.strokes.length} {selection.strokes.length === 1 ? "tratto selezionato" : "tratti selezionati"}
+              </span>
+            )}
             <button type="button" className="btn" onClick={deleteSelection} disabled={!selection} data-testid="delete-selection" title="Elimina i tratti selezionati (Canc)">
               <Icon name="trash" />
               <span className="les-lbl">Elimina</span>
