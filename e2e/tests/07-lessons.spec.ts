@@ -77,7 +77,7 @@ async function fingerDrag(page: Page, index: number, dy: number, pen: "hover" | 
 }
 
 /** Two fingers on a page's slide, `from` px apart around its middle, moved to `to` px apart; the first one draws a little
- *  before the second lands. Returns how far (px) the point of the slide that was between them ended up from there. */
+ *  before the second lands. Returns how far (px) the point of the slide that was between them ended up from there, at most. */
 async function pinch(page: Page, index: number, from: number, to: number): Promise<number> {
   return page
     .getByTestId("ink-surface")
@@ -102,11 +102,17 @@ async function pinch(page: Page, index: number, from: number, to: number): Promi
         }
         fire("pointerup", 61, cx - to / 2);
         fire("pointerup", 62, cx + to / 2);
-        await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
-        const r = el.getBoundingClientRect();
         const u = (cx - r0.left) / r0.width;
         const v = (cy - r0.top) / r0.width;
-        return Math.hypot(r.left + u * r.width - cx, r.top + v * r.width - cy);
+        const off = () => {
+          const r = el.getBoundingClientRect();
+          return Math.hypot(r.left + u * r.width - cx, r.top + v * r.width - cy);
+        };
+        // Right away, and once the rows have taken their new height (the notes follow the slide a moment later).
+        await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+        const now = off();
+        await new Promise((ok) => setTimeout(ok, 600));
+        return Math.max(now, off());
       },
       [from, to] as const,
     );
@@ -240,6 +246,23 @@ test.describe.serial("Lezioni", () => {
     await page.mouse.wheel(0, 100);
     await page.keyboard.up("Control");
     await expect(zoomLevel).toHaveText("117%");
+    // The buttons zoom around the middle of the editor, which stays at the same height of the slide (sideways the pages may
+    // have to move: at 100 % they cannot scroll).
+    const middle = () =>
+      page.getByTestId("ink-surface").nth(1).evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const s = document.querySelector("[data-testid=lesson-scroll]")!.getBoundingClientRect();
+        return { u: (s.left + s.width / 2 - r.left) / r.width, v: (s.top + s.height / 2 - r.top) / r.width };
+      });
+    for (const button of ["Ingrandisci", "Riduci", "Riduci"]) {
+      const before = await middle();
+      await page.getByRole("button", { name: button, exact: true }).click();
+      await page.waitForTimeout(600);
+      const after = await middle();
+      const width = (await page.getByTestId("ink-surface").nth(1).boundingBox())!.width;
+      expect(Math.abs(after.v - before.v) * width).toBeLessThan(3);
+    }
+    await expect(zoomLevel).toHaveText("85%");
     await zoomLevel.click();
     await expect(zoomLevel).toHaveText("100%");
     await page.getByTestId("lesson-page").nth(1).evaluate((el) => el.scrollIntoView({ block: "center" }));

@@ -21,6 +21,9 @@ const FRICTION = 0.95;
 const MIN_SPEED = 0.02;
 /** Only the last moments of a drag count for the speed of the glide. */
 const SPEED_WINDOW_MS = 80;
+/** After a zoom, its anchor is kept in place until the rows stop changing size for this long (and never longer than the other). */
+const HOLD_QUIET_MS = 250;
+const HOLD_MAX_MS = 1500;
 
 /** How far the pages zoom out and in (1 = as wide as the editor), and the steps of the − / + buttons. */
 export const ZOOM_MIN = 0.5;
@@ -156,6 +159,12 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
     let raf = 0;
     let pinch: (Zooming & { ids: [number, number]; d0: number }) | null = null;
     let wheel: (Zooming & { timer: number }) | null = null;
+    // How to stop keeping the last zoom's anchor in place (null: nothing is kept).
+    let hold: (() => void) | null = null;
+    const stopHold = () => {
+      hold?.();
+      hold = null;
+    };
 
     const stopGlide = () => {
       cancelAnimationFrame(raf);
@@ -201,15 +210,38 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
       z.pages.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
     };
     const endZoom = (z: Zooming) => {
+      stopHold();
       z.pages.style.transform = "";
       z.pages.style.willChange = "";
       const next = clampZoom(z.z0 * z.s);
       if (Math.abs(next - z.z0) > 0.001) flushSync(() => opts.current.setZoom(Math.round(next * 1000) / 1000));
-      // The pages have their new size now: scroll so that the anchor is under the fingers again.
-      if (z.anchor?.el.isConnected) {
-        const r = z.anchor.el.getBoundingClientRect();
-        el.scrollBy(r.left + z.anchor.u * r.width - z.f.x, r.top + z.anchor.v * r.width - z.f.y);
-      }
+      const anchor = z.anchor;
+      if (!anchor?.el.isConnected) return;
+      // The slides have their new size now: scroll so that the anchor is under the fingers again.
+      const keep = () => {
+        if (!anchor.el.isConnected) return;
+        const r = anchor.el.getBoundingClientRect();
+        const dx = r.left + anchor.u * r.width - z.f.x;
+        const dy = r.top + anchor.v * r.width - z.f.y;
+        if (Math.abs(dx) >= 1 || Math.abs(dy) >= 1) el.scrollBy(dx, dy);
+      };
+      keep();
+      // The rest of the rows takes its new height a moment later (the notes follow the slide's width once it is measured,
+      // their text wraps again): the rows above would push the anchor away, so it is put back at every change of size (after
+      // layout, before the frame is drawn), until the rows settle or the user touches the pages.
+      let quiet = window.setTimeout(stopHold, HOLD_QUIET_MS);
+      const ro = new ResizeObserver(() => {
+        keep();
+        window.clearTimeout(quiet);
+        quiet = window.setTimeout(stopHold, HOLD_QUIET_MS);
+      });
+      for (const row of z.pages.children) ro.observe(row);
+      const cap = window.setTimeout(stopHold, HOLD_MAX_MS);
+      hold = () => {
+        ro.disconnect();
+        window.clearTimeout(quiet);
+        window.clearTimeout(cap);
+      };
     };
     zoomRef.current = (target: number) => {
       const r = el.getBoundingClientRect();
@@ -231,6 +263,7 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
 
     const onWheel = (e: WheelEvent) => {
       stopGlide();
+      stopHold();
       if (!e.ctrlKey) return; // a touchpad's pinch comes as Ctrl + wheel too
       e.preventDefault();
       if (pinch) return;
@@ -253,6 +286,7 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
 
     const down = (e: PointerEvent) => {
       stopGlide();
+      stopHold();
       const now = performance.now();
       const o = opts.current;
       const onInk = !!(e.target as Element | null)?.closest?.(".les-ink");
@@ -346,8 +380,11 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
     el.addEventListener("pointerup", up, true);
     el.addEventListener("pointercancel", up, true);
     el.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("keydown", stopHold, true); // ← / → go to another page
     return () => {
       stopGlide();
+      stopHold();
+      window.removeEventListener("keydown", stopHold, true);
       if (wheel) window.clearTimeout(wheel.timer);
       el.removeEventListener("pointerdown", down, true);
       el.removeEventListener("pointermove", move, true);
