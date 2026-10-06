@@ -533,6 +533,12 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      draws the strokes on the slide and anything off it would be lost in the annotated PDF. Scaling with the corner handles is the same
      replacement (`move` in the history): the points and the widths are multiplied, never a picture of them, so a stroke made
      bigger is as sharp as one drawn at that size, and the PDF gets the same vectors.
+109. **Typed text on a page is an item of the ink.** A text is `{t: "text", c, w: font size, p: [x, y, 0], s}` in the page's
+     ink list, not a field of its own: selecting, moving, scaling (the font size is scaled like a width), erasing, undo,
+     saving, following others' edits and the annotated PDF all work on it as they are. It is typed in a real text field
+     placed over the page with the same font, size and line height, and the canvas draws its baseline where that field
+     shows it (measured from the font), so closing the field moves nothing. The server writes it with Helvetica at the same
+     place. *Alternative:* text as an annotation layer of its own (a second list, every tool taught about it).
 
 ## Assistant
 

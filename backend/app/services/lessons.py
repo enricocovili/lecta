@@ -1,7 +1,8 @@
 """Lessons: the ink of a page, the notes as Markdown for the import, and pages drawn with their strokes.
 
 Ink is stored the way the browser draws it: strokes in units of the page's width (so the same numbers fit
-any zoom and screen), y measured in page widths too. Rendering here (PyMuPDF) is for the annotated PDF
+any zoom and screen), y measured in page widths too. Typed text written on a page is an item of the same list
+(`t: "text"`, its top-left corner in `p`, its font size in `w`), so it is selected, moved, scaled and erased like a stroke. Rendering here (PyMuPDF) is for the annotated PDF
 download and for the pictures the reading model gets of pages that carry handwriting.
 """
 
@@ -20,6 +21,11 @@ MAX_STROKES = 4000
 MAX_POINTS_PER_STROKE = 20000
 MAX_POINTS_PER_PAGE = 250_000
 MAX_NOTES_CHARS = 200_000
+MAX_TEXT_CHARS = 5000
+# A text's lines are this many font sizes apart, and its first baseline this far below its top: where the browser puts it in
+# a text field of that line height with Helvetica or Arial (half the leading, then the font's ascent).
+TEXT_LINE_HEIGHT = 1.25
+TEXT_ASCENT = 0.97
 MAX_PAGES = 600
 RENDER_SIDE = 1600
 _COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -42,7 +48,7 @@ def clean_ink(raw: Any) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     total = 0
     for s in raw:
-        if not isinstance(s, dict) or s.get("t") not in ("pen", "hl"):
+        if not isinstance(s, dict) or s.get("t") not in ("pen", "hl", "text"):
             raise InkError("bad stroke")
         color, width, pts = s.get("c"), s.get("w"), s.get("p")
         if not isinstance(color, str) or not _COLOR.match(color):
@@ -51,13 +57,20 @@ def clean_ink(raw: Any) -> list[dict[str, Any]]:
             raise InkError("bad stroke width")
         if not isinstance(pts, list) or not pts or len(pts) % 3 or len(pts) > 3 * MAX_POINTS_PER_STROKE:
             raise InkError("bad stroke points")
+        if s["t"] == "text":
+            text = s.get("s")
+            if len(pts) != 3 or not isinstance(text, str) or not text.strip() or len(text) > MAX_TEXT_CHARS:
+                raise InkError("bad text")
         total += len(pts) // 3
         if total > MAX_POINTS_PER_PAGE:
             raise InkError("too much ink on this page")
         for v in pts:
             if not isinstance(v, (int, float)) or isinstance(v, bool) or not math.isfinite(v) or not -2 <= v <= 8:
                 raise InkError("bad stroke coordinate")
-        out.append({"t": s["t"], "c": color.lower(), "w": round(float(width), 5), "p": [round(float(v), 4) for v in pts]})
+        item = {"t": s["t"], "c": color.lower(), "w": round(float(width), 5), "p": [round(float(v), 4) for v in pts]}
+        if s["t"] == "text":
+            item["s"] = s["s"].replace("\x00", "").replace("\r\n", "\n")
+        out.append(item)
     return out
 
 
@@ -105,18 +118,27 @@ def _rgb(hex_color: str) -> tuple[float, float, float]:
 
 
 def draw_strokes(page: fitz.Page, strokes: list[dict[str, Any]]) -> None:
-    """Draw the strokes on a page (highlighters first, so pens stay readable above them)."""
+    """Draw the strokes on a page (highlighters first, so pens stay readable above them, and typed text on top)."""
     if not strokes:
         return
     rect = page.rect
     w_page = rect.width
     derot = page.derotation_matrix
     shape = page.new_shape()
-    for kind in ("hl", "pen"):
+    for kind in ("hl", "pen", "text"):
         for s in strokes:
             if s["t"] != kind:
                 continue
             pts = s["p"]
+            if kind == "text":
+                size = max(1.0, s["w"] * w_page)
+                for i, line in enumerate(s.get("s", "").split("\n")):
+                    if not line.strip():
+                        continue
+                    y = pts[1] * w_page + (TEXT_ASCENT + i * TEXT_LINE_HEIGHT) * size
+                    at = fitz.Point(rect.x0 + pts[0] * w_page, rect.y0 + y) * derot
+                    shape.insert_text(at, line, fontsize=size, fontname="helv", color=_rgb(s["c"]), rotate=page.rotation)
+                continue
             n = len(pts) // 3
             if n == 0:
                 continue

@@ -356,8 +356,9 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
       }
       if (e.pointerType !== "touch" && !(o.tool === "hand" && onInk && e.button === 0)) return;
       const live = [...ptrs.entries()].filter(([, p]) => p.mode !== "palm");
-      // A finger on the selection's handles or buttons works them, also when fingers do not write (a palm is still a palm).
-      const onControls = !!(e.target as Element | null)?.closest?.(".les-sel-ui");
+      // A finger on the selection's handles or buttons, or in a text being typed, works them, also when fingers do not write
+      // (a palm is still a palm).
+      const onControls = !!(e.target as Element | null)?.closest?.(".les-ink-ui");
       if (e.pointerType === "touch" && onControls && !live.length && !isPalm(pen, now, e)) return;
       let mode: Pointer["mode"] = "wait";
       if (e.pointerType === "touch" && isPalm(pen, now, e)) mode = "palm";

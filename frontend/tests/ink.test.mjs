@@ -116,3 +116,24 @@ test("a scaled stroke is a new one with its points and width scaled, the pressur
   assert.deepEqual(m, { t: "pen", c: "#d32f2f", w: 0.006, p: [0.2, 0.2, 0.4, 0.4, 0.3, 0.9] });
   assert.equal(scaleStroke({ ...s, w: 0.15 }, 0, 0, 3).w, 0.2, "no wider than the server takes");
 });
+
+import { hits as hitsText, TEXT_LINE_HEIGHT } from "../src/components/lessons/ink.ts";
+
+test("a typed text is picked anywhere on its lines, before the strokes under it, and taken by a rectangle around it", () => {
+  const text = { t: "text", c: "#000000", w: 0.03, p: [0.2, 0.2, 0], s: "ciao\nmondo" };
+  const under = stroke(0.1, 0.22, 0.5, 0.22);
+  const b = boundsOf([text]);
+  // Two lines; without a canvas to measure, a letter is about half the font size wide.
+  assert.ok(b.y1 - b.y0 >= 2 * TEXT_LINE_HEIGHT * 0.03 && b.x1 > 0.2 + 5 * 0.03 * 0.5);
+  assert.equal(hitsText(text, 0.25, 0.25, 0), true);
+  assert.equal(hitsText(text, 0.25, 0.4, 0.01), false);
+  assert.equal(pick([text, under], 0.25, 0.22), 0, "the text is on top");
+  assert.equal(pick([text, under], 0.25, 0.22, undefined, ["pen"]), 1);
+  assert.equal(inside(text, { x0: 0.1, y0: 0.1, x1: 0.6, y1: 0.4 }), true);
+});
+
+test("a scaled or moved text keeps what it says, its font size scaled with it", () => {
+  const text = { t: "text", c: "#000000", w: 0.03, p: [0.2, 0.2, 0], s: "ciao" };
+  assert.deepEqual(scaleStroke(text, 0.2, 0.2, 2), { ...text, w: 0.06 });
+  assert.deepEqual(moveStroke(text, 0.1, 0.1), { ...text, p: [0.3, 0.3, 0] });
+});

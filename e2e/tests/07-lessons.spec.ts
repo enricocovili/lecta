@@ -612,6 +612,93 @@ test.describe.serial("Lezioni", () => {
     con.assertClean(EXPECTED);
   });
 
+  test("the text tool writes typed text on a page, opened again with a click, then selected, scaled and deleted like a stroke", async ({ page }) => {
+    test.setTimeout(120_000);
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`/admin/lessons?course=${courseId}`);
+    await page.getByTestId("lesson-row").locator("a.pg-row-title").click();
+    await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
+    const pages = page.getByTestId("lesson-page");
+    const count = (await stored(page)).pages.length;
+    await expect(pages).toHaveCount(count);
+    await page.getByRole("button", { name: "Pagina bianca in fondo" }).click();
+    await expect(pages).toHaveCount(count + 1);
+    const last = count;
+    const surface = page.getByTestId("ink-surface").nth(last);
+    await surface.scrollIntoViewIfNeeded();
+    const ink = async () => (await stored(page)).pages[last].ink as { t: string; s?: string; p: number[]; w: number }[];
+    const b = (await surface.boundingBox())!;
+    const [x, y] = [b.x + b.width * 0.2, b.y + b.height * 0.3];
+
+    // A click opens a field there, focused; Esc writes what was typed on the page.
+    await page.keyboard.press("t");
+    await expect(page.getByTestId("tool-text")).toHaveAttribute("aria-pressed", "true");
+    await page.mouse.click(x, y);
+    const field = page.getByTestId("text-field");
+    await expect(field).toBeFocused();
+    await page.keyboard.type("Ciao");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("mondo");
+    await page.keyboard.press("Escape");
+    await expect(field).toHaveCount(0);
+    await save(page);
+    const written = await ink();
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatchObject({ t: "text", s: "Ciao\nmondo" });
+    expect(written[0].p[0]).toBeCloseTo(0.2, 2);
+
+    // A click on it opens it again; a click elsewhere closes it (without opening another) and the change is saved in its place.
+    await page.mouse.click(x + 5, y);
+    await expect(field).toHaveValue("Ciao\nmondo");
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type("!");
+    await page.mouse.click(b.x + b.width * 0.7, b.y + b.height * 0.8);
+    await expect(field).toHaveCount(0);
+    await save(page);
+    expect((await ink()).map((i) => i.s)).toEqual(["Ciao\nmondo!"]);
+    await page.keyboard.press("Control+z");
+    await save(page);
+    expect((await ink()).map((i) => i.s)).toEqual(["Ciao\nmondo"]);
+
+    // The select tool takes it like a stroke: its corner handle makes the letters bigger, the bin deletes it.
+    await page.keyboard.press("s");
+    await page.mouse.click(x + 5, y);
+    await expect(page.getByTestId("selection-count")).toHaveText("1 tratto selezionato");
+    const hb = (await page.getByTestId("selection-handle-se").boundingBox())!;
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hb.x + hb.width / 2 + 80, hb.y + hb.height / 2 + 30, { steps: 6 });
+    await page.mouse.up();
+    await save(page);
+    const big = (await ink())[0];
+    expect(big.s).toBe("Ciao\nmondo");
+    expect(big.w).toBeGreaterThan(written[0].w * 1.2);
+    await page.getByTestId("selection-delete").click();
+    await save(page);
+    expect(await ink()).toHaveLength(0);
+
+    // A text emptied in its field is removed.
+    await page.keyboard.press("t");
+    await page.mouse.click(x, y);
+    await page.keyboard.type("via");
+    await page.keyboard.press("Escape");
+    await save(page);
+    expect(await ink()).toHaveLength(1);
+    await page.mouse.click(x + 5, y);
+    await expect(field).toHaveValue("via");
+    await page.keyboard.press("Control+a");
+    await page.keyboard.press("Delete");
+    await page.keyboard.press("Escape");
+    await save(page);
+    expect(await ink()).toHaveLength(0);
+
+    await pages.nth(last).getByTestId("remove-page").click();
+    await expect(pages).toHaveCount(count);
+    await page.getByTestId("tool-pen").click();
+    con.assertClean(EXPECTED);
+  });
+
   test("a lesson shared with a link: readers only look and follow, the write link edits, a revoked link stops", async ({ page, browser, baseURL }) => {
     test.setTimeout(180_000);
     const con = watchConsole(page);

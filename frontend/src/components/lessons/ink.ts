@@ -1,17 +1,20 @@
-// Ink: the pen strokes of a lesson page. Coordinates are in units of the page's width (x and y alike), so the
+// Ink: the pen strokes of a lesson page, and the typed text written on it (an item of the same list, so that it is selected,
+// moved, scaled, erased and undone like a stroke). Coordinates are in units of the page's width (x and y alike), so the
 // same numbers fit every zoom and screen, and match what the server stores and draws on the annotated PDF.
 
-export type Tool = "pen" | "hl" | "eraser" | "select" | "hand";
+export type Tool = "pen" | "hl" | "text" | "eraser" | "select" | "hand";
 
 export interface Stroke {
-  /** pen | hl (highlighter) */
-  t: "pen" | "hl";
+  /** pen | hl (highlighter) | text (typed) */
+  t: "pen" | "hl" | "text";
   /** #rrggbb */
   c: string;
-  /** stroke width, in page widths */
+  /** stroke width, in page widths; for a text, its font size */
   w: number;
-  /** x, y, pressure, x, y, pressure, … */
+  /** x, y, pressure, x, y, pressure, …; for a text, its top-left corner and 0 */
   p: number[];
+  /** text only: what is written, lines separated by \n */
+  s?: string;
 }
 
 export const HL_ALPHA = 0.35;
@@ -20,6 +23,43 @@ export const HL_WIDTHS = [0.014, 0.026];
 export const ERASER_RADIUS = 0.011;
 export const COLORS = ["#1c1b17", "#1e4fd8", "#d32f2f", "#2e7d32", "#ef6c00", "#7b1fa2"];
 export const HL_COLORS = ["#ffeb3b", "#69f0ae", "#ff80ab", "#80d8ff"];
+/** Font sizes of typed text, in page widths (18, 26 and 38 px on a slide 1000 px wide). */
+export const TEXT_SIZES = [0.018, 0.026, 0.038];
+/** Typed text: lines this many font sizes apart, in a font the server's PDF has too (Helvetica). */
+export const TEXT_LINE_HEIGHT = 1.25;
+export const TEXT_FONT = 'Helvetica, Arial, "Liberation Sans", sans-serif';
+
+let measurer: CanvasRenderingContext2D | null | undefined;
+function measuring(): CanvasRenderingContext2D | null {
+  if (measurer === undefined) measurer = typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d");
+  if (measurer) measurer.font = `100px ${TEXT_FONT}`;
+  return measurer;
+}
+
+/** The width of a line of typed text at font size 1 (an estimate where there is no canvas to measure it). */
+export function lineWidth(line: string): number {
+  const m = measuring();
+  return m ? m.measureText(line).width / 100 : line.length * 0.55;
+}
+
+let baseline: number | undefined;
+/** Where the first baseline of a text is below its top, in font sizes: where a text field with the same line height puts it
+ *  (half the leading, then the font's ascent), so the text stays put when its field is closed. The server uses 0.97, which is
+ *  this for Helvetica and Arial. */
+export function textBaseline(): number {
+  if (baseline === undefined) {
+    const m = measuring()?.measureText("Hg");
+    const a = m?.fontBoundingBoxAscent;
+    const d = m?.fontBoundingBoxDescent;
+    baseline = a && d ? (TEXT_LINE_HEIGHT * 100 - (a + d)) / 2 / 100 + a / 100 : 0.97;
+  }
+  return baseline;
+}
+
+export function textLines(s: Stroke): string[] {
+  return (s.s ?? "").split("\n");
+}
+
 /** A canvas never gets more pixels than this: zoomed in, a slide would otherwise take hundreds of MB. */
 const MAX_CANVAS_PX = 8_000_000;
 
@@ -58,6 +98,16 @@ function variable(p: number[]): boolean {
 export function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke, scale: number): void {
   const n = s.p.length / 3;
   if (n === 0) return;
+  if (s.t === "text") {
+    ctx.save();
+    ctx.fillStyle = s.c;
+    ctx.font = `${s.w * scale}px ${TEXT_FONT}`;
+    ctx.textBaseline = "alphabetic";
+    const top = textBaseline();
+    textLines(s).forEach((line, i) => ctx.fillText(line, s.p[0] * scale, (s.p[1] + (top + i * TEXT_LINE_HEIGHT) * s.w) * scale));
+    ctx.restore();
+    return;
+  }
   const base = Math.max(0.6, s.w * scale);
   ctx.save();
   ctx.strokeStyle = s.c;
@@ -98,9 +148,12 @@ export function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke, scale: numb
   ctx.restore();
 }
 
-/** Redraw everything (highlighters first, so pens stay readable above them). */
+/** Drawn in this order: highlighters first, so pens stay readable above them, and typed text on top. */
+const LAYERS = ["hl", "pen", "text"] as const;
+
+/** Redraw everything, layer by layer. */
 export function drawAll(ctx: CanvasRenderingContext2D, strokes: Stroke[], scale: number, skip?: Set<number>): void {
-  for (const kind of ["hl", "pen"] as const) {
+  for (const kind of LAYERS) {
     strokes.forEach((s, i) => {
       if (s.t === kind && !skip?.has(i)) drawStroke(ctx, s, scale);
     });
@@ -117,9 +170,19 @@ interface Box {
 }
 const boxes = new WeakMap<Stroke, Box>();
 
-/** The rectangle around a stroke's points (kept: the eraser asks for it at every move, for every stroke). */
+/** The rectangle around a stroke's points, or around a text's lines (kept: the eraser asks for it at every move, for every
+ *  stroke). */
 function boxOf(s: Stroke): Box {
   let b = boxes.get(s);
+  if (s.t === "text") {
+    if (!b) {
+      const lines = textLines(s);
+      const [x, y] = s.p;
+      b = { x0: x, y0: y, x1: x + Math.max(...lines.map(lineWidth)) * s.w, y1: y + lines.length * TEXT_LINE_HEIGHT * s.w, n: s.p.length };
+      boxes.set(s, b);
+    }
+    return b;
+  }
   if (!b || s.p.length !== b.n) {
     b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity, n: s.p.length };
     for (let i = 0; i < s.p.length; i += 3) {
@@ -144,7 +207,7 @@ export interface Rect {
 /** The rectangle a stroke covers, ink width included. */
 export function strokeRect(s: Stroke): Rect {
   const b = boxOf(s);
-  const pad = s.w;
+  const pad = s.t === "text" ? s.w * 0.15 : s.w;
   return { x0: b.x0 - pad, y0: b.y0 - pad, x1: b.x1 + pad, y1: b.y1 + pad };
 }
 
@@ -165,7 +228,7 @@ export function drawRegion(ctx: CanvasRenderingContext2D, strokes: Stroke[], sca
   ctx.rect(x0 * scale, y0 * scale, (x1 - x0) * scale, (y1 - y0) * scale);
   ctx.clip();
   ctx.clearRect(x0 * scale, y0 * scale, (x1 - x0) * scale, (y1 - y0) * scale);
-  for (const kind of ["hl", "pen"] as const) {
+  for (const kind of LAYERS) {
     strokes.forEach((s, i) => {
       if (s.t !== kind || skip?.has(i)) return;
       const b = strokeRect(s);
@@ -178,8 +241,9 @@ export function drawRegion(ctx: CanvasRenderingContext2D, strokes: Stroke[], sca
 
 /** Whether the eraser (a disc of radius r at x, y) touches the stroke. */
 export function hits(s: Stroke, x: number, y: number, r: number): boolean {
-  const reach = r + s.w / 2;
   const b = boxOf(s);
+  if (s.t === "text") return x >= b.x0 - r && x <= b.x1 + r && y >= b.y0 - r && y <= b.y1 + r;
+  const reach = r + s.w / 2;
   if (x < b.x0 - reach || x > b.x1 + reach || y < b.y0 - reach || y > b.y1 + reach) return false;
   const n = s.p.length / 3;
   if (n === 1) return Math.hypot(s.p[0] - x, s.p[1] - y) <= reach;
@@ -202,9 +266,10 @@ function distToSegment(px: number, py: number, ax: number, ay: number, bx: numbe
 /** How close (page widths) a click has to be to a stroke to pick it. */
 export const PICK_RADIUS = 0.008;
 
-/** The stroke a click at x, y picks (the one drawn on top: pens over highlighters, the latest first), or -1. */
-export function pick(strokes: Stroke[], x: number, y: number, r = PICK_RADIUS): number {
-  for (const kind of ["pen", "hl"] as const) {
+/** The stroke a click at x, y picks (the one drawn on top: text, then pens, then highlighters, the latest first), or -1;
+ *  `kinds` only those. */
+export function pick(strokes: Stroke[], x: number, y: number, r = PICK_RADIUS, kinds: readonly Stroke["t"][] = ["text", "pen", "hl"]): number {
+  for (const kind of kinds) {
     for (let i = strokes.length - 1; i >= 0; i--) if (strokes[i].t === kind && hits(strokes[i], x, y, r)) return i;
   }
   return -1;

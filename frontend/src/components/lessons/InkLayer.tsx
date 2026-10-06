@@ -1,15 +1,18 @@
-// The drawing surface over one page: pen, highlighter, stroke eraser and selection, for mouse, pen and finger.
+// The drawing surface over one page: pen, highlighter, typed text, stroke eraser and selection, for mouse, pen and finger.
 // A finger only reaches it when "finger draws" is on: scrolling and palms are told apart before, by the gestures (gestures.ts).
 // Selecting: a click on a stroke picks it (and dragging moves it at once), a drag on an empty spot draws a rectangle that picks
 // what it encloses, a drag inside the selection's box moves it all; Shift adds to the selection. The selection itself is the
 // editor's (one for the whole lesson), so that deleting it and the keyboard work from the toolbar; the button that deletes it
 // is also attached to its box, and the handles on its corners make it bigger or smaller.
-import { useCallback, useEffect, useRef, useState } from "react";
+// Text: a click (a tap too, with any pointer) opens a text field there, or on the text under it to change it; leaving the field
+// (Esc, Ctrl+Enter, a click elsewhere, another tool) writes the text on the page, emptied it removes it.
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Icon } from "../icons";
 import { fingerInk } from "./gestures";
 import {
-  boundsOf, canvasScale, clampShift, cornerPoints, drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, inside, moveStroke, pick, PICK_RADIUS, roundStroke, scaleFactor,
-  scaleStroke, strokeRect, unionRect, type Corner, type Rect, type Stroke, type Tool,
+  boundsOf, canvasScale, clampShift, cornerPoints, drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, inside, lineWidth, moveStroke, pick, PICK_RADIUS, roundStroke,
+  scaleFactor, scaleStroke, strokeRect, TEXT_FONT, TEXT_LINE_HEIGHT, unionRect, type Corner, type Rect, type Stroke, type Tool,
 } from "./ink";
 import { recognize } from "./shapes";
 
@@ -25,6 +28,8 @@ interface Props {
   hlColor: string;
   penWidth: number;
   hlWidth: number;
+  /** font size of new text, in page widths */
+  textSize: number;
   fingerDraws: boolean;
   /** A stroke that is a line, rectangle, triangle or ellipse is replaced by the clean shape (like Xournal++). */
   shapes: boolean;
@@ -68,7 +73,7 @@ function SelectionControls({ r, width, height, onDelete, onHandle }: { r: Rect; 
   const below = r.y1 * width + GAP;
   const top = above >= 4 ? above : below + BTN <= height - 4 ? below : Math.max(4, r.y0 * width + GAP);
   return (
-    <div className="les-sel-ui" data-testid="selection-controls">
+    <div className="les-ink-ui" data-testid="selection-controls">
       {CORNERS.map((c) => {
         // Outside the box's corner (a press inside the box moves the selection), but kept on the page.
         const { cx, cy } = cornerPoints(r, c);
@@ -104,6 +109,56 @@ function SelectionControls({ r, width, height, onDelete, onHandle }: { r: Rect; 
   );
 }
 
+/** A text being typed: a new one (`from` null) or one on the page, which is hidden on the canvas meanwhile. */
+interface Editing {
+  from: Stroke | null;
+  x: number;
+  y: number;
+  w: number;
+  c: string;
+  value: string;
+}
+
+/** A text is being typed on some page: the click that ends it (by taking the focus away) does not open another one. Seen at
+ *  the click's mousedown, which a tap and the pen send too (the gestures keep a finger's pointerdown to themselves). */
+let typing = false;
+
+/** The text field over the page, with the text's font, size, colour and line height: what is typed is where it will stay. */
+function TextField({ ed, width, field, onChange, onDone }: { ed: Editing; width: number; field: React.RefObject<HTMLTextAreaElement | null>; onChange: (v: string) => void; onDone: () => void }) {
+  const px = ed.w * width;
+  const lines = ed.value.split("\n");
+  const w = Math.max(...lines.map(lineWidth), 0.5) * px + px;
+  return (
+    <div className="les-ink-ui">
+      <textarea
+        ref={field}
+        className="les-text-field"
+        data-testid="text-field"
+        aria-label="Testo sulla pagina"
+        value={ed.value}
+        wrap="off"
+        spellCheck={false}
+        style={{
+          left: ed.x * width,
+          top: ed.y * width,
+          width: Math.min(w, Math.max(px * 2, (1 - ed.x) * width)),
+          height: lines.length * TEXT_LINE_HEIGHT * px,
+          font: `${px}px/${TEXT_LINE_HEIGHT} ${TEXT_FONT}`,
+          color: ed.c,
+        }}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onDone}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+      />
+    </div>
+  );
+}
+
 /** The selection's box (dashed, lightly filled), or the rectangle being drawn. */
 function drawBox(ctx: CanvasRenderingContext2D, r: Rect, scale: number, dpr: number) {
   const x = Math.min(r.x0, r.x1) * scale;
@@ -120,7 +175,7 @@ function drawBox(ctx: CanvasRenderingContext2D, r: Rect, scale: number, dpr: num
   ctx.restore();
 }
 
-export default function InkLayer({ strokes, width, height, active, tool, color, hlColor, penWidth, hlWidth, fingerDraws, shapes, selected, onAdd, onErase, onSelect, onMoveStrokes }: Props) {
+export default function InkLayer({ strokes, width, height, active, tool, color, hlColor, penWidth, hlWidth, textSize, fingerDraws, shapes, selected, onAdd, onErase, onSelect, onMoveStrokes }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLCanvasElement>(null);
   const live = useRef<HTMLCanvasElement>(null);
@@ -130,8 +185,17 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
   const justErased = useRef<{ gone: Set<Stroke>; len: number } | null>(null);
   // The selection is being moved, or a rectangle drawn: its buttons step aside.
   const [busy, setBusy] = useState(false);
-  const props = useRef({ strokes, tool, color, hlColor, penWidth, hlWidth, fingerDraws, shapes, width, height, selected });
-  props.current = { strokes, tool, color, hlColor, penWidth, hlWidth, fingerDraws, shapes, width, height, selected };
+  const [editing, setEditingState] = useState<Editing | null>(null);
+  const editingRef = useRef<Editing | null>(null);
+  const setEditing = (ed: Editing | null) => {
+    editingRef.current = ed;
+    typing = !!ed;
+    setEditingState(ed);
+  };
+  const field = useRef<HTMLTextAreaElement>(null);
+  const closing = useRef(false);
+  const props = useRef({ strokes, tool, color, hlColor, penWidth, hlWidth, textSize, fingerDraws, shapes, width, height, selected });
+  props.current = { strokes, tool, color, hlColor, penWidth, hlWidth, textSize, fingerDraws, shapes, width, height, selected };
   const dpr = canvasScale(width, height);
 
   const paintBase = useCallback(
@@ -140,7 +204,9 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       const ctx = c?.getContext("2d");
       if (!c || !ctx) return;
       ctx.clearRect(0, 0, c.width, c.height);
-      drawAll(ctx, props.current.strokes, props.current.width * dpr, skip);
+      // The text being changed is in its field, not on the canvas.
+      const typing = editingRef.current?.from ? props.current.strokes.indexOf(editingRef.current.from) : -1;
+      drawAll(ctx, props.current.strokes, props.current.width * dpr, typing >= 0 ? new Set([...(skip ?? []), typing]) : skip);
     },
     [dpr],
   );
@@ -167,6 +233,15 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     if (!resized && erased && strokes.length === erased.len && !strokes.some((s) => erased.gone.has(s))) return;
     paintBase();
   }, [strokes, width, height, active, dpr, paintBase]);
+
+  useEffect(() => {
+    if (active) paintBase();
+  }, [editing?.from, active, paintBase]);
+
+  // Another tool, or the page far from the view: what was typed is written on the page.
+  useEffect(() => {
+    if ((tool !== "text" || !active) && editingRef.current) field.current?.blur();
+  }, [tool, active]);
 
   const paintLive = useCallback(() => {
     raf.current = 0;
@@ -268,6 +343,8 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     const type = e.pointerType;
     if (type === "mouse" && e.button !== 0) return;
     if (type === "touch" && !p.fingerDraws) return;
+    // Text is placed by the click that follows (a finger's tap too, which the gestures keep from reaching here).
+    if (p.tool === "text" && !(e.buttons & 32)) return;
     e.preventDefault();
     capture(e.pointerId);
     if (type === "touch") fingerInk.cancel = cancelFinger.current;
@@ -427,6 +504,47 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     }
   };
 
+  /** A click with the text tool: the text under it is opened to be changed, or a new one starts there. */
+  const onClick = (e: React.MouseEvent) => {
+    const p = props.current;
+    if (p.tool !== "text" || editingRef.current || closing.current) return;
+    if ((e.target as Element).closest(".les-ink-ui")) return;
+    const pt = point(e);
+    const i = pick(p.strokes, pt.x, pt.y, PICK_RADIUS, ["text"]);
+    const ed: Editing =
+      i >= 0
+        ? { from: p.strokes[i], x: p.strokes[i].p[0], y: p.strokes[i].p[1], w: p.strokes[i].w, c: p.strokes[i].c, value: p.strokes[i].s ?? "" }
+        : { from: null, x: Math.min(pt.x, 1 - p.textSize * 2), y: Math.max(0, pt.y - (p.textSize * TEXT_LINE_HEIGHT) / 2), w: p.textSize, c: p.color, value: "" };
+    // Focused within the click, so that a tablet opens its keyboard.
+    flushSync(() => setEditing(ed));
+    field.current?.focus();
+  };
+
+  /** The field is left: the text is written on the page (added, changed, or removed when emptied). */
+  const closeText = () => {
+    const ed = editingRef.current;
+    if (!ed) return;
+    setEditing(null);
+    const value = ed.value.replace(/\s+$/, "");
+    const at = ed.from ? props.current.strokes.indexOf(ed.from) : -1;
+    if (!value.trim()) {
+      if (at >= 0) onErase([at]);
+    } else if (!ed.from) {
+      onAdd(roundStroke({ t: "text", c: ed.c, w: ed.w, p: [ed.x, ed.y, 0], s: value }));
+    } else if (at >= 0 && value !== ed.from.s) {
+      onMoveStrokes([{ from: ed.from, to: { ...ed.from, s: value } }]);
+    }
+  };
+  useLayoutEffect(() => {
+    if (editing && document.activeElement !== field.current) field.current?.focus();
+  }, [editing]);
+  useEffect(
+    () => () => {
+      if (editingRef.current) typing = false; // the page went away while its text was open
+    },
+    [],
+  );
+
   // A second finger landing turns the writing one into a pinch: what it was drawing or erasing is dropped.
   const finishRef = useRef(finish);
   finishRef.current = finish;
@@ -452,11 +570,22 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       onPointerUp={(e) => finish(e.pointerId, false)}
       onPointerCancel={(e) => finish(e.pointerId, true)}
       onPointerLeave={() => cursorAt(null, null)}
+      onMouseDown={() => (closing.current = typing)}
+      onClick={onClick}
       onContextMenu={(e) => e.preventDefault()}
     >
       <canvas ref={base} />
       <canvas ref={live} />
       {selBox && <SelectionControls r={pad(selBox, SEL_PAD)} width={width} height={height} onDelete={deleteSelected} onHandle={startScale} />}
+      {editing && (
+        <TextField
+          ed={editing}
+          width={width}
+          field={field}
+          onChange={(value) => editingRef.current && setEditing({ ...editingRef.current, value })}
+          onDone={closeText}
+        />
+      )}
     </div>
   );
 }

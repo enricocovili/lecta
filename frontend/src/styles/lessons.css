@@ -121,6 +121,13 @@ body.ws-page .les {
   border-radius: 50%;
   background: var(--fg);
 }
+.les-size.les-size-text span {
+  border-radius: 0;
+  background: none;
+  color: var(--fg);
+  font-weight: 600;
+  line-height: 1;
+}
 .les-size.on {
   border-color: var(--accent);
   background: var(--accent-soft);
@@ -295,17 +302,36 @@ body.ws-page .les {
 .les-ink.tool-select {
   cursor: default;
 }
+.les-ink.tool-text {
+  cursor: text;
+}
+/* The text being typed on a page: no box of its own (padding, border) so the letters are where they will stay. */
+.les .les-text-field {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  outline: 1px dashed #1e6fd8;
+  outline-offset: 2px;
+  background: rgb(255 255 255 / 55%);
+  box-shadow: none;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  min-height: 0;
+}
 .les-sel-hint {
   white-space: nowrap;
 }
 /* The buttons attached to the selection's box (InkLayer): only they take the pointer, the rest of the page draws. */
-.les-sel-ui {
+.les-ink-ui {
   position: absolute;
   inset: 0;
   pointer-events: none;
   line-height: normal;
 }
-.les-sel-ui > * {
+.les-ink-ui > * {
   pointer-events: auto;
 }
 .les .les-sel-delete {

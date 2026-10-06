@@ -9,7 +9,7 @@ import { Confirm, Seg, toastError, useLocalStorage } from "../ui";
 import GenerateDialog from "./GenerateDialog";
 import { clampZoom, stepZoom, useGestures, ZOOM_MAX, ZOOM_MIN, type GestureOptions } from "./gestures";
 import ShareDialog from "./ShareDialog";
-import { COLORS, HL_COLORS, HL_WIDTHS, PEN_WIDTHS, type Stroke, type Tool } from "./ink";
+import { COLORS, HL_COLORS, HL_WIDTHS, PEN_WIDTHS, TEXT_SIZES, type Stroke, type Tool } from "./ink";
 import LessonStatusPill, { type LessonStatus } from "./LessonStatus";
 import PageRow, { type Actions, type DrawSettings } from "./PageRow";
 import { usePdfDoc } from "./SlideView";
@@ -102,6 +102,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   const [hlIdx, setHlIdx] = useState(0);
   const [penSize, setPenSize] = useLocalStorage("lecta:lesson:pen", 1);
   const [hlSize, setHlSize] = useLocalStorage("lecta:lesson:hl", 0);
+  const [textSize, setTextSize] = useLocalStorage("lecta:lesson:text", 1);
   const [fingerDraws, setFingerDraws] = useLocalStorage("lecta:lesson:finger", false);
   const [shapes, setShapes] = useLocalStorage("lecta:lesson:shapes", true);
   const [layout, setLayout] = useLocalStorage<"side" | "stack" | "slides">("lecta:lesson:layout", "side");
@@ -175,9 +176,14 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   }, [sendBookmark]);
 
   const draw = useMemo<DrawSettings>(
-    () => ({ tool: readOnly ? "hand" : tool, color: COLORS[colorIdx], hlColor: HL_COLORS[hlIdx], penWidth: PEN_WIDTHS[Math.min(penSize, PEN_WIDTHS.length - 1)], hlWidth: HL_WIDTHS[Math.min(hlSize, HL_WIDTHS.length - 1)], fingerDraws, shapes }),
-    [tool, readOnly, colorIdx, hlIdx, penSize, hlSize, fingerDraws, shapes],
+    () => ({
+      tool: readOnly ? "hand" : tool, color: COLORS[colorIdx], hlColor: HL_COLORS[hlIdx], penWidth: PEN_WIDTHS[Math.min(penSize, PEN_WIDTHS.length - 1)],
+      hlWidth: HL_WIDTHS[Math.min(hlSize, HL_WIDTHS.length - 1)], textSize: TEXT_SIZES[Math.min(textSize, TEXT_SIZES.length - 1)], fingerDraws, shapes,
+    }),
+    [tool, readOnly, colorIdx, hlIdx, penSize, hlSize, textSize, fingerDraws, shapes],
   );
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
   const gestureOpts = useRef<GestureOptions>({ tool: draw.tool, fingerDraws, zoom, setZoom });
   gestureOpts.current = { tool: draw.tool, fingerDraws, zoom, setZoom };
   const zoomTo = useGestures(scroller, gestureOpts);
@@ -200,7 +206,8 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
       eraseStrokes,
       moveStrokes: (pid, moves) => {
         moveStrokes(pid, moves);
-        setSelection({ pid, strokes: moves.map((m) => m.to) });
+        // What was moved or scaled stays selected (a text changed with the text tool is not selected).
+        if (toolRef.current === "select") setSelection({ pid, strokes: moves.map((m) => m.to) });
       },
       select: (pid, strokes) => setSelection(strokes.length ? { pid, strokes } : null),
       visible: setCurrent,
@@ -287,6 +294,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
         const k = e.key.toLowerCase();
         if (k === "p") setTool("pen");
         else if (k === "h") setTool("hl");
+        else if (k === "t") setTool("text");
         else if (k === "e") setTool("eraser");
         else if (k === "s") setTool("select");
         else if (k === "v") setTool("hand");
@@ -483,11 +491,12 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
         <div className="btn-group">
           <ToolButton id="pen" icon="pencil" label="Penna (P)" tool={tool} onPick={setTool} />
           <ToolButton id="hl" icon="highlighter" label="Evidenziatore (H)" tool={tool} onPick={setTool} />
+          <ToolButton id="text" icon="text" label="Testo (T)" tool={tool} onPick={setTool} />
           <ToolButton id="eraser" icon="eraser" label="Gomma (E)" tool={tool} onPick={setTool} />
           <ToolButton id="select" icon="select" label="Seleziona (S)" tool={tool} onPick={setTool} />
           <ToolButton id="hand" icon="hand" label="Scorri, senza scrivere (V)" tool={tool} onPick={setTool} />
         </div>
-        {(tool === "pen" || tool === "hl") && (
+        {(tool === "pen" || tool === "hl" || tool === "text") && (
           <>
             <div className="les-colors" role="group" aria-label="Colore">
               {colors.map((c, i) => (
@@ -502,6 +511,22 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
                 />
               ))}
             </div>
+            {tool === "text" ? (
+              <div className="les-sizes" role="group" aria-label="Dimensione del testo">
+                {TEXT_SIZES.map((w, i) => (
+                  <button
+                    key={w}
+                    type="button"
+                    className={`les-size les-size-text ${textSize === i ? "on" : ""}`}
+                    aria-label={`Testo ${["piccolo", "medio", "grande"][i]}`}
+                    aria-pressed={textSize === i}
+                    onClick={() => setTextSize(i)}
+                  >
+                    <span style={{ fontSize: 11 + i * 4 }}>A</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
             <div className="les-sizes" role="group" aria-label="Spessore">
               {(tool === "hl" ? HL_WIDTHS : PEN_WIDTHS).map((w, i) => (
                 <button
@@ -516,6 +541,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
                 </button>
               ))}
             </div>
+            )}
           </>
         )}
         {tool === "select" && (

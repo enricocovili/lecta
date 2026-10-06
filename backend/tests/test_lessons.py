@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import fitz
 import pytest
-from PIL import ImageChops
+from PIL import Image, ImageChops, ImageOps
 from sqlalchemy import select
 
 from app.models import Course
@@ -54,6 +54,48 @@ def test_ink_is_validated():
     for b in bad:
         with pytest.raises(ls.InkError):
             ls.clean_ink(b)
+
+
+
+def text(s="Nota: f = 2B", c="#d32f2f", w=0.03, x=0.1, y=0.5):
+    return {"t": "text", "c": c, "w": w, "p": [x, y, 0], "s": s}
+
+
+def test_typed_text_is_validated_with_the_strokes():
+    ok = ls.clean_ink([stroke(), text("riga 1\r\nriga 2\x00")])
+    assert ok[1] == {"t": "text", "c": "#d32f2f", "w": 0.03, "p": [0.1, 0.5, 0.0], "s": "riga 1\nriga 2"}
+    assert "s" not in ok[0]
+    for b in ([text("")], [text("   ")], [{**text(), "s": 3}], [{**text(), "p": [0.1, 0.5, 0, 0.2, 0.5, 0]}], [text("x" * 5001)]):
+        with pytest.raises(ls.InkError):
+            ls.clean_ink(b)
+
+
+def test_typed_text_is_written_in_the_annotated_pdf_where_the_browser_shows_it(tmp_path):
+    pdf = tmp_path / "s.pdf"
+    pdf.write_bytes(slides_pdf(1))
+    pages = [{"kind": "slide", "slide_page": 1, "ratio": 0.7, "ink": [text("Prima riga\nSeconda riga", x=0.1, y=0.5)]}]
+    page = fitz.open(stream=ls.annotated_pdf(pdf, pages), filetype="pdf")[0]
+    spans = {sp["text"]: sp for b in page.get_text("dict")["blocks"] for ln in b.get("lines", []) for sp in ln["spans"]}
+    assert "Prima riga" in spans and "Seconda riga" in spans
+    W = page.rect.width
+    size = 0.03 * W
+    first, second = spans["Prima riga"]["origin"], spans["Seconda riga"]["origin"]
+    # The baselines: TEXT_ASCENT font sizes below the text's top, then one every TEXT_LINE_HEIGHT.
+    assert abs(first[0] - 0.1 * W) < 1 and abs(first[1] - (0.5 * W + ls.TEXT_ASCENT * size)) < 1
+    assert abs((second[1] - first[1]) - ls.TEXT_LINE_HEIGHT * size) < 1
+    # A rotated page shows the text upright where the browser put it, like the strokes.
+    doc = fitz.open()
+    doc.new_page(width=595, height=842).set_rotation(90)
+    rotated = tmp_path / "r.pdf"
+    rotated.write_bytes(doc.tobytes())
+    page = fitz.open(stream=ls.annotated_pdf(rotated, [{"kind": "slide", "slide_page": 1, "ink": [text("Ruotata", x=0.1, y=0.3)]}]), filetype="pdf")[0]
+    pix = page.get_pixmap()
+    W = page.rect.width
+    assert pix.width > pix.height and abs(pix.width - W) < 1
+    x0, y0, x1, y1 = ImageOps.invert(Image.frombytes("RGB", (pix.width, pix.height), pix.samples).convert("L")).getbbox()
+    baseline = (0.3 + ls.TEXT_ASCENT * 0.03) * W
+    assert x1 - x0 > 3 * (y1 - y0), "a line read left to right, not top to bottom"
+    assert abs(x0 - 0.1 * W) < 4 and abs(y1 - baseline) < 3 and y0 > 0.3 * W - 2
 
 
 def test_notes_are_one_section_per_slide():

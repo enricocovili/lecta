@@ -15,6 +15,8 @@ export interface DrawSettings {
   hlColor: string;
   penWidth: number;
   hlWidth: number;
+  /** font size of new text, in page widths */
+  textSize: number;
   fingerDraws: boolean;
   shapes: boolean;
 }
@@ -112,6 +114,7 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
           hlColor={draw.hlColor}
           penWidth={draw.penWidth}
           hlWidth={draw.hlWidth}
+          textSize={draw.textSize}
           fingerDraws={draw.fingerDraws}
           shapes={draw.shapes}
           onAdd={(s) => actions.addStroke(page.id, s)}

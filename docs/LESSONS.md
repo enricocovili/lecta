@@ -9,7 +9,7 @@ pages added by hand (a slide never has enough room). Every page has:
 * **Markdown notes**, next to the slide (or below it): a plain text field that continues lists on Enter, indents with
   Tab, wraps `**bold**` / `*italic*` with Ctrl+B / Ctrl+I, grows with what is written, and has a rendered preview
   (maths with KaTeX). There is no limit to the room: the row grows past the slide.
-* **Ink over the slide**: pen (3 widths, 6 colours), highlighter, stroke eraser (drawn as a ring that follows the pointer, also while erasing; also the stylus' eraser end), a **select** tool (S: a click
+* **Ink over the slide**: pen (3 widths, 6 colours), highlighter, **text** (T: a click or a tap, with the mouse, the pen or a finger, opens a field there in the chosen colour and size (3 sizes), focused so a tablet shows its keyboard; Esc, Ctrl+Enter or a click elsewhere writes it on the page, a click on a text opens it again, emptied it goes away; on the page it is an item of the ink, selected, moved, scaled, erased and undone like a stroke), stroke eraser (drawn as a ring that follows the pointer, also while erasing; also the stylus' eraser end), a **select** tool (S: a click
   picks the stroke under it, the one on top, and dragging moves it at once; a drag on an empty spot draws a rectangle that picks
   the strokes it encloses; a drag inside the dashed box moves the whole selection, kept on the page; Shift adds or removes a
   stroke; Canc/Backspace, «Elimina» in the toolbar or the bin attached to the box (above it, or below when there is no room) deletes it, the handles on the box's corners make it bigger or smaller (uniformly, around the opposite corner, kept on the page; the points and the widths are scaled, so the strokes stay as sharp as before; a finger works them even when fingers do not write), Esc or a click on an empty spot lets it go; one page at a time), a "hand" tool
@@ -56,7 +56,15 @@ fits, and the server can draw the same thing on the PDF):
 ```
 
 `t` is `pen` or `hl` (highlighter, 35 % opacity, drawn under the pens), `c` `#rrggbb`, `w` the stroke width, `p` triples
-`x, y, pressure`. The server validates everything (`services/lessons.clean_ink`): at most 4000 strokes and 250 000
+`x, y, pressure`. Typed text is an item of the same list, drawn above the strokes:
+
+```json
+{"t": "text", "c": "#1c1b17", "w": 0.026, "p": [0.2, 0.3, 0], "s": "first line\nsecond line"}
+```
+
+`w` is the font size, `p` the text's top-left corner, `s` what it says (up to 5000 characters). Lines are 1.25 font sizes
+apart and the first baseline is 0.97 font sizes below the top (where a text field of that line height puts it with
+Helvetica or Arial, the font of the browser and of the PDF). The server validates everything (`services/lessons.clean_ink`): at most 4000 strokes and 250 000
 points per page, sane coordinates, colour and width.
 
 ## API (admin only, like the rest)
@@ -73,7 +81,7 @@ points per page, sane coordinates, colour and width.
 | `POST /api/lessons/{id}/pages` `{after_page_id?}` · `DELETE …/pages/{pid}` | add a blank page · remove any page, slides included (the last one stays); a removed slide leaves the lesson but not the stored PDF |
 | `POST /api/lessons/{id}/pages/restore` `{id, kind, slide_page, ratio, position, notes, ink}` | undo of a removal: the page comes back **with its own id** (only an id that was already handed out, and not taken), notes and strokes, at its place |
 | `GET /api/lessons/{id}/pdf` | the slides |
-| `GET /api/lessons/{id}/annotated.pdf` | slides and added pages in order with the strokes drawn on them |
+| `GET /api/lessons/{id}/annotated.pdf` | slides and added pages in order with the strokes and the typed text drawn on them |
 | `GET /api/lessons/{id}/notes.md` | the typed notes as the import receives them |
 | `POST /api/lessons/{id}/generate` `{guidelines?, save_guidelines, chapter_id?, placement?, mark_completed=true}` | starts the import → `{job_id}`; `placement`: `update` (default when the lesson has a chapter), `new_chapter` (default otherwise), `auto` |
 
