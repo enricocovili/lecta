@@ -121,6 +121,12 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
           onMoveStrokes={(moves) => actions.moveStrokes(page.id, moves)}
         />
         <span className="les-tag">{label}</span>
+        {/* Without the notes column its remove button sits on the slide's corner. */}
+        {layout === "slides" && !readOnly && (
+          <button type="button" className="btn icon les-slide-remove" onClick={() => actions.removePage(page.id)} title={page.kind === "slide" ? "Togli questa slide dalla lezione" : "Togli questa pagina"} aria-label="Togli questa pagina" data-testid="remove-page">
+            <Icon name="trash" />
+          </button>
+        )}
       </div>
       {layout !== "slides" && (
         <div className="les-notes">

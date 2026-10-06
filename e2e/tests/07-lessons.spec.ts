@@ -566,10 +566,14 @@ test.describe.serial("Lezioni", () => {
     await save(page);
     expect(await ink()).toHaveLength(0);
 
-    // The page goes away again, so the lesson is as it was: empty, it goes without asking.
+    // The page goes away again, so the lesson is as it was: empty, it goes without asking. With slides only, the button is
+    // on the slide.
+    await page.getByRole("tab", { name: "Solo slide" }).click();
+    await expect(pages.nth(last).locator(".les-notes")).toHaveCount(0);
     await pages.nth(last).getByTestId("remove-page").click();
     await expect(pages).toHaveCount(count);
     await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("tab", { name: "Slide e appunti affiancati" }).click();
     await page.getByTestId("tool-pen").click();
     con.assertClean(EXPECTED);
   });

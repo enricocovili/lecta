@@ -239,6 +239,34 @@ body.ws-page .les {
 .les-row:focus-within .les-tag {
   opacity: 1;
 }
+/* «Solo slide»: the page's remove button on the slide's top-right corner, shown like the tag (always on a touch screen). */
+.les .les-slide-remove {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: none;
+  background: rgb(28 27 23 / 62%);
+  color: #fff;
+  line-height: normal;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.les .les-slide-remove:hover {
+  background: #b3261e;
+}
+.les-row:hover .les-slide-remove,
+.les-slide-remove:focus-visible {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .les .les-slide-remove {
+    opacity: 0.8;
+  }
+}
 .les-ink {
   position: absolute;
   inset: 0;
