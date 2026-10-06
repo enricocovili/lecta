@@ -209,9 +209,14 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
           .then((id) => setTimeout(() => reveal(id, true), 80))
           .catch(toastError);
       },
-      removePage: setAskRemove,
+      // A page with nothing written on it goes at once (undo brings it back); one with notes or strokes asks first.
+      removePage: (pid) => {
+        const p = pagesRef.current.find((x) => x.id === pid);
+        if (p && !p.notes.trim() && !p.ink.length) removePage(pid).catch(toastError);
+        else setAskRemove(pid);
+      },
     }),
-    [setNotes, addStroke, eraseStrokes, moveStrokes, addBlankAfter],
+    [setNotes, addStroke, eraseStrokes, moveStrokes, addBlankAfter, removePage],
   );
 
   // The selection is let go when another tool is picked, and keeps only the strokes that are still there (undo, erasing,

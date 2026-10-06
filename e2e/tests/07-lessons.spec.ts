@@ -459,8 +459,12 @@ test.describe.serial("Lezioni", () => {
     await expect.poll(async () => (await stored(page)).pages[1].ink.length, { timeout: 15_000 }).toBe(inkBefore + 1);
     expect((await stored(page)).pages[1].notes).toBe("appunto nuovo");
 
-    // A removed slide asks in a dialog of the app (Enter confirms) and comes back with Ctrl+Z, notes and strokes included.
+    // A removed slide with something written on it asks in a dialog of the app (Enter confirms) and comes back with Ctrl+Z,
+    // notes and strokes included.
+    await scribble(page, 2, [0.6, 0.7], [0.8, 0.8]);
+    await save(page);
     const third = (await stored(page)).pages[2];
+    expect(third.ink.length).toBeGreaterThan(0);
     await pages.nth(2).getByTestId("remove-page").click();
     await expect(page.getByRole("dialog")).toContainText("esce dalla lezione");
     await page.keyboard.press("Enter");
@@ -562,10 +566,10 @@ test.describe.serial("Lezioni", () => {
     await save(page);
     expect(await ink()).toHaveLength(0);
 
-    // The page goes away again, so the lesson is as it was.
+    // The page goes away again, so the lesson is as it was: empty, it goes without asking.
     await pages.nth(last).getByTestId("remove-page").click();
-    await page.keyboard.press("Enter");
     await expect(pages).toHaveCount(count);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.getByTestId("tool-pen").click();
     con.assertClean(EXPECTED);
   });
