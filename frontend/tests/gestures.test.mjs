@@ -1,7 +1,7 @@
 // Finger gestures of the lesson editor (palm or finger, the glide after a flick, the pinch zoom): run with `npm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clampZoom, glide, isPalm, PALM_AFTER_PEN_MS, pinchView, releaseSpeed, stepZoom, wheelZoom, ZOOM_MAX, ZOOM_MIN } from "../src/components/lessons/gestures.ts";
+import { clampZoom, glide, isPalm, PALM_AFTER_PEN_MS, pinchView, reachable, releaseSpeed, stepZoom, wheelZoom, ZOOM_MAX, ZOOM_MIN } from "../src/components/lessons/gestures.ts";
 
 const finger = { width: 12, height: 14 };
 
@@ -60,6 +60,33 @@ test("a pinch keeps the point that was between the fingers under them, wherever 
   // Fingers that only move together scroll the pages, without zooming.
   const pan = pinchView(f0, 100, f, 100, origin, 1);
   assert.ok(close(pan.s, 1) && close(pan.tx, 30) && close(pan.ty, -50));
+});
+
+// A scroller with its content box 1000 px wide from x = 20 and 800 px tall from y = 100; pages as wide as it, 6000 px tall
+// with 160 px of padding above and below.
+const room = { left: 20, width: 1000, top: 100, bottom: 900, w: 1000, h: 6000, padTop: 160, padBottom: 160 };
+
+test("in the middle of the lesson, zoomed in, the point under the fingers can stay where it is", () => {
+  const p = { x: 500, y: 450 };
+  assert.deepEqual(reachable(room, { x: 480, y: 2350 }, 1.5, p), p);
+  assert.deepEqual(reachable(room, { x: 480, y: 2350 }, 0.8, { x: 520, y: 450 }).y, 450);
+});
+
+test("pages zoomed out narrower than the editor are centred: the point goes where centring puts it", () => {
+  // 1000 px → 600 px wide, centred: their left edge at 20 + 200; the point 480 px in is then 288 px in.
+  assert.ok(close(reachable(room, { x: 480, y: 2350 }, 0.6, { x: 500, y: 450 }).x, 220 + 288));
+  // Zoomed in, the pages scroll sideways only as far as they are wider than the editor.
+  assert.ok(close(reachable(room, { x: 10, y: 2350 }, 2, { x: 900, y: 450 }).x, 20 + 20));
+});
+
+test("at the top of the lesson, zooming out cannot bring the first page further down than the top", () => {
+  // The point is 300 px into the pages (140 below their padding): zoomed by a half, 160 + 70 from their top, which is at
+  // 100 at most (scrolled all the way up).
+  assert.ok(close(reachable(room, { x: 480, y: 300 }, 0.5, { x: 500, y: 600 }).y, 100 + 230));
+  // At the bottom, the last page cannot go further up than the bottom of the editor.
+  assert.ok(close(reachable(room, { x: 480, y: 5900 }, 0.5, { x: 500, y: 200 }).y, 900 - 100));
+  // Pages shorter than the editor stay at the top.
+  assert.ok(close(reachable({ ...room, h: 700 }, { x: 480, y: 400 }, 0.5, { x: 500, y: 800 }).y, 100 + 160 + 120));
 });
 
 test("the zoom stays within its limits, also when pinched beyond them", () => {

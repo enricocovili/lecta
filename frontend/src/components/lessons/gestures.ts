@@ -53,6 +53,36 @@ export function pinchView(f0: Point, d0: number, f: Point, d: number, origin: Po
   return { s, tx: f.x - origin.x - s * (f0.x - origin.x), ty: f.y - origin.y - s * (f0.y - origin.y) };
 }
 
+/** The scroller and the pages when a zoom begins (screen px), to know where the pages can be once it is applied. */
+export interface Room {
+  /** the scroller's content box, inside its padding: left edge and width */
+  left: number;
+  width: number;
+  /** where the pages' top is when scrolled all the way up, and the lowest their bottom can be when scrolled all the way down */
+  top: number;
+  bottom: number;
+  /** the pages' size before the zoom, and their padding above and below (it does not zoom) */
+  w: number;
+  h: number;
+  padTop: number;
+  padBottom: number;
+}
+
+/** Where the point `a` of the pages (px from their top-left corner, before the zoom) can be on screen once they are zoomed by
+ *  `s`, as close as possible to `p`: the scroller cannot go past its ends, and pages narrower than it are centred. */
+export function reachable(room: Room, a: Point, s: number, p: Point): Point {
+  const w = room.w * s;
+  const start = room.left + Math.max(0, (room.width - w) / 2); // the pages' left edge, scrolled all the way left
+  const end = start - Math.max(0, w - room.width); // … and all the way right
+  const x = Math.min(start + s * a.x, Math.max(end + s * a.x, p.x));
+  // Rows zoom (nearly) with the pages, their padding does not: how far the point will be from their top and bottom.
+  const zoomed = (d: number, pad: number) => (d <= pad ? d : pad + s * (d - pad));
+  const lowest = room.top + zoomed(a.y, room.padTop);
+  const highest = room.bottom - zoomed(room.h - a.y, room.padBottom);
+  const y = highest >= lowest ? lowest : Math.min(lowest, Math.max(highest, p.y));
+  return { x, y };
+}
+
 /** The zoom a wheel turn asks for: a touchpad pinch sends small steps, a mouse wheel notch a big one (kept to a fifth). */
 export function wheelZoom(s: number, deltaY: number, deltaMode: number): number {
   const d = deltaMode === 1 ? deltaY * 16 : deltaY;
@@ -141,6 +171,7 @@ interface Pointer {
 interface Zooming {
   pages: HTMLElement;
   origin: Point;
+  room: Room;
   f0: Point;
   z0: number;
   s: number;
@@ -201,13 +232,32 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
         if (dist === 0) break;
       }
       const r = pages.getBoundingClientRect();
+      const sr = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      const ps = getComputedStyle(pages);
+      const px = (v: string) => parseFloat(v) || 0;
+      const room: Room = {
+        left: sr.left + el.clientLeft + px(cs.paddingLeft),
+        width: el.clientWidth - px(cs.paddingLeft) - px(cs.paddingRight),
+        top: r.top + el.scrollTop,
+        bottom: sr.top + el.clientTop + el.clientHeight - px(cs.paddingBottom),
+        w: r.width,
+        h: r.height,
+        padTop: px(ps.paddingTop),
+        padBottom: px(ps.paddingBottom),
+      };
       pages.style.transformOrigin = "0 0";
       pages.style.willChange = "transform";
-      return { pages, origin: { x: r.left, y: r.top }, f0, z0: opts.current.zoom, s: 1, f: f0, anchor };
+      return { pages, origin: { x: r.left, y: r.top }, room, f0, z0: opts.current.zoom, s: 1, f: f0, anchor };
     };
-    const showZoom = (z: Zooming, s: number, tx: number, ty: number) => {
+    /** Show the pages zoomed by `s`, the point that was at `f0` brought to `f`: or as close to it as the pages will be able to
+     *  go once the zoom is applied (at the ends of the lesson, or centred when narrower than the editor), so that applying it
+     *  moves nothing. */
+    const showZoom = (z: Zooming, s: number, f: Point) => {
+      const a = { x: z.f0.x - z.origin.x, y: z.f0.y - z.origin.y };
       z.s = s;
-      z.pages.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+      z.f = reachable(z.room, a, s, f);
+      z.pages.style.transform = `translate(${z.f.x - z.origin.x - s * a.x}px, ${z.f.y - z.origin.y - s * a.y}px) scale(${s})`;
     };
     const endZoom = (z: Zooming) => {
       stopHold();
@@ -249,6 +299,7 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
       const z = beginZoom(c);
       if (!z) return;
       z.s = clampZoom(target) / z.z0;
+      z.f = reachable(z.room, { x: c.x - z.origin.x, y: c.y - z.origin.y }, z.s, c);
       endZoom(z);
     };
 
@@ -256,9 +307,7 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
       if (!pinch) return;
       const [a, b] = pinch.ids.map((id) => ptrs.get(id)!);
       const f = { x: (a.cx + b.cx) / 2, y: (a.cy + b.cy) / 2 };
-      const v = pinchView(pinch.f0, pinch.d0, f, Math.hypot(a.cx - b.cx, a.cy - b.cy), pinch.origin, pinch.z0);
-      pinch.f = f;
-      showZoom(pinch, v.s, v.tx, v.ty);
+      showZoom(pinch, pinchView(pinch.f0, pinch.d0, f, Math.hypot(a.cx - b.cx, a.cy - b.cy), pinch.origin, pinch.z0).s, f);
     };
 
     const onWheel = (e: WheelEvent) => {
@@ -274,7 +323,7 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
       }
       const w = wheel;
       const s = clampZoom(w.z0 * wheelZoom(w.s, e.deltaY, e.deltaMode)) / w.z0;
-      showZoom(w, s, (1 - s) * (w.f0.x - w.origin.x), (1 - s) * (w.f0.y - w.origin.y));
+      showZoom(w, s, w.f0);
       window.clearTimeout(w.timer);
       w.timer = window.setTimeout(() => {
         wheel = null;

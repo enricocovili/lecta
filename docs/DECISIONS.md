@@ -515,7 +515,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      height in that same commit: the rows measure their width in a layout effect keyed on the zoom (not a frame later, from
      their `ResizeObserver`) and the notes wrap again there, so the rows above cannot push the anchor away afterwards, not
      even when the next pinch begins at once; the anchor is still put back at every later change of a row's size until the
-     rows settle or the user touches the pages. Canvases are sized by their
+     rows settle or the user touches the pages. Where the scroll cannot follow (the first or last page, or pages zoomed out
+     narrower than the editor, which are centred) the zooming pages are shown where they will be able to go
+     (`reachable`), not under the fingers, so lifting them moves nothing. Canvases are sized by their
      box (CSS), so the old picture stretches until the new one is drawn, and never get more than 8 M pixels, which at 300 %
      lowers their density instead of taking hundreds of MB per page. The zoom is continuous now (`lecta:lesson:scale`), the
      buttons step from wherever a pinch left it.

@@ -78,8 +78,9 @@ async function fingerDrag(page: Page, index: number, dy: number, pen: "hover" | 
 
 /** Two fingers on a page's slide, `from` px apart around its middle, moved to `to` px apart; the first one draws a little
  *  before the second lands. More pinches follow at once, 30 ms apart (zooming fast). Returns how far (px) the point of the
- *  slide that was between them ended up from there, at most. */
-async function pinch(page: Page, index: number, ...moves: [number, number][]): Promise<number> {
+ *  slide that was first between them ended up from there (`off`), and how far the point under the last pinch moved when the
+ *  fingers were lifted, from where the zooming pages showed it (`jump`): at most, right away and once the rows settle. */
+async function pinch(page: Page, index: number, ...moves: [number, number][]): Promise<{ off: number; jump: number }> {
   return page
     .getByTestId("ink-surface")
     .nth(index)
@@ -92,7 +93,20 @@ async function pinch(page: Page, index: number, ...moves: [number, number][]): P
           el.dispatchEvent(
             new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: id, pointerType: "touch", isPrimary: id === 61, clientX: x, clientY: cy, button: 0, buttons: type === "pointerup" ? 0 : 1, pressure: 0.5 }),
           );
+        // A point of the slide (in its widths from its corner) and where it is on screen now, zoomed pages included.
+        const at = (p: { u: number; v: number }) => {
+          const r = el.getBoundingClientRect();
+          return { x: r.left + p.u * r.width, y: r.top + p.v * r.width };
+        };
+        const under = () => {
+          const r = el.getBoundingClientRect();
+          return { u: (cx - r.left) / r.width, v: (cy - r.top) / r.width };
+        };
+        const first = under();
+        let last = first;
+        let shown = { x: cx, y: cy };
         for (const [from, to] of moves) {
+          last = under();
           fire("pointerdown", 61, cx - from / 2);
           fire("pointermove", 61, cx - from / 2 - 6);
           fire("pointermove", 61, cx - from / 2);
@@ -102,21 +116,21 @@ async function pinch(page: Page, index: number, ...moves: [number, number][]): P
             fire("pointermove", 61, cx - d / 2);
             fire("pointermove", 62, cx + d / 2);
           }
+          shown = at(last);
           fire("pointerup", 61, cx - to / 2);
           fire("pointerup", 62, cx + to / 2);
           await new Promise((ok) => setTimeout(ok, 30));
         }
-        const u = (cx - r0.left) / r0.width;
-        const v = (cy - r0.top) / r0.width;
-        const off = () => {
-          const r = el.getBoundingClientRect();
-          return Math.hypot(r.left + u * r.width - cx, r.top + v * r.width - cy);
+        const measure = () => {
+          const a = at(first);
+          const b = at(last);
+          return { off: Math.hypot(a.x - cx, a.y - cy), jump: Math.hypot(b.x - shown.x, b.y - shown.y) };
         };
-        // Right away, and once the rows have taken their new height (the notes follow the slide a moment later).
         await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
-        const now = off();
+        const now = measure();
         await new Promise((ok) => setTimeout(ok, 600));
-        return Math.max(now, off());
+        const later = measure();
+        return { off: Math.max(now.off, later.off), jump: Math.max(now.jump, later.jump) };
       },
       moves,
     );
@@ -239,7 +253,9 @@ test.describe.serial("Lezioni", () => {
     const zoomLevel = page.getByTestId("zoom-level");
     await expect(zoomLevel).toHaveText("100%");
     await page.getByRole("button", { name: "Dito scrive" }).click();
-    expect(await pinch(page, 1, [100, 150])).toBeLessThan(3);
+    const first = await pinch(page, 1, [100, 150]);
+    expect(first.off).toBeLessThan(3);
+    expect(first.jump).toBeLessThan(3);
     await expect(zoomLevel).toHaveText("150%");
     await page.getByRole("button", { name: "Dito scrive" }).click();
     await save(page);
@@ -271,8 +287,21 @@ test.describe.serial("Lezioni", () => {
     await expect(zoomLevel).toHaveText("100%");
     // Pinching fast, in and out again before the last zoom has settled, stays on the same point too.
     await page.getByTestId("lesson-page").nth(1).evaluate((el) => el.scrollIntoView({ block: "center" }));
-    expect(await pinch(page, 1, [120, 200], [200, 120], [150, 200])).toBeLessThan(3);
+    const fast = await pinch(page, 1, [120, 200], [200, 120], [150, 200]);
+    expect(fast.off).toBeLessThan(3);
+    expect(fast.jump).toBeLessThan(3);
     await expect(zoomLevel).toHaveText("133%");
+    // Zoomed out below 100 % the pages are centred, not under the fingers: they are shown centred while zooming, so lifting
+    // the fingers moves nothing.
+    await zoomLevel.click();
+    await page.getByTestId("lesson-page").nth(1).evaluate((el) => el.scrollIntoView({ block: "center" }));
+    expect((await pinch(page, 1, [200, 120])).jump).toBeLessThan(3);
+    await expect(zoomLevel).toHaveText("60%");
+    // At the top of the lesson the first page cannot come further down: zooming out it stays at the top while zooming too.
+    await zoomLevel.click();
+    await page.getByTestId("lesson-scroll").evaluate((el) => el.scrollTo(0, 0));
+    expect((await pinch(page, 0, [200, 100])).jump).toBeLessThan(3);
+    await expect(zoomLevel).toHaveText("50%");
     await zoomLevel.click();
     await page.getByTestId("lesson-page").nth(1).evaluate((el) => el.scrollIntoView({ block: "center" }));
 
