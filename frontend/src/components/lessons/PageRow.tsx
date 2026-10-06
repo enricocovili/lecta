@@ -2,6 +2,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { Icon } from "../icons";
 import { Markdown } from "../workspace/Markdown";
+import { zooming } from "./gestures";
 import InkLayer from "./InkLayer";
 import type { Stroke, Tool } from "./ink";
 import NotesField from "./NotesField";
@@ -73,11 +74,23 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
     const el = row.current;
     const root = scroller.current;
     if (!el || !root) return;
-    const io = new IntersectionObserver((es) => es.forEach((e) => setNear(e.isIntersecting)), { root, rootMargin: "1400px 0px" });
+    // While the pages are being zoomed they are only scaled on screen: what comes near is drawn once the zoom is applied.
+    let seen: boolean | null = null;
+    const io = new IntersectionObserver(
+      (es) =>
+        es.forEach((e) => {
+          seen = e.isIntersecting;
+          if (!zooming.on) setNear(seen);
+        }),
+      { root, rootMargin: "1400px 0px" },
+    );
+    const zoomed = () => seen !== null && setNear(seen);
+    zooming.ended.add(zoomed);
     const mid = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && actions.visible(index)), { root, rootMargin: "-45% 0px -45% 0px" });
     io.observe(el);
     mid.observe(el);
     return () => {
+      zooming.ended.delete(zoomed);
       io.disconnect();
       mid.disconnect();
     };

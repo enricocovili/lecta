@@ -25,7 +25,8 @@ The screen is kept on (Wake Lock) while the editor is open, and the layout is ch
 side (automatic single column under ~860 px), notes below the slide, or slides only. **Zoom** from 50 % to 300 %: two
 fingers pinch around the point between them (and move the pages while they do), Ctrl + wheel and a touchpad's pinch zoom
 around the pointer, − / + step through 50–70–85–100–125–150–200–250–300 % and the percentage between them goes back to
-100 %; with «Dito scrive» a second finger landing drops the stroke the first one began and the two zoom. Previous/next page (buttons, or the ← / → keys, also in a shared lesson; not while typing or in a dialog).
+100 %; with «Dito scrive» a second finger landing drops the stroke the first one began and the two zoom. While zooming a
+slide shows a small picture of itself until it is drawn sharp at the new size. Previous/next page (buttons, or the ← / → keys, also in a shared lesson; not while typing or in a dialog).
 The top bar leads to the lesson's **laboratory** («Laboratorio», [LABS.md](LABS.md)).
 The page being looked at (the first one too, when the lesson opens) is centred vertically in the editor, unless the slide and its notes are taller than it: then it starts at the top.
 

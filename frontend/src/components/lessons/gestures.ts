@@ -147,6 +147,10 @@ export interface GestureOptions {
   setZoom: (z: number) => void;
 }
 
+/** Whether the pages are being zoomed (only scaled on screen, not laid out yet) and who wants to know when that ends: the
+ *  pages do not draw or free their slides while the fingers move, only once the zoom is applied. */
+export const zooming: { on: boolean; ended: Set<() => void> } = { on: false, ended: new Set() };
+
 /** The finger that is writing on a slide ("Dito scrive"), so that a second finger landing can turn the two into a pinch. */
 export const fingerInk: { cancel: (() => void) | null } = { cancel: null };
 
@@ -248,6 +252,7 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
       };
       pages.style.transformOrigin = "0 0";
       pages.style.willChange = "transform";
+      zooming.on = true;
       return { pages, origin: { x: r.left, y: r.top }, room, f0, z0: opts.current.zoom, s: 1, f: f0, anchor };
     };
     /** Show the pages zoomed by `s`, the point that was at `f0` brought to `f`: or as close to it as the pages will be able to
@@ -265,6 +270,8 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
       z.pages.style.willChange = "";
       const next = clampZoom(z.z0 * z.s);
       if (Math.abs(next - z.z0) > 0.001) flushSync(() => opts.current.setZoom(Math.round(next * 1000) / 1000));
+      zooming.on = false;
+      zooming.ended.forEach((f) => f());
       const anchor = z.anchor;
       if (!anchor?.el.isConnected) return;
       // The slides have their new size now: scroll so that the anchor is under the fingers again.
@@ -433,6 +440,7 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
     return () => {
       stopGlide();
       stopHold();
+      zooming.on = false;
       window.removeEventListener("keydown", stopHold, true);
       if (wheel) window.clearTimeout(wheel.timer);
       el.removeEventListener("pointerdown", down, true);

@@ -203,6 +203,16 @@ body.ws-page .les {
   overflow: hidden;
   line-height: 0;
 }
+/* The small picture of the slide, under the sharp one: what shows while that is drawn, or far from the viewport. */
+.les-slide-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
 .les-slide-canvas {
   display: block;
   position: absolute;

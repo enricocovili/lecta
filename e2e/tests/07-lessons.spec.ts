@@ -163,6 +163,8 @@ test.describe.serial("Lezioni", () => {
     await expect(pages).toHaveCount(3);
     await expect(page.getByTestId("page-number")).toContainText("/ 3");
     await expect(pages.first().locator("canvas.les-slide-canvas")).toBeVisible();
+    // Every slide gets a small picture too, shown while the sharp one is drawn (zooming, scrolling to it).
+    await expect(page.locator("img.les-slide-thumb")).toHaveCount(3);
     await expect(page.getByTestId("save-state")).toContainText("Salvato");
 
     // Markdown notes: Enter continues the list, an empty item ends it.

@@ -519,7 +519,11 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      narrower than the editor, which are centred) the zooming pages are shown where they will be able to go
      (`reachable`), not under the fingers, so lifting them moves nothing. Canvases are sized by their
      box (CSS), so the old picture stretches until the new one is drawn, and never get more than 8 M pixels, which at 300 %
-     lowers their density instead of taking hundreds of MB per page. The zoom is continuous now (`lecta:lesson:scale`), the
+     lowers their density instead of taking hundreds of MB per page. A slide is never blank: every page gets a small picture
+     (480 px wide JPEG, an object URL; made from its first sharp drawing, or in the background nearest first while nothing
+     sharp is being drawn) shown under the canvas while that is empty. While the fingers move the pages neither draw nor free
+     their slides (what comes near waits for the zoom to be applied), and after a zoom a page is drawn again at the new size
+     only once the zoom has settled (120 ms in view, 450 ms away), so zooming fast draws each page once. The zoom is continuous now (`lecta:lesson:scale`), the
      buttons step from wherever a pinch left it.
 107. **Selected strokes are moved by replacing them.** The select tool picks strokes by identity (the editor keeps the stroke
      objects, not their indices, so a selection survives others being added or erased) and a move puts a moved copy in each
