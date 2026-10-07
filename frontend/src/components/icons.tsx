@@ -1,6 +1,7 @@
 // Inline SVG icons (24×24, stroke-based, lucide-like). Usable from React islands and,
 // without a client directive, from .astro pages (rendered to static markup).
 import type { CSSProperties } from "react";
+import { MARK, MARK_VIEWBOX } from "../lib/brand";
 
 const P: Record<string, string> = {
   home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
@@ -102,40 +103,17 @@ export function Icon({ name, size, className = "", style, title }: { name: strin
   );
 }
 
-/** One half of the brain in the mark, mirrored for the other half. */
-const BRAIN_HALF = (
-  <>
-    <path d="M803 692a50 50 0 0 0-91 36a52 52 0 0 0-40 94a55 55 0 0 0 18 116a58 58 0 0 0 113 44" strokeWidth="30" />
-    <path d="M742 812l38 42h23M733 906l35 37v37" strokeWidth="16" />
-    <circle cx="726" cy="793" r="19" strokeWidth="16" />
-    <circle cx="717" cy="890" r="19" strokeWidth="16" />
-  </>
-);
-
-/** The Lecta mark: a notebook with three lines, a sparkle and a circuit brain (same drawing as favicon.svg). */
+/** The Lecta mark (lib/brand.ts: the same drawing as the favicon and the app's icon), in the theme's text colour. */
 export function BrandMark({ size = 28 }: { size?: number }) {
   return (
     <svg
       className="brand-mark"
       width={size}
       height={size}
-      viewBox="257 290 760 760"
+      viewBox={MARK_VIEWBOX.join(" ")}
       aria-hidden="true"
-      fill="none"
-      stroke="var(--fg)"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path
-        d="M594 897H402a62 62 0 0 1-62-62V405a62 62 0 0 1 62-62h336a62 62 0 0 1 62 62v232"
-        strokeWidth="36"
-        strokeLinecap="butt"
-      />
-      <path d="M290 503h88M290 645h88M460 495h228M460 578h228M460 660h174" strokeWidth="36" />
-      <path d="M933 508q10 67 72 77q-62 10-72 80q-10-70-73-80q63-10 73-77z" fill="var(--fg)" stroke="none" />
-      <g>{BRAIN_HALF}</g>
-      <g transform="matrix(-1 0 0 1 1606 0)">{BRAIN_HALF}</g>
-      <path d="M803 700v282" strokeWidth="16" />
-    </svg>
+      style={{ color: "var(--fg)" }}
+      dangerouslySetInnerHTML={{ __html: MARK }}
+    />
   );
 }

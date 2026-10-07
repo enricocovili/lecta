@@ -1,9 +1,0 @@
-{
-  "name": "Lecta",
-  "short_name": "Lecta",
-  "start_url": "/admin/lessons",
-  "display": "standalone",
-  "background_color": "#f3f2ed",
-  "theme_color": "#fcfbf7",
-  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
-}

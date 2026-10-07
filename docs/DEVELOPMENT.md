@@ -26,10 +26,17 @@ latex/                 compile service (TeX Live, stdlib Python, unix socket)
 frontend/              Astro + React islands, server.mjs (proxy)
 db/                    Postgres + pgvector image (password generated on first boot)
 e2e/                   Playwright browser tests
-scripts/               test.sh, smoke.sh, e2e.sh, backup.sh, restore.sh, board.sh (the planning board)
+scripts/               test.sh, smoke.sh, e2e.sh, backup.sh, restore.sh, board.sh (the planning board), icons.sh
 .github/               issue forms (bug, enhancement, idea), workflow that places new issues on the board
 docs/                  this documentation
 ```
+
+## The logo
+
+The mark is drawn once, in `frontend/src/lib/brand.ts`: the header's logo, `/favicon.svg`, `/manifest.webmanifest`
+and the home-screen pictures (`frontend/public/icons/`) all come from it, and their URLs carry its version, so browsers
+drop a cached old icon as soon as it changes. After changing the drawing, run `scripts/icons.sh` (Node and the app
+image) to draw the PNG pictures again; `npm test` fails until they match.
 
 ## Adding a provider type
 
