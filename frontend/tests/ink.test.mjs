@@ -175,3 +175,35 @@ test("a turned text is picked on its lines, not on the empty corners of the rect
   const b = boundsOf([text]);
   assert.equal(hitsText(text, b.x1 - 0.005, b.y0 + 0.005, 0), false, "the top-right corner of its box is empty");
 });
+
+import { onPage, rotation, snapAngle, turnBy } from "../src/components/lessons/ink.ts";
+
+test("a turn goes clockwise on the screen around its middle, caught at the round angles, by 15° with Shift", () => {
+  const t = rotation(0.5, 0.5, Math.PI / 2);
+  const s = transformStroke({ t: "pen", c: "#000000", w: 0.004, p: [0.6, 0.5, 0.5] }, t);
+  assert.deepEqual(s.p, [0.5, 0.6, 0.5], "a quarter turn takes the right of the middle below it");
+  assert.equal(s.w, 0.004, "a turn keeps the width");
+  const deg = (r) => Math.round(((r * 180) / Math.PI) * 1000) / 1000 + 0;
+  assert.equal(deg(snapAngle((47 * Math.PI) / 180)), 45);
+  assert.equal(deg(snapAngle((-2 * Math.PI) / 180)), 0);
+  assert.equal(deg(snapAngle((30 * Math.PI) / 180)), 30, "far from a round angle it stays");
+  assert.equal(deg(snapAngle((37 * Math.PI) / 180, true)), 30);
+});
+
+test("a turned text keeps its corner on the turn and its font size, the turn in m; a full turn makes it upright again", () => {
+  const text = { t: "text", c: "#000000", w: 0.03, p: [0.2, 0.2, 0], s: "ciao" };
+  const turned = transformStroke(text, rotation(0.2, 0.2, Math.PI / 2));
+  assert.deepEqual(turned, { ...text, m: [0, 1, -1, 0] });
+  assert.deepEqual(transformStroke(turned, rotation(0.2, 0.2, -Math.PI / 2)), text);
+});
+
+test("a turn that would take the selection past an edge moves it back onto the page", () => {
+  assert.deepEqual(onPage({ x0: -0.1, y0: 0.2, x1: 0.3, y1: 0.4 }, 0.75), { dx: 0.1, dy: 0 });
+  assert.ok(Math.abs(onPage({ x0: 0.5, y0: 0.6, x1: 0.9, y1: 0.8 }, 0.75).dy + 0.05) < 1e-9);
+  assert.deepEqual(onPage({ x0: 0.1, y0: 0.1, x1: 0.2, y1: 0.2 }, 0.75), { dx: 0, dy: 0 });
+  // A long line near the top, turned upright: its ends would go above the page, so it comes down.
+  const line = { t: "pen", c: "#000000", w: 0.004, p: [0.1, 0.05, 0.5, 0.5, 0.05, 0.5] };
+  const t = turnBy([line], boundsOf([line]), Math.PI / 2, 0.75);
+  const b = boundsOf([transformStroke(line, t)]);
+  assert.ok(b.y0 >= -1e-9 && b.y1 - b.y0 > 0.39);
+});

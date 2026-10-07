@@ -400,6 +400,37 @@ export function stretchBy(box: Rect, h: Handle, x: number, y: number, ratio: num
   return across ? scaling(a, 0, f, 1) : scaling(0, a, 1, f);
 }
 
+/** Turning by `angle` (radians, clockwise on the screen) around cx, cy. */
+export function rotation(cx: number, cy: number, angle: number): Affine {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return [cos, sin, -sin, cos, cx - cos * cx + sin * cy, cy - sin * cx - cos * cy];
+}
+
+/** The angle a turn is dragged to, caught by the nearest multiple of 45° within 4° of it, or (`fine`: Shift) rounded to 15°. */
+export function snapAngle(angle: number, fine = false): number {
+  const deg = (angle * 180) / Math.PI;
+  const step = fine ? 15 : 45;
+  const near = Math.round(deg / step) * step;
+  return ((fine || Math.abs(deg - near) <= 4 ? near : deg) * Math.PI) / 180;
+}
+
+/** The shift that brings a rectangle back onto the page (`ratio` = height / width), as far as it fits. */
+export function onPage(r: Rect, ratio: number): { dx: number; dy: number } {
+  const fit = (lo: number, hi: number, end: number) => (lo < 0 ? Math.min(-lo, Math.max(0, end - hi)) : hi > end ? Math.max(end - hi, -lo) : 0);
+  return { dx: fit(r.x0, r.x1, 1), dy: fit(r.y0, r.y1, ratio) };
+}
+
+/** The selection turned by `angle` around the middle of its box, then moved back onto the page if the turn took it past an
+ *  edge (the server draws only what is on the slide). */
+export function turnBy(strokes: Stroke[], box: Rect, angle: number, ratio: number): Affine {
+  const t = rotation((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2, angle);
+  const r = boundsOf(strokes.map((s) => transformStroke(s, t)));
+  if (!r) return t;
+  const { dx, dy } = onPage(r, ratio);
+  return [t[0], t[1], t[2], t[3], t[4] + dx, t[5] + dy];
+}
+
 /** The stroke mapped by t (a new object: the history keeps the old one): its points, not a picture of them, so it is drawn
  *  again as sharp as before at any size; its width (a text's font size) grows with the area. A text's corner moves with the
  *  map, and the rest of the map (a stretch, a turn) goes into its `m`. */

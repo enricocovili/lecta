@@ -334,15 +334,26 @@ body.ws-page .les {
 .les-ink-ui > * {
   pointer-events: auto;
 }
-.les .les-sel-delete {
+.les .les-sel-btn {
   position: absolute;
   width: 36px;
   height: 36px;
   border-radius: 999px;
   border: 1px solid #1e6fd8;
   background: #fff;
-  color: #b3261e;
   box-shadow: 0 2px 6px rgb(0 0 0 / 18%);
+}
+.les .les-sel-delete {
+  color: #b3261e;
+}
+.les .les-sel-rotate {
+  color: #1e6fd8;
+  cursor: grab;
+  touch-action: none;
+}
+.les .les-sel-rotate:hover {
+  background: #1e6fd8;
+  color: #fff;
 }
 /* A small square outside each corner of the box, touching it, with a bigger area further out that takes the pointer (a finger
  * or a pen hit it easily); none of it covers the box, where a press moves the selection. */

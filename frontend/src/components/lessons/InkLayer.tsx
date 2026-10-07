@@ -3,7 +3,8 @@
 // Selecting: a click on a stroke picks it (and dragging moves it at once), a drag on an empty spot draws a rectangle that picks
 // what it encloses, a drag inside the selection's box moves it all; Shift adds to the selection. The selection itself is the
 // editor's (one for the whole lesson), so that deleting it and the keyboard work from the toolbar; the button that deletes it
-// is also attached to its box, the handles on its corners make it bigger or smaller, those on its sides stretch it one way.
+// is also attached to its box, the handles on its corners make it bigger or smaller, those on its sides stretch it one way, and
+// the button beside the bin turns it while dragged around.
 // Text: a click (a tap too, with any pointer) opens a text field there, or on the text under it to change it; leaving the field
 // (Esc, Ctrl+Enter, a click elsewhere, another tool) writes the text on the page, emptied it removes it.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -12,7 +13,7 @@ import { Icon } from "../icons";
 import { fingerInk } from "./gestures";
 import {
   boundsOf, canvasScale, clampShift, cornerPoints, drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, IDENTITY, inside, lineWidth, mapRect, moves, moveStroke, pick,
-  PICK_RADIUS, roundStroke, stretchBy, strokeRect, TEXT_FONT, TEXT_LINE_HEIGHT, transformStroke, unionRect, type Affine, type Corner, type Handle, type Rect, type Side,
+  PICK_RADIUS, roundStroke, snapAngle, stretchBy, strokeRect, TEXT_FONT, TEXT_LINE_HEIGHT, transformStroke, turnBy, unionRect, type Affine, type Corner, type Handle, type Rect, type Side,
   type Stroke, type Tool,
 } from "./ink";
 import { recognize } from "./shapes";
@@ -53,6 +54,9 @@ type Current =
   | { kind: "move"; id: number; x0: number; y0: number; dx: number; dy: number; box: Rect; strokes: Stroke[]; idx: Set<number>; hidden: boolean }
   /** a handle of the selection dragged: the strokes are mapped by `t` (scaled from a corner, stretched from a side) */
   | { kind: "scale"; id: number; handle: Handle; box: Rect; t: Affine; strokes: Stroke[]; idx: Set<number>; hidden: boolean }
+  /** the turn button dragged: the strokes are turned around the box's middle (cx, cy) by `angle`, the pointer's angle around
+   *  it less `a0` where it started; `t` is the turn, moved back onto the page */
+  | { kind: "rotate"; id: number; box: Rect; cx: number; cy: number; a0: number; angle: number; t: Affine; strokes: Stroke[]; idx: Set<number>; hidden: boolean }
   /** the selection rectangle being drawn; `add`: Shift, it adds to what is selected */
   | { kind: "rect"; id: number; x0: number; y0: number; x1: number; y1: number; add: boolean };
 
@@ -67,12 +71,13 @@ const HANDLE = 14;
 const SIDE_MIN = 2 * HANDLE;
 
 /** The buttons attached to the selection's box (`r`, padded, in page widths), in CSS px over the page: a handle on every corner
- *  to scale it and in the middle of every side to stretch it, and the delete button above the box, or below it when there is
- *  no room above, or inside it when there is none below either. */
-function SelectionControls({ r, width, height, onDelete, onHandle }: { r: Rect; width: number; height: number; onDelete: () => void; onHandle: (e: React.PointerEvent, h: Handle) => void }) {
+ *  to scale it and in the middle of every side to stretch it, and the turn and delete buttons above the box, or below it when
+ *  there is no room above, or inside it when there is none below either. */
+function SelectionControls({ r, width, height, onDelete, onHandle, onRotate }: { r: Rect; width: number; height: number; onDelete: () => void; onHandle: (e: React.PointerEvent, h: Handle) => void; onRotate: (e: React.PointerEvent) => void }) {
   const BTN = 36;
   const GAP = 28;
-  const left = Math.min(Math.max(((r.x0 + r.x1) / 2) * width - BTN / 2, 4), width - BTN - 4);
+  const SPACE = 8;
+  const left = Math.min(Math.max(((r.x0 + r.x1) / 2) * width - BTN - SPACE / 2, 4), width - 2 * BTN - SPACE - 4);
   const above = r.y0 * width - BTN - GAP;
   const below = r.y1 * width + GAP;
   const top = above >= 4 ? above : below + BTN <= height - 4 ? below : Math.max(4, r.y0 * width + GAP);
@@ -119,8 +124,19 @@ function SelectionControls({ r, width, height, onDelete, onHandle }: { r: Rect; 
       })}
       <button
         type="button"
-        className="btn icon les-sel-delete"
+        className="btn icon les-sel-btn les-sel-rotate"
         style={{ left, top }}
+        onPointerDown={onRotate}
+        aria-label="Ruota la selezione"
+        title="Trascina per ruotare (con Maiusc a scatti di 15°)"
+        data-testid="selection-rotate"
+      >
+        <Icon name="rotate" />
+      </button>
+      <button
+        type="button"
+        className="btn icon les-sel-btn les-sel-delete"
+        style={{ left: left + BTN + SPACE, top }}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={onDelete}
         aria-label="Elimina la selezione"
@@ -293,8 +309,31 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       drawAll(ctx, c.strokes, scale);
       ctx.restore();
       drawBox(ctx, pad(mapRect(c.t, c.box), SEL_PAD), scale, dpr);
+    } else if (c?.kind === "rotate") {
+      // The strokes and their box turn together, with the angle in the middle.
+      const [a, b, cc, d, e, f] = c.t;
+      ctx.save();
+      ctx.transform(a, b, cc, d, e * scale, f * scale);
+      drawAll(ctx, c.strokes, scale);
+      drawBox(ctx, pad(c.box, SEL_PAD), scale, dpr);
+      ctx.restore();
+      const deg = Math.round((((c.angle * 180) / Math.PI) % 360 + 540) % 360 - 180);
+      const mid = { x: a * c.cx + cc * c.cy + e, y: b * c.cx + d * c.cy + f };
+      ctx.save();
+      ctx.font = `600 ${13 * dpr}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const label = `${deg}°`;
+      const w = ctx.measureText(label).width + 10 * dpr;
+      ctx.fillStyle = SEL_COLOR;
+      ctx.beginPath();
+      ctx.roundRect(mid.x * scale - w / 2, mid.y * scale - 11 * dpr, w, 22 * dpr, 11 * dpr);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.fillText(label, mid.x * scale, mid.y * scale);
+      ctx.restore();
     } else if (c?.kind === "rect") drawBox(ctx, c, scale, dpr);
-    if (c?.kind === "move" || c?.kind === "scale") return;
+    if (c?.kind === "move" || c?.kind === "scale" || c?.kind === "rotate") return;
     const box = boundsOf(props.current.selected ?? []);
     if (box) drawBox(ctx, pad(box, SEL_PAD), scale, dpr);
   }, [dpr]);
@@ -429,6 +468,24 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     setBusy(true);
   };
 
+  /** The turn button pressed: the selection turns around its middle as the pointer goes around it (by any pointer, a finger
+   *  too). */
+  const startRotate = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    const p = props.current;
+    const sel = p.selected ?? [];
+    const box = boundsOf(sel);
+    if (cur.current || !box || (e.pointerType === "mouse" && e.button !== 0)) return;
+    e.preventDefault();
+    capture(e.pointerId);
+    const pt = point(e);
+    const cx = (box.x0 + box.x1) / 2;
+    const cy = (box.y0 + box.y1) / 2;
+    const idx = new Set(sel.map((x) => p.strokes.indexOf(x)).filter((i) => i >= 0));
+    cur.current = { kind: "rotate", id: e.pointerId, box, cx, cy, a0: Math.atan2(pt.y - cy, pt.x - cx), angle: 0, t: IDENTITY, strokes: sel, idx, hidden: false };
+    setBusy(true);
+  };
+
   const onMove = (e: React.PointerEvent) => {
     const c = cur.current;
     if (!c) {
@@ -444,9 +501,16 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       return;
     }
     if (e.pointerId !== c.id) return;
-    if (c.kind === "move" || c.kind === "rect" || c.kind === "scale") {
+    if (c.kind === "move" || c.kind === "rect" || c.kind === "scale" || c.kind === "rotate") {
       const pt = point(e);
-      if (c.kind === "scale") {
+      if (c.kind === "rotate") {
+        c.angle = snapAngle(Math.atan2(pt.y - c.cy, pt.x - c.cx) - c.a0, e.shiftKey);
+        c.t = turnBy(c.strokes, c.box, c.angle, props.current.height / props.current.width);
+        if (!c.hidden) {
+          c.hidden = true;
+          paintBase(c.idx);
+        }
+      } else if (c.kind === "scale") {
         c.t = stretchBy(c.box, c.handle, pt.x, pt.y, props.current.height / props.current.width);
         if (!c.hidden) {
           c.hidden = true;
@@ -501,7 +565,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
         onMoveStrokes(c.strokes.map((from) => ({ from, to: moveStroke(from, c.dx, c.dy) })));
       } else if (c.hidden) paintBase();
       schedule();
-    } else if (c.kind === "scale") {
+    } else if (c.kind === "scale" || c.kind === "rotate") {
       if (!cancelled && moves(c.t)) {
         onMoveStrokes(c.strokes.map((from) => ({ from, to: transformStroke(from, c.t) })));
       } else if (c.hidden) paintBase();
@@ -601,7 +665,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     >
       <canvas ref={base} />
       <canvas ref={live} />
-      {selBox && <SelectionControls r={pad(selBox, SEL_PAD)} width={width} height={height} onDelete={deleteSelected} onHandle={startScale} />}
+      {selBox && <SelectionControls r={pad(selBox, SEL_PAD)} width={width} height={height} onDelete={deleteSelected} onHandle={startScale} onRotate={startRotate} />}
       {editing && (
         <TextField
           ed={editing}

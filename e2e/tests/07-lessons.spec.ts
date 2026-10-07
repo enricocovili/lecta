@@ -40,6 +40,24 @@ async function scribble(page: Page, index: number, from: [number, number], to: [
   await page.mouse.up();
 }
 
+/** The selection's turn button dragged a quarter turn clockwise around the middle of its box (between its corner handles). */
+async function turnQuarter(page: Page) {
+  const nw = (await page.getByTestId("selection-handle-nw").boundingBox())!;
+  const se = (await page.getByTestId("selection-handle-se").boundingBox())!;
+  const [cx, cy] = [(nw.x + se.x + se.width) / 2, (nw.y + se.y + se.height) / 2];
+  const rb = (await page.getByTestId("selection-rotate").boundingBox())!;
+  const [bx, by] = [rb.x + rb.width / 2, rb.y + rb.height / 2];
+  const r = Math.hypot(bx - cx, by - cy);
+  const a0 = Math.atan2(by - cy, bx - cx);
+  await page.mouse.move(bx, by);
+  await page.mouse.down();
+  for (let i = 1; i <= 8; i++) {
+    const a = a0 + (Math.PI / 2) * (i / 8);
+    await page.mouse.move(cx + r * Math.cos(a), cy + r * Math.sin(a));
+  }
+  await page.mouse.up();
+}
+
 /** A finger dragged upwards by `dy` px over a page's drawing surface, all at once; returns how far the lesson scrolled.
  *  The pen (its events on the page, outside the slides) meanwhile: `hover` it is just above the screen, `writing` it touches
  *  the screen, `lifted` it has just left it, `after` it lands while the finger is already scrolling. */
@@ -577,6 +595,19 @@ test.describe.serial("Lezioni", () => {
     await save(page);
     expect((await ink())[0]).toEqual(small);
 
+    // The button beside the bin turns it: a quarter turn makes it as wide as it was tall, its width untouched; undo.
+    await page.mouse.click(sx, sy);
+    await expect(count1).toHaveText("1 tratto selezionato");
+    await turnQuarter(page);
+    await save(page);
+    const turned = (await ink())[0];
+    expect(span(turned)).toBeCloseTo(ySpan(small), 2);
+    expect(ySpan(turned)).toBeCloseTo(span(small), 2);
+    expect(turned.w).toBeCloseTo(small.w, 4);
+    await page.keyboard.press("Control+z");
+    await save(page);
+    expect((await ink())[0]).toEqual(small);
+
     // A click on an empty spot lets go; a rectangle around both picks both; Canc deletes them, undo brings them back.
     const [ex, ey] = await at(0.5, 0.9);
     await page.mouse.click(ex, ey);
@@ -702,6 +733,13 @@ test.describe.serial("Lezioni", () => {
     const stretched = (await ink())[0] as { s?: string; m?: number[] };
     expect(stretched.s).toBe("Ciao\nmondo");
     expect(stretched.m![0]).toBeGreaterThan(stretched.m![3] * 1.2);
+    // Turned a quarter, it reads top to bottom: the stretch stays, turned with it.
+    await turnQuarter(page);
+    await save(page);
+    const turned = (await ink())[0] as { s?: string; m?: number[] };
+    expect(turned.s).toBe("Ciao\nmondo");
+    expect(Math.abs(turned.m![0])).toBeLessThan(0.05);
+    expect(turned.m![1]).toBeCloseTo(stretched.m![0], 1);
     await page.getByTestId("selection-delete").click();
     await save(page);
     expect(await ink()).toHaveLength(0);

@@ -532,8 +532,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      does not take the box. Deleting the selection is an ordinary erase (one step). Moves are kept on the page, since the server
      draws the strokes on the slide and anything off it would be lost in the annotated PDF. Scaling with the corner handles is the same
      replacement (`move` in the history): the points and the widths are multiplied, never a picture of them, so a stroke made
-     bigger is as sharp as one drawn at that size, and the PDF gets the same vectors. The sides' handles stretch one way with
-     the same replacement; a width grows with the area (the square root of the two factors).
+     bigger is as sharp as one drawn at that size, and the PDF gets the same vectors. The sides' handles stretch one way and the turn button
+     turns around the box's middle with the same replacement; a width grows with the area (the square root of the two
+     factors), so a turn keeps it. A turn that takes the selection past an edge moves it back onto the page.
 109. **Typed text on a page is an item of the ink.** A text is `{t: "text", c, w: font size, p: [x, y, 0], s}` in the page's
      ink list, not a field of its own: selecting, moving, scaling (the font size is scaled like a width), erasing, undo,
      saving, following others' edits and the annotated PDF all work on it as they are. It is typed in a real text field
