@@ -532,13 +532,17 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      does not take the box. Deleting the selection is an ordinary erase (one step). Moves are kept on the page, since the server
      draws the strokes on the slide and anything off it would be lost in the annotated PDF. Scaling with the corner handles is the same
      replacement (`move` in the history): the points and the widths are multiplied, never a picture of them, so a stroke made
-     bigger is as sharp as one drawn at that size, and the PDF gets the same vectors.
+     bigger is as sharp as one drawn at that size, and the PDF gets the same vectors. The sides' handles stretch one way with
+     the same replacement; a width grows with the area (the square root of the two factors).
 109. **Typed text on a page is an item of the ink.** A text is `{t: "text", c, w: font size, p: [x, y, 0], s}` in the page's
      ink list, not a field of its own: selecting, moving, scaling (the font size is scaled like a width), erasing, undo,
      saving, following others' edits and the annotated PDF all work on it as they are. It is typed in a real text field
      placed over the page with the same font, size and line height, and the canvas draws its baseline where that field
      shows it (measured from the font), so closing the field moves nothing. The server writes it with Helvetica at the same
-     place. *Alternative:* text as an annotation layer of its own (a second list, every tool taught about it).
+     place. A text stretched (or turned) keeps its font size in `w` and the rest of the map in `m`, a matrix of area 1
+     around its top-left corner that the canvas, the text field (a CSS transform) and the PDF (PyMuPDF's `morph`) apply
+     alike; an upright, unstretched text has none. *Alternative:* text as an annotation layer of its own (a second list,
+     every tool taught about it).
 
 ## Assistant
 

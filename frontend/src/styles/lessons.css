@@ -386,6 +386,38 @@ body.ws-page .les {
 .les-sel-handle.se::before {
   inset: 0 -14px -14px 0;
 }
+/* The sides' handles are round, in the middle of the side and outside it. */
+.les-sel-handle.side {
+  border-radius: 999px;
+}
+.les-sel-handle.e {
+  transform: translate(0, -50%);
+  cursor: ew-resize;
+}
+.les-sel-handle.e::before {
+  inset: -8px -14px -8px 0;
+}
+.les-sel-handle.w {
+  transform: translate(-100%, -50%);
+  cursor: ew-resize;
+}
+.les-sel-handle.w::before {
+  inset: -8px 0 -8px -14px;
+}
+.les-sel-handle.n {
+  transform: translate(-50%, -100%);
+  cursor: ns-resize;
+}
+.les-sel-handle.n::before {
+  inset: -14px -8px 0 -8px;
+}
+.les-sel-handle.s {
+  transform: translate(-50%, 0);
+  cursor: ns-resize;
+}
+.les-sel-handle.s::before {
+  inset: 0 -8px -14px -8px;
+}
 .les .les-sel-delete:hover {
   background: #b3261e;
   border-color: #b3261e;

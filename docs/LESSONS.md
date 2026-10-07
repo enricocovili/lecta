@@ -12,7 +12,7 @@ pages added by hand (a slide never has enough room). Every page has:
 * **Ink over the slide**: pen (3 widths, 6 colours), highlighter, **text** (T: a click or a tap, with the mouse, the pen or a finger, opens a field there in the chosen colour and size (3 sizes), focused so a tablet shows its keyboard; Esc, Ctrl+Enter or a click elsewhere writes it on the page, a click on a text opens it again, emptied it goes away; on the page it is an item of the ink, selected, moved, scaled, erased and undone like a stroke), stroke eraser (drawn as a ring that follows the pointer, also while erasing; also the stylus' eraser end), a **select** tool (S: a click
   picks the stroke under it, the one on top, and dragging moves it at once; a drag on an empty spot draws a rectangle that picks
   the strokes it encloses; a drag inside the dashed box moves the whole selection, kept on the page; Shift adds or removes a
-  stroke; Canc/Backspace, «Elimina» in the toolbar or the bin attached to the box (above it, or below when there is no room) deletes it, the handles on the box's corners make it bigger or smaller (uniformly, around the opposite corner, kept on the page; the points and the widths are scaled, so the strokes stay as sharp as before; a finger works them even when fingers do not write), Esc or a click on an empty spot lets it go; one page at a time), a "hand" tool
+  stroke; Canc/Backspace, «Elimina» in the toolbar or the bin attached to the box (above it, or below when there is no room) deletes it, the handles on the box's corners make it bigger or smaller (uniformly, around the opposite corner, kept on the page; the points and the widths are scaled, so the strokes stay as sharp as before; a finger works them even when fingers do not write), the round ones in the middle of its sides stretch it one way only, wider or taller (around the opposite side; shown on a side long enough for them), Esc or a click on an empty spot lets it go; one page at a time), a "hand" tool
   that only scrolls, undo/redo (Ctrl+Z, Ctrl+Shift+Z): **one history** in the order things were done — strokes, erasing, moving a selection, the typed notes (typing in bursts, one step per pause or paste, kept as small patches in `components/lessons/history.ts`, also while the cursor is in a note) and removed pages (removing a page or slide with notes or strokes asks in a dialog, an empty one goes at once; it comes back with its notes and strokes through `pages/restore`). Mouse, stylus and finger; by default a finger scrolls the page and
   only mouse and pen write ("Dito scrive" makes the finger write). Fingers are handled once for the whole editor
   (`components/lessons/gestures.ts`): a drag scrolls as soon as it moves a few pixels and glides on when flicked, the hand tool
@@ -64,7 +64,8 @@ fits, and the server can draw the same thing on the PDF):
 
 `w` is the font size, `p` the text's top-left corner, `s` what it says (up to 5000 characters). Lines are 1.25 font sizes
 apart and the first baseline is 0.97 font sizes below the top (where a text field of that line height puts it with
-Helvetica or Arial, the font of the browser and of the PDF). The server validates everything (`services/lessons.clean_ink`): at most 4000 strokes and 250 000
+Helvetica or Arial, the font of the browser and of the PDF). A text stretched or turned by the select tool also has
+`m`: `[a, b, c, d]`, the canvas matrix (area 1) of its lines around its top-left corner. The server validates everything (`services/lessons.clean_ink`): at most 4000 strokes and 250 000
 points per page, sane coordinates, colour and width.
 
 ## API (admin only, like the rest)

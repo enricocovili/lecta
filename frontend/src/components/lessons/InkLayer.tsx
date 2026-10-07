@@ -3,7 +3,7 @@
 // Selecting: a click on a stroke picks it (and dragging moves it at once), a drag on an empty spot draws a rectangle that picks
 // what it encloses, a drag inside the selection's box moves it all; Shift adds to the selection. The selection itself is the
 // editor's (one for the whole lesson), so that deleting it and the keyboard work from the toolbar; the button that deletes it
-// is also attached to its box, and the handles on its corners make it bigger or smaller.
+// is also attached to its box, the handles on its corners make it bigger or smaller, those on its sides stretch it one way.
 // Text: a click (a tap too, with any pointer) opens a text field there, or on the text under it to change it; leaving the field
 // (Esc, Ctrl+Enter, a click elsewhere, another tool) writes the text on the page, emptied it removes it.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -11,8 +11,9 @@ import { flushSync } from "react-dom";
 import { Icon } from "../icons";
 import { fingerInk } from "./gestures";
 import {
-  boundsOf, canvasScale, clampShift, cornerPoints, drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, inside, lineWidth, moveStroke, pick, PICK_RADIUS, roundStroke,
-  scaleFactor, scaleStroke, strokeRect, TEXT_FONT, TEXT_LINE_HEIGHT, unionRect, type Corner, type Rect, type Stroke, type Tool,
+  boundsOf, canvasScale, clampShift, cornerPoints, drawAll, drawRegion, drawStroke, ERASER_RADIUS, farEnough, hits, IDENTITY, inside, lineWidth, mapRect, moves, moveStroke, pick,
+  PICK_RADIUS, roundStroke, stretchBy, strokeRect, TEXT_FONT, TEXT_LINE_HEIGHT, transformStroke, unionRect, type Affine, type Corner, type Handle, type Rect, type Side,
+  type Stroke, type Tool,
 } from "./ink";
 import { recognize } from "./shapes";
 
@@ -50,8 +51,8 @@ type Current =
   | { kind: "erase"; id: number; removed: Set<number>; dirty: Rect | null }
   /** dragging the selection: the strokes leave the base canvas (once it really moves) and follow on the live one */
   | { kind: "move"; id: number; x0: number; y0: number; dx: number; dy: number; box: Rect; strokes: Stroke[]; idx: Set<number>; hidden: boolean }
-  /** a corner handle of the selection dragged: the strokes are scaled by `f` around the opposite corner (ax, ay) */
-  | { kind: "scale"; id: number; corner: Corner; box: Rect; f: number; ax: number; ay: number; strokes: Stroke[]; idx: Set<number>; hidden: boolean }
+  /** a handle of the selection dragged: the strokes are mapped by `t` (scaled from a corner, stretched from a side) */
+  | { kind: "scale"; id: number; handle: Handle; box: Rect; t: Affine; strokes: Stroke[]; idx: Set<number>; hidden: boolean }
   /** the selection rectangle being drawn; `add`: Shift, it adds to what is selected */
   | { kind: "rect"; id: number; x0: number; y0: number; x1: number; y1: number; add: boolean };
 
@@ -59,13 +60,16 @@ const pad = (r: Rect, m: number): Rect => ({ x0: r.x0 - m, y0: r.y0 - m, x1: r.x
 const within = (r: Rect | null, x: number, y: number) => !!r && x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
 
 const CORNERS: Corner[] = ["nw", "ne", "sw", "se"];
+const SIDES: Side[] = ["n", "s", "e", "w"];
 /** The side of a corner handle, CSS px (as in lessons.css). */
 const HANDLE = 14;
+/** A side's handle shows when the side is at least this long (CSS px): on a shorter one it would touch the corners'. */
+const SIDE_MIN = 2 * HANDLE;
 
 /** The buttons attached to the selection's box (`r`, padded, in page widths), in CSS px over the page: a handle on every corner
- *  to scale it, and the delete button above the box, or below it when there is no room above, or inside it when there is none
- *  below either. */
-function SelectionControls({ r, width, height, onDelete, onHandle }: { r: Rect; width: number; height: number; onDelete: () => void; onHandle: (e: React.PointerEvent, c: Corner) => void }) {
+ *  to scale it and in the middle of every side to stretch it, and the delete button above the box, or below it when there is
+ *  no room above, or inside it when there is none below either. */
+function SelectionControls({ r, width, height, onDelete, onHandle }: { r: Rect; width: number; height: number; onDelete: () => void; onHandle: (e: React.PointerEvent, h: Handle) => void }) {
   const BTN = 36;
   const GAP = 28;
   const left = Math.min(Math.max(((r.x0 + r.x1) / 2) * width - BTN / 2, 4), width - BTN - 4);
@@ -93,6 +97,26 @@ function SelectionControls({ r, width, height, onDelete, onHandle }: { r: Rect; 
           />
         );
       })}
+      {SIDES.map((sd) => {
+        // Outside the middle of the side, kept on the page like the corners'.
+        const across = sd === "e" || sd === "w";
+        if ((across ? r.y1 - r.y0 : r.x1 - r.x0) * width < SIDE_MIN) return null;
+        const x = across ? (sd === "w" ? r.x0 : r.x1) * width : ((r.x0 + r.x1) / 2) * width;
+        const y = across ? ((r.y0 + r.y1) / 2) * width : (sd === "n" ? r.y0 : r.y1) * width;
+        return (
+          <span
+            key={sd}
+            className={`les-sel-handle side ${sd}`}
+            style={{
+              left: across ? Math.min(Math.max(x, sd === "w" ? HANDLE : 0), width - (sd === "w" ? 0 : HANDLE)) : x,
+              top: across ? y : Math.min(Math.max(y, sd === "n" ? HANDLE : 0), height - (sd === "n" ? 0 : HANDLE)),
+            }}
+            onPointerDown={(e) => onHandle(e, sd)}
+            title={across ? "Trascina per allargare o stringere" : "Trascina per allungare o accorciare"}
+            data-testid={`selection-handle-${sd}`}
+          />
+        );
+      })}
       <button
         type="button"
         className="btn icon les-sel-delete"
@@ -116,6 +140,8 @@ interface Editing {
   y: number;
   w: number;
   c: string;
+  /** the text's stretch (and turn), shown on the field too */
+  m?: Stroke["m"];
   value: string;
 }
 
@@ -145,6 +171,8 @@ function TextField({ ed, width, field, onChange, onDone }: { ed: Editing; width:
           height: lines.length * TEXT_LINE_HEIGHT * px,
           font: `${px}px/${TEXT_LINE_HEIGHT} ${TEXT_FONT}`,
           color: ed.c,
+          transform: ed.m ? `matrix(${ed.m.join(",")},0,0)` : undefined,
+          transformOrigin: "0 0",
         }}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onDone}
@@ -259,14 +287,12 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       drawBox(ctx, pad(c.box, SEL_PAD), scale, dpr);
       ctx.restore();
     } else if (c?.kind === "scale") {
+      const [a, b, cc, d, e, f] = c.t;
       ctx.save();
-      ctx.translate(c.ax * scale, c.ay * scale);
-      ctx.scale(c.f, c.f);
-      ctx.translate(-c.ax * scale, -c.ay * scale);
+      ctx.transform(a, b, cc, d, e * scale, f * scale);
       drawAll(ctx, c.strokes, scale);
       ctx.restore();
-      const at = (v: number, a: number) => a + (v - a) * c.f;
-      drawBox(ctx, pad({ x0: at(c.box.x0, c.ax), y0: at(c.box.y0, c.ay), x1: at(c.box.x1, c.ax), y1: at(c.box.y1, c.ay) }, SEL_PAD), scale, dpr);
+      drawBox(ctx, pad(mapRect(c.t, c.box), SEL_PAD), scale, dpr);
     } else if (c?.kind === "rect") drawBox(ctx, c, scale, dpr);
     if (c?.kind === "move" || c?.kind === "scale") return;
     const box = boundsOf(props.current.selected ?? []);
@@ -389,8 +415,8 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     schedule();
   };
 
-  /** A corner handle pressed: the selection is scaled while it is dragged (by any pointer, a finger too). */
-  const startScale = (e: React.PointerEvent, corner: Corner) => {
+  /** A handle pressed: the selection is scaled or stretched while it is dragged (by any pointer, a finger too). */
+  const startScale = (e: React.PointerEvent, handle: Handle) => {
     e.stopPropagation();
     const p = props.current;
     const sel = p.selected ?? [];
@@ -398,9 +424,8 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     if (cur.current || !box || (e.pointerType === "mouse" && e.button !== 0)) return;
     e.preventDefault();
     capture(e.pointerId);
-    const { ax, ay } = cornerPoints(box, corner);
     const idx = new Set(sel.map((x) => p.strokes.indexOf(x)).filter((i) => i >= 0));
-    cur.current = { kind: "scale", id: e.pointerId, corner, box, f: 1, ax, ay, strokes: sel, idx, hidden: false };
+    cur.current = { kind: "scale", id: e.pointerId, handle, box, t: IDENTITY, strokes: sel, idx, hidden: false };
     setBusy(true);
   };
 
@@ -422,7 +447,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     if (c.kind === "move" || c.kind === "rect" || c.kind === "scale") {
       const pt = point(e);
       if (c.kind === "scale") {
-        c.f = scaleFactor(c.box, c.corner, pt.x, pt.y, props.current.height / props.current.width);
+        c.t = stretchBy(c.box, c.handle, pt.x, pt.y, props.current.height / props.current.width);
         if (!c.hidden) {
           c.hidden = true;
           paintBase(c.idx);
@@ -477,8 +502,8 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
       } else if (c.hidden) paintBase();
       schedule();
     } else if (c.kind === "scale") {
-      if (!cancelled && Math.abs(c.f - 1) > 0.002) {
-        onMoveStrokes(c.strokes.map((from) => ({ from, to: scaleStroke(from, c.ax, c.ay, c.f) })));
+      if (!cancelled && moves(c.t)) {
+        onMoveStrokes(c.strokes.map((from) => ({ from, to: transformStroke(from, c.t) })));
       } else if (c.hidden) paintBase();
       schedule();
     } else if (c.kind === "rect") {
@@ -513,7 +538,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     const i = pick(p.strokes, pt.x, pt.y, PICK_RADIUS, ["text"]);
     const ed: Editing =
       i >= 0
-        ? { from: p.strokes[i], x: p.strokes[i].p[0], y: p.strokes[i].p[1], w: p.strokes[i].w, c: p.strokes[i].c, value: p.strokes[i].s ?? "" }
+        ? { from: p.strokes[i], x: p.strokes[i].p[0], y: p.strokes[i].p[1], w: p.strokes[i].w, c: p.strokes[i].c, m: p.strokes[i].m, value: p.strokes[i].s ?? "" }
         : { from: null, x: Math.min(pt.x, 1 - p.textSize * 2), y: Math.max(0, pt.y - (p.textSize * TEXT_LINE_HEIGHT) / 2), w: p.textSize, c: p.color, value: "" };
     // Focused within the click, so that a tablet opens its keyboard.
     flushSync(() => setEditing(ed));

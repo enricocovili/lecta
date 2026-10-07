@@ -87,7 +87,9 @@ test("a selection dragged past an edge of the page stops at it", () => {
   assert.deepEqual(clampShift(out, 0.05, 0, 0.75), { dx: 0.05, dy: 0 });
 });
 
-import { scaleFactor, scaleStroke } from "../src/components/lessons/ink.ts";
+import { scaleFactor, scaling, stretchBy, transformStroke } from "../src/components/lessons/ink.ts";
+
+const scaleStroke = (s, ax, ay, f) => transformStroke(s, scaling(ax, ay, f, f));
 
 test("a corner handle scales the selection around the opposite corner, by how far it is dragged along the diagonal", () => {
   const box = { x0: 0.2, y0: 0.2, x1: 0.4, y1: 0.3 };
@@ -136,4 +138,40 @@ test("a scaled or moved text keeps what it says, its font size scaled with it", 
   const text = { t: "text", c: "#000000", w: 0.03, p: [0.2, 0.2, 0], s: "ciao" };
   assert.deepEqual(scaleStroke(text, 0.2, 0.2, 2), { ...text, w: 0.06 });
   assert.deepEqual(moveStroke(text, 0.1, 0.1), { ...text, p: [0.3, 0.3, 0] });
+});
+
+test("a side's handle stretches the selection one way only, around the opposite side, kept on the page and never turned over", () => {
+  const box = { x0: 0.2, y0: 0.2, x1: 0.4, y1: 0.3 };
+  const close = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-9);
+  assert.ok(close(stretchBy(box, "e", 0.6, 0.9, 0.75), [2, 0, 0, 1, -0.2, 0]), "twice as wide, from the left side, whatever y");
+  const n = stretchBy(box, "n", 0, 0.25, 0.75);
+  assert.ok(Math.abs(n[3] - 0.5) < 1e-9 && n[0] === 1 && Math.abs(n[5] - 0.15) < 1e-9, "half as tall, the bottom stays");
+  assert.ok(Math.abs(stretchBy(box, "e", 2, 0, 0.75)[0] - 4) < 1e-9, "the page's right edge stops it");
+  assert.ok(Math.abs(stretchBy(box, "w", 0.9, 0, 0.75)[0] - 0.05) < 1e-9, "past the other side it stays 0.01 wide");
+  // A corner still scales both ways alike.
+  const c = stretchBy(box, "se", 0.6, 0.4, 0.75);
+  assert.ok(Math.abs(c[0] - 2) < 1e-9 && Math.abs(c[3] - 2) < 1e-9);
+});
+
+test("a stretched stroke has its points stretched and its width grown with the area; a stretched text keeps its font in m", () => {
+  const s = { t: "pen", c: "#000000", w: 0.004, p: [0.2, 0.2, 0.5, 0.3, 0.3, 0.5] };
+  assert.deepEqual(transformStroke(s, scaling(0.2, 0.2, 4, 1)), { ...s, w: 0.008, p: [0.2, 0.2, 0.5, 0.6, 0.3, 0.5] });
+  const text = { t: "text", c: "#000000", w: 0.03, p: [0.2, 0.2, 0], s: "ciao" };
+  const wide = transformStroke(text, scaling(0.2, 0.2, 4, 1));
+  assert.deepEqual(wide, { ...text, w: 0.06, m: [2, 0, 0, 0.5] });
+  // Its box is the stretched text's: twice as wide as the same text upright at 0.06, half as tall.
+  const upright = boundsOf([{ ...text, w: 0.06 }]);
+  const b = boundsOf([wide]);
+  assert.ok(Math.abs((b.x1 - b.x0) - (upright.x1 - upright.x0) * 2) < 0.03 && b.y1 - b.y0 < (upright.y1 - upright.y0) * 0.6);
+  // Stretched back, it is upright again (no m).
+  assert.deepEqual(transformStroke(wide, scaling(0.2, 0.2, 0.25, 1)), text);
+});
+
+test("a turned text is picked on its lines, not on the empty corners of the rectangle around it", () => {
+  const r = Math.SQRT1_2;
+  const text = { t: "text", c: "#000000", w: 0.03, p: [0.2, 0.2, 0], s: "ciao ciao ciao", m: [r, r, -r, r] };
+  // Along its line, 45° down to the right.
+  assert.equal(hitsText(text, 0.2 + 0.1 * r, 0.2 + 0.1 * r, 0), true);
+  const b = boundsOf([text]);
+  assert.equal(hitsText(text, b.x1 - 0.005, b.y0 + 0.005, 0), false, "the top-right corner of its box is empty");
 });

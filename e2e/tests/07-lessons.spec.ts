@@ -559,6 +559,24 @@ test.describe.serial("Lezioni", () => {
     await save(page);
     expect((await ink())[0]).toEqual(small);
 
+    // The handle on a side stretches it one way only: wider, as tall as before, the left side where it was.
+    const ySpan = (s: { p: number[] }) => Math.max(...s.p.filter((_, i) => i % 3 === 1)) - Math.min(...s.p.filter((_, i) => i % 3 === 1));
+    await page.mouse.click(sx, sy);
+    await expect(count1).toHaveText("1 tratto selezionato");
+    const eb = (await page.getByTestId("selection-handle-e").boundingBox())!;
+    await page.mouse.move(eb.x + eb.width / 2, eb.y + eb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(eb.x + eb.width / 2 + width * 0.1, eb.y + eb.height / 2 + width * 0.08, { steps: 6 });
+    await page.mouse.up();
+    await save(page);
+    const wide = (await ink())[0];
+    expect(span(wide)).toBeGreaterThan(span(small) * 1.3);
+    expect(ySpan(wide)).toBeCloseTo(ySpan(small), 3);
+    expect(Math.min(...wide.p.filter((_, i) => i % 3 === 0))).toBeCloseTo(Math.min(...small.p.filter((_, i) => i % 3 === 0)), 2);
+    await page.keyboard.press("Control+z");
+    await save(page);
+    expect((await ink())[0]).toEqual(small);
+
     // A click on an empty spot lets go; a rectangle around both picks both; Canc deletes them, undo brings them back.
     const [ex, ey] = await at(0.5, 0.9);
     await page.mouse.click(ex, ey);
@@ -674,6 +692,16 @@ test.describe.serial("Lezioni", () => {
     const big = (await ink())[0];
     expect(big.s).toBe("Ciao\nmondo");
     expect(big.w).toBeGreaterThan(written[0].w * 1.2);
+    // Its side's handle stretches the letters: wider than tall, kept with the text (m) for the PDF too.
+    const eb = (await page.getByTestId("selection-handle-e").boundingBox())!;
+    await page.mouse.move(eb.x + eb.width / 2, eb.y + eb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(eb.x + eb.width / 2 + 120, eb.y + eb.height / 2, { steps: 6 });
+    await page.mouse.up();
+    await save(page);
+    const stretched = (await ink())[0] as { s?: string; m?: number[] };
+    expect(stretched.s).toBe("Ciao\nmondo");
+    expect(stretched.m![0]).toBeGreaterThan(stretched.m![3] * 1.2);
     await page.getByTestId("selection-delete").click();
     await save(page);
     expect(await ink()).toHaveLength(0);

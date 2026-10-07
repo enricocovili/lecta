@@ -15,6 +15,9 @@ export interface Stroke {
   p: number[];
   /** text only: what is written, lines separated by \n */
   s?: string;
+  /** text only: how its lines are stretched (and turned) around its top-left corner, as a canvas' a, b, c, d; none when
+   *  they are upright and unstretched. Scaled to area 1: the size is the font size's. */
+  m?: [number, number, number, number];
 }
 
 export const HL_ALPHA = 0.35;
@@ -73,7 +76,10 @@ export function canvasScale(width: number, height: number): number {
 const MIN_STEP = 0.0005;
 
 export function roundStroke(s: Stroke): Stroke {
-  return { ...s, p: s.p.map((v, i) => (i % 3 === 2 ? Math.round(v * 100) / 100 : Math.round(v * 10000) / 10000)) };
+  const r = (v: number) => Math.round(v * 10000) / 10000;
+  const out = { ...s, p: s.p.map((v, i) => (i % 3 === 2 ? Math.round(v * 100) / 100 : r(v))) };
+  if (s.m) out.m = s.m.map(r) as Stroke["m"];
+  return out;
 }
 
 /** Whether a new point is far enough from the last one to be worth keeping. */
@@ -104,7 +110,9 @@ export function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke, scale: numb
     ctx.font = `${s.w * scale}px ${TEXT_FONT}`;
     ctx.textBaseline = "alphabetic";
     const top = textBaseline();
-    textLines(s).forEach((line, i) => ctx.fillText(line, s.p[0] * scale, (s.p[1] + (top + i * TEXT_LINE_HEIGHT) * s.w) * scale));
+    ctx.translate(s.p[0] * scale, s.p[1] * scale);
+    if (s.m) ctx.transform(s.m[0], s.m[1], s.m[2], s.m[3], 0, 0);
+    textLines(s).forEach((line, i) => ctx.fillText(line, 0, (top + i * TEXT_LINE_HEIGHT) * s.w * scale));
     ctx.restore();
     return;
   }
@@ -170,15 +178,24 @@ interface Box {
 }
 const boxes = new WeakMap<Stroke, Box>();
 
+/** A text's own size (its widest line, its lines' height), before its `m`. */
+function textSize(s: Stroke): { w: number; h: number } {
+  const lines = textLines(s);
+  return { w: Math.max(...lines.map(lineWidth)) * s.w, h: lines.length * TEXT_LINE_HEIGHT * s.w };
+}
+
 /** The rectangle around a stroke's points, or around a text's lines (kept: the eraser asks for it at every move, for every
  *  stroke). */
 function boxOf(s: Stroke): Box {
   let b = boxes.get(s);
   if (s.t === "text") {
     if (!b) {
-      const lines = textLines(s);
+      const { w, h } = textSize(s);
       const [x, y] = s.p;
-      b = { x0: x, y0: y, x1: x + Math.max(...lines.map(lineWidth)) * s.w, y1: y + lines.length * TEXT_LINE_HEIGHT * s.w, n: s.p.length };
+      const [a, bb, c, d] = s.m ?? [1, 0, 0, 1];
+      const xs = [0, a * w, c * h, a * w + c * h];
+      const ys = [0, bb * w, d * h, bb * w + d * h];
+      b = { x0: x + Math.min(...xs), y0: y + Math.min(...ys), x1: x + Math.max(...xs), y1: y + Math.max(...ys), n: s.p.length };
       boxes.set(s, b);
     }
     return b;
@@ -242,7 +259,18 @@ export function drawRegion(ctx: CanvasRenderingContext2D, strokes: Stroke[], sca
 /** Whether the eraser (a disc of radius r at x, y) touches the stroke. */
 export function hits(s: Stroke, x: number, y: number, r: number): boolean {
   const b = boxOf(s);
-  if (s.t === "text") return x >= b.x0 - r && x <= b.x1 + r && y >= b.y0 - r && y <= b.y1 + r;
+  if (s.t === "text") {
+    if (!s.m) return x >= b.x0 - r && x <= b.x1 + r && y >= b.y0 - r && y <= b.y1 + r;
+    // Turned or stretched: the point brought back into the text's own frame, against its upright rectangle.
+    const [a, bb, c, d] = s.m;
+    const det = a * d - bb * c || 1;
+    const dx = x - s.p[0];
+    const dy = y - s.p[1];
+    const u = (d * dx - c * dy) / det;
+    const v = (a * dy - bb * dx) / det;
+    const { w, h } = textSize(s);
+    return u >= -r && u <= w + r && v >= -r && v <= h + r;
+  }
   const reach = r + s.w / 2;
   if (x < b.x0 - reach || x > b.x1 + reach || y < b.y0 - reach || y > b.y1 + reach) return false;
   const n = s.p.length / 3;
@@ -293,12 +321,40 @@ export function moveStroke(s: Stroke, dx: number, dy: number): Stroke {
 
 /** A corner of the selection's box, where a handle scales it from. */
 export type Corner = "nw" | "ne" | "sw" | "se";
-/** The smallest a selection can be scaled down to (its longer side, in page widths), and how much bigger at most at once. */
+/** A side of the selection's box, where a handle stretches it in one direction only. */
+export type Side = "n" | "s" | "e" | "w";
+export type Handle = Corner | Side;
+/** The smallest a selection can be scaled down to (its longer side, or the side stretched, in page widths), and how much
+ *  bigger at most at once. */
 const MIN_SELECTION = 0.01;
 const MAX_SCALE = 10;
 /** Stroke widths stay within what the server takes. */
 const MIN_WIDTH = 0.0003;
 const MAX_WIDTH = 0.2;
+
+/** A map of the page onto itself, as a canvas' transform: x' = a x + c y + e, y' = b x + d y + f. */
+export type Affine = [number, number, number, number, number, number];
+export const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
+
+/** Scaling by sx, sy around ax, ay. */
+export function scaling(ax: number, ay: number, sx: number, sy: number): Affine {
+  return [sx, 0, 0, sy, ax - ax * sx, ay - ay * sy];
+}
+
+export function applyAffine([a, b, c, d, e, f]: Affine, x: number, y: number): { x: number; y: number } {
+  return { x: a * x + c * y + e, y: b * x + d * y + f };
+}
+
+/** Whether the map changes anything worth keeping. */
+export function moves(t: Affine): boolean {
+  return Math.max(Math.abs(t[0] - 1), Math.abs(t[1]), Math.abs(t[2]), Math.abs(t[3] - 1)) > 0.002 || Math.hypot(t[4], t[5]) > 0.0005;
+}
+
+/** The rectangle around the box once mapped. */
+export function mapRect(t: Affine, r: Rect): Rect {
+  const pts = [applyAffine(t, r.x0, r.y0), applyAffine(t, r.x1, r.y0), applyAffine(t, r.x0, r.y1), applyAffine(t, r.x1, r.y1)];
+  return { x0: Math.min(...pts.map((p) => p.x)), y0: Math.min(...pts.map((p) => p.y)), x1: Math.max(...pts.map((p) => p.x)), y1: Math.max(...pts.map((p) => p.y)) };
+}
 
 /** The corner `c` of the box and the one opposite to it (which stays put while the box is scaled). */
 export function cornerPoints(box: Rect, c: Corner): { cx: number; cy: number; ax: number; ay: number } {
@@ -306,6 +362,9 @@ export function cornerPoints(box: Rect, c: Corner): { cx: number; cy: number; ax
   const north = c[0] === "n";
   return { cx: west ? box.x0 : box.x1, cy: north ? box.y0 : box.y1, ax: west ? box.x1 : box.x0, ay: north ? box.y1 : box.y0 };
 }
+
+/** How many times the stretch from `a` (the side that stays) by `d` fits before `end` (the page's edge, 0 below `a`). */
+const room = (a: number, d: number, end: number) => (d > 0 ? (end - a) / d : d < 0 ? a / -d : Infinity);
 
 /** How much the box is scaled when its corner `c` is dragged to x, y: the drag along the box's diagonal, uniform (the strokes
  *  keep their proportions). Kept so that the box stays on the page (`ratio` = height / width; a box already past an edge is
@@ -317,20 +376,45 @@ export function scaleFactor(box: Rect, c: Corner, x: number, y: number, ratio: n
   const len2 = dx * dx + dy * dy;
   if (!len2) return 1;
   const f = ((x - ax) * dx + (y - ay) * dy) / len2;
-  const room = (a: number, d: number, end: number) => (d > 0 ? (end - a) / d : d < 0 ? a / -d : Infinity);
   const hi = Math.min(MAX_SCALE, Math.max(1, room(ax, dx, 1)), Math.max(1, room(ay, dy, ratio)));
   const lo = Math.min(1, MIN_SELECTION / Math.max(Math.abs(dx), Math.abs(dy)));
   return Math.min(hi, Math.max(lo, f));
 }
 
-/** The stroke scaled by f around ax, ay, its width too (a new object: the history keeps the old one). The points are scaled,
- *  not a picture of them: the stroke is drawn again as sharp as before at any size. */
-export function scaleStroke(s: Stroke, ax: number, ay: number, f: number): Stroke {
-  return roundStroke({
-    ...s,
-    w: Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, s.w * f)),
-    p: s.p.map((v, i) => (i % 3 === 0 ? ax + (v - ax) * f : i % 3 === 1 ? ay + (v - ay) * f : v)),
-  });
+/** The map that drags the handle `h` of the box to x, y: from a corner the box is scaled the same both ways around the
+ *  opposite corner (`scaleFactor`), from a side only across it, around the opposite side (the proportions change). Kept on
+ *  the page and from vanishing like a scaling, and never turned over: past the other side the box stays thin. */
+export function stretchBy(box: Rect, h: Handle, x: number, y: number, ratio: number): Affine {
+  if (h.length === 2) {
+    const f = scaleFactor(box, h as Corner, x, y, ratio);
+    const { ax, ay } = cornerPoints(box, h as Corner);
+    return scaling(ax, ay, f, f);
+  }
+  const across = h === "e" || h === "w";
+  const a = h === "e" ? box.x0 : h === "w" ? box.x1 : h === "s" ? box.y0 : box.y1;
+  const d = (h === "e" ? box.x1 : h === "w" ? box.x0 : h === "s" ? box.y1 : box.y0) - a;
+  if (!d) return IDENTITY;
+  const hi = Math.min(MAX_SCALE, Math.max(1, room(a, d, across ? 1 : ratio)));
+  const lo = Math.min(1, MIN_SELECTION / Math.abs(d));
+  const f = Math.min(hi, Math.max(lo, ((across ? x : y) - a) / d));
+  return across ? scaling(a, 0, f, 1) : scaling(0, a, 1, f);
+}
+
+/** The stroke mapped by t (a new object: the history keeps the old one): its points, not a picture of them, so it is drawn
+ *  again as sharp as before at any size; its width (a text's font size) grows with the area. A text's corner moves with the
+ *  map, and the rest of the map (a stretch, a turn) goes into its `m`. */
+export function transformStroke(s: Stroke, t: Affine): Stroke {
+  const [a, b, c, d, e, f] = t;
+  const k = Math.sqrt(Math.abs(a * d - b * c)) || 1;
+  const p = s.p.map((v, i, q) => (i % 3 === 0 ? a * v + c * q[i + 1] + e : i % 3 === 1 ? b * q[i - 1] + d * v + f : v));
+  const { m: old, ...rest } = s;
+  const out: Stroke = { ...rest, w: Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, s.w * k)), p };
+  if (s.t === "text") {
+    const [m0, m1, m2, m3] = old ?? [1, 0, 0, 1];
+    const m: Stroke["m"] = [(a * m0 + c * m1) / k, (b * m0 + d * m1) / k, (a * m2 + c * m3) / k, (b * m2 + d * m3) / k];
+    if (Math.max(Math.abs(m[0] - 1), Math.abs(m[1]), Math.abs(m[2]), Math.abs(m[3] - 1)) > 0.0005) out.m = m;
+  }
+  return roundStroke(out);
 }
 
 /** The move asked for, kept so that the box stays on the page (`ratio` = height / width); a box already past an edge is not

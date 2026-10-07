@@ -2,7 +2,7 @@
 
 Ink is stored the way the browser draws it: strokes in units of the page's width (so the same numbers fit
 any zoom and screen), y measured in page widths too. Typed text written on a page is an item of the same list
-(`t: "text"`, its top-left corner in `p`, its font size in `w`), so it is selected, moved, scaled and erased like a stroke. Rendering here (PyMuPDF) is for the annotated PDF
+(`t: "text"`, its top-left corner in `p`, its font size in `w`, and in `m` how it is stretched or turned around that corner), so it is selected, moved, scaled and erased like a stroke. Rendering here (PyMuPDF) is for the annotated PDF
 download and for the pictures the reading model gets of pages that carry handwriting.
 """
 
@@ -70,8 +70,22 @@ def clean_ink(raw: Any) -> list[dict[str, Any]]:
         item = {"t": s["t"], "c": color.lower(), "w": round(float(width), 5), "p": [round(float(v), 4) for v in pts]}
         if s["t"] == "text":
             item["s"] = s["s"].replace("\x00", "").replace("\r\n", "\n")
+            if s.get("m") is not None:
+                item["m"] = _clean_matrix(s["m"])
         out.append(item)
     return out
+
+
+def _clean_matrix(m: Any) -> list[float]:
+    """A text's stretch and turn (a, b, c, d as on a canvas): finite, not flattened nor turned over."""
+    if not isinstance(m, list) or len(m) != 4:
+        raise InkError("bad text matrix")
+    for v in m:
+        if not isinstance(v, (int, float)) or isinstance(v, bool) or not math.isfinite(v) or not -20 <= v <= 20:
+            raise InkError("bad text matrix")
+    if m[0] * m[3] - m[1] * m[2] < 0.01:
+        raise InkError("bad text matrix")
+    return [round(float(v), 4) for v in m]
 
 
 def has_ink(ink: Any) -> bool:
@@ -117,6 +131,9 @@ def _rgb(hex_color: str) -> tuple[float, float, float]:
     return tuple(int(hex_color[i : i + 2], 16) / 255 for i in (1, 3, 5))  # type: ignore[return-value]
 
 
+_FLIP = fitz.Matrix(1, 0, 0, -1, 0, 0)
+
+
 def draw_strokes(page: fitz.Page, strokes: list[dict[str, Any]]) -> None:
     """Draw the strokes on a page (highlighters first, so pens stay readable above them, and typed text on top)."""
     if not strokes:
@@ -132,12 +149,18 @@ def draw_strokes(page: fitz.Page, strokes: list[dict[str, Any]]) -> None:
             pts = s["p"]
             if kind == "text":
                 size = max(1.0, s["w"] * w_page)
+                corner = fitz.Point(rect.x0 + pts[0] * w_page, rect.y0 + pts[1] * w_page)
+                # Stretched or turned around its corner like in the browser. `morph` works the other way up (y going up)
+                # and on the page as stored, so the matrix is flipped, then carried over the page's rotation.
+                m = fitz.Matrix(*s["m"], 0, 0) if s.get("m") else fitz.Identity
+                morph = page.rotation_matrix * (_FLIP * m * _FLIP) * derot
+                morph = fitz.Matrix(morph.a, morph.b, morph.c, morph.d, 0, 0)
                 for i, line in enumerate(s.get("s", "").split("\n")):
                     if not line.strip():
                         continue
-                    y = pts[1] * w_page + (TEXT_ASCENT + i * TEXT_LINE_HEIGHT) * size
-                    at = fitz.Point(rect.x0 + pts[0] * w_page, rect.y0 + y) * derot
-                    shape.insert_text(at, line, fontsize=size, fontname="helv", color=_rgb(s["c"]), rotate=page.rotation)
+                    at = (corner + fitz.Point(0, (TEXT_ASCENT + i * TEXT_LINE_HEIGHT) * size) * m) * derot
+                    shape.insert_text(at, line, fontsize=size, fontname="helv", color=_rgb(s["c"]), rotate=page.rotation,
+                                      morph=(at, morph) if s.get("m") else None)
                 continue
             n = len(pts) // 3
             if n == 0:

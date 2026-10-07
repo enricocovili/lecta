@@ -98,6 +98,33 @@ def test_typed_text_is_written_in_the_annotated_pdf_where_the_browser_shows_it(t
     assert abs(x0 - 0.1 * W) < 4 and abs(y1 - baseline) < 3 and y0 > 0.3 * W - 2
 
 
+def test_a_stretched_or_turned_text_keeps_its_matrix_and_is_drawn_that_way(tmp_path):
+    ok = ls.clean_ink([{**text(), "m": [0.70711, 0.70711, -0.70711, 0.70711]}])
+    assert ok[0]["m"] == [0.7071, 0.7071, -0.7071, 0.7071]
+    for m in ([1, 0, 0], [1, 0, 0, "x"], [1, 0, 0, float("inf")], [1, 0, 0, 0], [-1, 0, 0, 1], [30, 0, 0, 1]):
+        with pytest.raises(ls.InkError):
+            ls.clean_ink([{**text(), "m": m}])
+
+    def ink_box(ink, rotation=0):
+        doc = fitz.open()
+        doc.new_page(width=595, height=842).set_rotation(rotation)
+        pdf = tmp_path / f"p{rotation}.pdf"
+        pdf.write_bytes(doc.tobytes())
+        page = fitz.open(stream=ls.annotated_pdf(pdf, [{"kind": "slide", "slide_page": 1, "ink": ink}]), filetype="pdf")[0]
+        pix = page.get_pixmap()
+        return ImageOps.invert(Image.frombytes("RGB", (pix.width, pix.height), pix.samples).convert("L")).getbbox(), page.rect.width
+
+    r = 0.7071
+    for rotation in (0, 90):
+        (x0, y0, x1, y1), W = ink_box([text("Testo inclinato lungo", x=0.2, y=0.2, w=0.03)], rotation)
+        (sx0, sy0, sx1, sy1), _ = ink_box([{**text("Testo inclinato lungo", x=0.2, y=0.2, w=0.03), "m": [2, 0, 0, 0.5]}], rotation)
+        # Twice as wide and half as tall as the upright text, from the same corner.
+        assert abs((sx1 - sx0) - 2 * (x1 - x0)) < 6 and abs((sy1 - sy0) - (y1 - y0) / 2) < 4 and abs(sx0 - x0) < 3, rotation
+        (tx0, ty0, tx1, ty1), _ = ink_box([{**text("Testo inclinato lungo", x=0.2, y=0.2, w=0.03), "m": [r, r, -r, r]}], rotation)
+        # Turned 45° clockwise, as on a screen: the line goes down to the right from its corner.
+        assert ty0 > 0.2 * W - 20 and tx1 - tx0 > 0.6 * (x1 - x0) and ty1 - ty0 > 0.6 * (x1 - x0), rotation
+
+
 def test_notes_are_one_section_per_slide():
     pages = [
         {"kind": "slide", "slide_page": 1, "notes": "- intro"}, {"kind": "slide", "slide_page": 2, "notes": "  "},
