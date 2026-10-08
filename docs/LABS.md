@@ -103,7 +103,8 @@ address), with the same notes field and a preview; they are saved with the comme
 ## The assistant
 
 «Assistente» in the lab's top bar (owner only) opens the course's AI panel on the lab (`components/labs/LabAssistant.tsx`),
-with its own conversations (`chat_sessions.lab_id`; the course's text lists only those without a lab). It knows the open
+with its own conversations (`chat_sessions.lab_id`; the course's text lists only those without a lab; they follow the lesson
+when it moves to another course). It knows the open
 file; selecting lines and pressing **«Chiedi»** (next to «Commenta» over the selection) adds them as context. Quick actions:
 explain this file, find errors, comment the code, connect it to the theory.
 

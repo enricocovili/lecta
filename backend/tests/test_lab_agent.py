@@ -103,3 +103,10 @@ async def test_undo_is_refused_when_the_file_changed_since(admin):
     await admin.put(f"/api/lessons/{lesson['id']}/lab/files/{f['id']}/content", json={"content": current["content"] + "// mia\n", "base_version": current["version"]})
     r = await admin.post(f"/api/chat/replies/{reply['id']}/undo")
     assert r.status_code == 409 and r.json()["detail"]["skipped"] == ["main.c"]
+
+
+async def test_the_lab_conversations_follow_the_lesson_to_another_course(admin):
+    _, lesson, lab, _, _, s = await _lab(admin)
+    other = (await admin.post("/api/courses", json={"name": "Analisi", "language": "it"})).json()
+    assert (await admin.patch(f"/api/lessons/{lesson['id']}", json={"course_id": other["id"]})).status_code == 200
+    assert [x["id"] for x in (await admin.get("/api/chat/sessions", params={"course_id": other["id"], "lab_id": lab["id"]})).json()] == [s["id"]]
