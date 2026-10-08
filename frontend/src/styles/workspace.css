@@ -1181,6 +1181,9 @@ body.ws-page {
   flex: none;
 }
 
+.ai-keep {
+  margin-top: 0.5rem;
+}
 .ai-error {
   display: flex;
   align-items: center;

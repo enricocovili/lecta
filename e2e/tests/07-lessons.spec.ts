@@ -436,6 +436,17 @@ test.describe.serial("Lezioni", () => {
     await expect(panel.getByTestId("ai-change-card")).toHaveCount(0);
     await page.screenshot({ path: "/e2e/.results/lesson-assistant.png" });
 
+    // «Aggiungi agli appunti» puts the answer at the end of that page's notes, to edit there; Ctrl+Z takes it out.
+    const notes = page.getByTestId("lesson-page").nth(1).locator(".les-notes-field");
+    const before = await notes.inputValue();
+    await panel.getByTestId("ai-keep").click();
+    await expect(panel.getByTestId("ai-keep")).toContainText("Aggiunta agli appunti");
+    await expect(notes).toHaveValue(/Il passaggio si spiega così: \$f_s > 2B\$/);
+    expect((await notes.inputValue()).startsWith(before.trimEnd())).toBe(true);
+    await expect(notes).not.toHaveValue(/suggestions/);
+    await page.keyboard.press("Control+z");
+    await expect(notes).toHaveValue(before);
+
     // The top bar's button closes it; the lesson's conversations stay apart from the course text's.
     await page.getByTestId("lesson-ai-toggle").click();
     await expect(panel).toBeHidden();

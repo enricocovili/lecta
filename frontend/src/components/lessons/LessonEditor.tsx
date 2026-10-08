@@ -5,7 +5,7 @@ import { api, fmtDay, get, patch } from "../../lib/api";
 import { courseText } from "../../lib/links";
 import { Icon } from "../icons";
 import Pop from "../workspace/Pop";
-import { Confirm, Seg, toastError, useLocalStorage } from "../ui";
+import { Confirm, Seg, toast, toastError, useLocalStorage } from "../ui";
 import GenerateDialog from "./GenerateDialog";
 import LessonAssistant from "./LessonAssistant";
 import { clampZoom, stepZoom, useGestures, ZOOM_MAX, ZOOM_MIN, type GestureOptions } from "./gestures";
@@ -374,6 +374,22 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   const askedIndex = pinnedIndex >= 0 ? pinnedIndex : current;
   const askedPage = useMemo(() => (pages[askedIndex] ? { id: pages[askedIndex].id, label: labels[askedIndex] } : null), [pages, labels, askedIndex]);
   const pageName = useCallback((id: number) => labels[pages.findIndex((p) => p.id === id)] ?? null, [pages, labels]);
+  // An answer of the assistant goes at the end of the page's notes: one step of the history, so Ctrl+Z takes it out.
+  const keepAnswer = useCallback(
+    (pid: number | null, text: string) => {
+      const i = pagesRef.current.findIndex((p) => p.id === pid);
+      if (i < 0) {
+        toastError(new Error("Quella pagina non c’è più nella lezione"));
+        return false;
+      }
+      const notes = pagesRef.current[i].notes.replace(/\s+$/, "");
+      setNotes(pid!, `${notes ? `${notes}\n\n` : ""}${text.trim()}\n`);
+      reveal(pid!, true);
+      toast(`Aggiunta agli appunti di «${pageLabel(pagesRef.current, i)}»: Ctrl+Z la toglie`);
+      return true;
+    },
+    [setNotes],
+  );
   const colors = tool === "hl" ? HL_COLORS : COLORS;
   const colorSel = tool === "hl" ? hlIdx : colorIdx;
 
@@ -720,6 +736,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
             pageName={pageName}
             onClose={() => setAiOpen(false)}
             onUnpin={() => setAskPin(null)}
+            onKeep={keepAnswer}
           />
         )}
       </div>

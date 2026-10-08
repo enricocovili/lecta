@@ -46,7 +46,10 @@ looked at. Quick actions: explain the slide, the procedure step by step, a numer
 Every question is sent with the **whole lesson** in the prompt (every page: the text printed on its slide, the typed notes, whether
 it carries handwriting) and the **pictures of the pages from ten before to ten after** the one asked about, strokes and typed text
 drawn on them (the asked page at 1600 px, the others at 1100 px). Its tools are `view_page` (any other page as a picture) and
-`read_chapter` (the lesson's section of its chapter). It **only explains**: no tool changes anything, and a turn has nothing to undo.
+`read_chapter` (the lesson's section of its chapter). It **only explains**: no tool changes anything, and a turn has nothing to undo. Under an answer, **«Aggiungi agli appunti»**
+puts it at the end of the notes of the page asked about (a blank line after what is there), where it is edited like the rest
+and later goes into the text with «Integra appunti»; it is one step of the editor's history, so Ctrl+Z takes it out, and the
+editor scrolls to the page.
 The prompt is `lesson.system` (Settings → Prompt). Conversations belong to the lesson (`chat_sessions.lesson_id`), stay out of the
 course text's list and follow the lesson when it moves to another course. The turn is `agent._drive` on a bench made by
 `pipeline/lesson_agent.py` (tools in `pipeline/lesson_tools.py`); the chat API is the course assistant's

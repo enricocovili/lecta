@@ -15,6 +15,8 @@ export interface MessageCtx {
   fileName?: (fileId: number) => string | null;
   /** a lesson's conversation: name the page a question was about («Slide 12») */
   pageName?: (pageId: number) => string | null;
+  /** a lesson's conversation: bring an answer into the notes of the page asked about (`prev`: the question) */
+  onKeep?: (m: Message, prev: Message | null) => boolean;
 }
 
 const chapterName = (ctx: MessageCtx, id: number | null | undefined) => {
@@ -236,6 +238,7 @@ function ReviewCard({ r, ctx }: { r: Review; ctx: MessageCtx }) {
 
 function AssistantMessage({ m, prev, last, canUndo, ctx }: { m: Message; prev: Message | null; last: boolean; canUndo: boolean; ctx: MessageCtx }) {
   const live = m.status === "streaming";
+  const [kept, setKept] = useState(false);
   return (
     <div className={`ai-msg assistant ${m.status}`} data-testid="ai-message" data-role="assistant" data-status={m.status}>
       <div className="ai-avatar" aria-hidden="true">
@@ -253,6 +256,20 @@ function AssistantMessage({ m, prev, last, canUndo, ctx }: { m: Message; prev: M
         )}
         {m.review && <ReviewCard r={m.review} ctx={ctx} />}
         <ChangeCard m={m} live={live} canUndo={canUndo} ctx={ctx} />
+        {ctx.onKeep && m.status === "done" && m.content.trim() && (
+          <div className="ai-keep">
+            <button
+              type="button"
+              className="btn sm"
+              onClick={() => ctx.onKeep!(m, prev) && setKept(true)}
+              data-testid="ai-keep"
+              title="Aggiunge questa risposta in fondo agli appunti della pagina, dove puoi modificarla; Ctrl+Z la toglie"
+            >
+              <Icon name={kept ? "check" : "plus"} />
+              {kept ? "Aggiunta agli appunti" : "Aggiungi agli appunti"}
+            </button>
+          </div>
+        )}
         {m.status === "cancelled" && <div className="ai-note tiny muted">Interrotto.</div>}
         {m.status === "error" && (
           <div className="ai-error" role="alert">

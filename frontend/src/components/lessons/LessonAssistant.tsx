@@ -1,5 +1,6 @@
 // The lesson's assistant: the course's AI panel, asked about one page. With each question it gets the pictures of the pages
-// around it (ten before and after, with the strokes) and the text and notes of the whole lesson; it only explains.
+// around it (ten before and after, with the strokes) and the text and notes of the whole lesson; it only explains. An answer
+// goes into the page's notes with a click, as a step of the lesson's history.
 import { useMemo } from "react";
 import AiPanel from "../workspace/AiPanel";
 import type { QuickAction, ScopeView } from "../workspace/Composer";
@@ -34,6 +35,7 @@ export default function LessonAssistant({
   pageName,
   onClose,
   onUnpin,
+  onKeep,
 }: {
   lessonId: number;
   courseId: number;
@@ -46,6 +48,8 @@ export default function LessonAssistant({
   pageName: (id: number) => string | null;
   onClose: () => void;
   onUnpin: () => void;
+  /** put an answer at the end of the page's notes; false when it could not */
+  onKeep: (pageId: number | null, text: string) => boolean;
 }) {
   const assistant = useAssistant({ courseId, lessonId, onChange: () => undefined });
   const scope = useMemo<ScopeView | null>(() => (page ? { chapterId: null, chapterLabel: page.label, selection: null, pinned } : null), [page, pinned]);
@@ -58,6 +62,7 @@ export default function LessonAssistant({
     },
     onUndo: assistant.undo,
     pageName,
+    onKeep: (m, prev) => onKeep(prev?.scope.page_id ?? page?.id ?? null, m.content),
   };
   return (
     <div className={`les-ai ${open ? "" : "off"}`} data-testid="lesson-ai">
