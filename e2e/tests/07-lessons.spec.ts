@@ -418,6 +418,34 @@ test.describe.serial("Lezioni", () => {
     con.assertClean(EXPECTED);
   });
 
+  test("«Chiedi» on a page asks the assistant about it, with the pages around it and the whole lesson", async ({ page }) => {
+    test.setTimeout(180_000);
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`/admin/courses/${courseId}/lessons/1`);
+    const lesson = await stored(page);
+    await page.getByTestId("lesson-page").nth(1).getByTestId("ask-page").click();
+    const panel = page.getByTestId("lesson-ai");
+    await expect(panel).toBeVisible();
+    await expect(panel.locator(".ai-scope-pill")).toContainText("Slide 2");
+    await panel.getByRole("button", { name: "Spiega la slide" }).click();
+    const reply = panel.getByTestId("ai-message").last();
+    await expect(reply).toContainText(`Domanda su [p. 2] Slide 2: ho le immagini di ${lesson.pages.length} pagine ([p. 1] Slide 1`, { timeout: 60_000 });
+    await expect(reply).toContainText("con gli appunti");
+    await expect(panel.locator(".ai-scope-chip").last()).toContainText("Slide 2");
+    await expect(panel.getByTestId("ai-change-card")).toHaveCount(0);
+    await page.screenshot({ path: "/e2e/.results/lesson-assistant.png" });
+
+    // The top bar's button closes it; the lesson's conversations stay apart from the course text's.
+    await page.getByTestId("lesson-ai-toggle").click();
+    await expect(panel).toBeHidden();
+    const course = (await (await page.request.get(`/api/chat/sessions?course_id=${courseId}`)).json()) as { id: number }[];
+    const own = (await (await page.request.get(`/api/chat/sessions?course_id=${courseId}&lesson_id=${lesson.id}`)).json()) as { id: number }[];
+    expect(own).toHaveLength(1);
+    expect(course.map((s) => s.id)).not.toContain(own[0].id);
+    con.assertClean(EXPECTED);
+  });
+
   test("the course page lists the lessons with their state and the chapters, each one click away", async ({ page }) => {
     const con = watchConsole(page);
     await login(page);

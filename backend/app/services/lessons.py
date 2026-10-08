@@ -209,6 +209,43 @@ def render_blank(ratio: float, strokes: list[dict[str, Any]], side: int = RENDER
             doc.close()
 
 
+def render_pages(pdf_path: Path | str | None, pages: list[dict[str, Any]], sides: list[int]) -> list[Image.Image]:
+    """Several pages of a lesson (slides or blank pages, with their strokes) as pictures, the PDF opened once; `sides` is the
+    longest side of each picture."""
+    with LOCK:
+        src = fitz.open(str(pdf_path)) if pdf_path else None
+        blank = fitz.open()
+        try:
+            out = []
+            for p, side in zip(pages, sides, strict=True):
+                if p["kind"] == "slide" and src is not None and 1 <= (p.get("slide_page") or 0) <= src.page_count:
+                    page = src[p["slide_page"] - 1]
+                else:
+                    page = blank.new_page(width=1000, height=1000 * max(0.2, min(float(p.get("ratio") or 0.75), 5.0)))
+                draw_strokes(page, p.get("ink") or [])
+                out.append(_image(page, side))
+            return out
+        finally:
+            if src is not None:
+                src.close()
+            blank.close()
+
+
+def slide_texts(pdf_path: Path | str, slide_pages: list[int]) -> dict[int, str]:
+    """The text printed on the given slides (PDF page numbers), whitespace collapsed; '' for a slide without text."""
+    with LOCK:
+        doc = fitz.open(str(pdf_path))
+        try:
+            out = {}
+            for n in slide_pages:
+                if 1 <= n <= doc.page_count:
+                    lines = (re.sub(r"[ \t]+", " ", ln).strip() for ln in doc[n - 1].get_text("text").split("\n"))
+                    out[n] = "\n".join(ln for ln in lines if ln)
+            return out
+        finally:
+            doc.close()
+
+
 def annotated_pdf(pdf_path: Path | str | None, pages: list[dict[str, Any]]) -> bytes:
     """The whole lesson as a PDF: slides and blank pages in order, with the strokes drawn on top."""
     with LOCK:

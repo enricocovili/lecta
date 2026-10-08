@@ -3,7 +3,8 @@
 Self-hosted platform for university notes, worked on with an AI assistant.
 
 * **Lessons**: take notes during the lecture, Markdown next to every slide and pen strokes over it, on a tablet or a
-  laptop; a lesson's **lab** holds the files explained in class, to read and comment.
+  laptop; stuck on a slide, **«Chiedi»** asks the assistant about it (it sees the slides around it and reads the whole
+  lesson); a lesson's **lab** holds the files explained in class, to read and comment.
 * **Study text**: «Integra appunti» turns a lesson into the study text of its course, typeset by LaTeX. You read it as a
   draft, and an **AI assistant** that reads and changes everything in the course does the editing (one click undoes an
   answer). There is no LaTeX editor; the LaTeX project can be downloaded whenever you want.

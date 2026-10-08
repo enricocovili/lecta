@@ -1,4 +1,4 @@
-// The AI conversation of a course (or of one of its lessons' labs): sessions, sending, live streaming of a turn (with reconnect) and undo.
+// The AI conversation of a course (or of one of its lessons, or of a lesson's lab): sessions, sending, live streaming of a turn (with reconnect) and undo.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, del, get, post, streamSSE } from "../../lib/api";
 import { toast, toastError } from "../ui";
@@ -37,12 +37,14 @@ interface Opts {
   courseId: number;
   /** the conversations of this lab instead of the course's text */
   labId?: number;
+  /** the conversations about this lesson's slides instead of the course's text */
+  lessonId?: number;
   /** The AI wrote something (`final`: the turn is over or was undone). Refresh the draft. */
   onChange: (files: ChangedFile[], final: boolean) => void;
 }
 
-export function useAssistant({ courseId, labId, onChange }: Opts) {
-  const where = labId ? { course_id: courseId, lab_id: labId } : { course_id: courseId };
+export function useAssistant({ courseId, labId, lessonId, onChange }: Opts) {
+  const where = labId ? { course_id: courseId, lab_id: labId } : lessonId ? { course_id: courseId, lesson_id: lessonId } : { course_id: courseId };
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -170,7 +172,7 @@ export function useAssistant({ courseId, labId, onChange }: Opts) {
   useEffect(() => {
     let stop = false;
     setLoading(true);
-    get<SessionInfo[]>(`/api/chat/sessions?course_id=${courseId}${labId ? `&lab_id=${labId}` : ""}`)
+    get<SessionInfo[]>(`/api/chat/sessions?course_id=${courseId}${labId ? `&lab_id=${labId}` : ""}${lessonId ? `&lesson_id=${lessonId}` : ""}`)
       .then(async (list) => {
         if (stop) return;
         const sorted = [...list].sort((a, b) => b.id - a.id);
@@ -188,7 +190,7 @@ export function useAssistant({ courseId, labId, onChange }: Opts) {
       stop = true;
       detach();
     };
-  }, [courseId, labId, loadSession, detach]);
+  }, [courseId, labId, lessonId, loadSession, detach]);
 
   const ensureSession = async (): Promise<number> => {
     if (sidRef.current) return sidRef.current;

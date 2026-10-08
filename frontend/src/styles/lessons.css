@@ -155,6 +155,27 @@ body.ws-page .les {
   flex: 1;
   min-height: 0;
   display: flex;
+  position: relative;
+}
+/* The assistant: beside the pages, over them on a narrow screen. */
+.les-ai {
+  width: 26rem;
+  min-height: 0;
+  display: flex;
+  background: var(--bg-elev);
+  border-left: 1px solid var(--border);
+}
+.les-ai.off {
+  display: none;
+}
+@media (max-width: 860px) {
+  .les-ai {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    width: auto;
+    border-left: none;
+  }
 }
 .les-scroll {
   flex: 1;
@@ -247,7 +268,8 @@ body.ws-page .les {
   opacity: 1;
 }
 /* «Solo slide»: the page's remove button on the slide's top-right corner, shown like the tag (always on a touch screen). */
-.les .les-slide-remove {
+.les .les-slide-remove,
+.les .les-slide-ask {
   position: absolute;
   right: 6px;
   top: 6px;
@@ -265,12 +287,21 @@ body.ws-page .les {
 .les .les-slide-remove:hover {
   background: #b3261e;
 }
+.les .les-slide-ask {
+  right: 46px;
+}
+.les .les-slide-ask:hover {
+  background: #2c4fa3;
+}
 .les-row:hover .les-slide-remove,
-.les-slide-remove:focus-visible {
+.les-slide-remove:focus-visible,
+.les-row:hover .les-slide-ask,
+.les-slide-ask:focus-visible {
   opacity: 1;
 }
 @media (pointer: coarse) {
-  .les .les-slide-remove {
+  .les .les-slide-remove,
+  .les .les-slide-ask {
     opacity: 0.8;
   }
 }

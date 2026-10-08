@@ -583,6 +583,8 @@ class ChatSession(Base):
     chapter_id: Mapped[int | None] = mapped_column(ForeignKey("chapters.id", ondelete="SET NULL"))
     # A conversation of a lesson's lab (its assistant works on the lab's files); None: the course's text.
     lab_id: Mapped[int | None] = mapped_column(ForeignKey("labs.id", ondelete="CASCADE"), index=True)
+    # A conversation about a lesson's slides (its assistant only explains); None: the course's text or a lab.
+    lesson_id: Mapped[int | None] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = _now()
     updated_at: Mapped[datetime] = _now()

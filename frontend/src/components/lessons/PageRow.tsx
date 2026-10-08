@@ -31,6 +31,8 @@ export interface Actions {
   addBlankAfter: (pid: number | null) => void;
   removePage: (pid: number) => void;
   visible: (index: number) => void;
+  /** open the assistant on this page (the owner only) */
+  ask?: (pid: number) => void;
 }
 
 interface Props {
@@ -124,7 +126,12 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
           onMoveStrokes={(moves) => actions.moveStrokes(page.id, moves)}
         />
         <span className="les-tag">{label}</span>
-        {/* Without the notes column its remove button sits on the slide's corner. */}
+        {/* Without the notes column its buttons sit on the slide's corner. */}
+        {layout === "slides" && actions.ask && (
+          <button type="button" className="btn icon les-slide-ask" onClick={() => actions.ask!(page.id)} title="Chiedi all’assistente di questa pagina" aria-label="Chiedi all’assistente di questa pagina" data-testid="ask-page">
+            <Icon name="sparkles" />
+          </button>
+        )}
         {layout === "slides" && !readOnly && (
           <button type="button" className="btn icon les-slide-remove" onClick={() => actions.removePage(page.id)} title={page.kind === "slide" ? "Togli questa slide dalla lezione" : "Togli questa pagina"} aria-label="Togli questa pagina" data-testid="remove-page">
             <Icon name="trash" />
@@ -135,6 +142,12 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
         <div className="les-notes">
           <div className="les-notes-head">
             <span className="les-notes-title">Appunti · {label}</span>
+            {actions.ask && (
+              <button type="button" className="btn ghost xs" onClick={() => actions.ask!(page.id)} title="Chiedi all’assistente di questa pagina: vede anche le slide vicine e legge tutta la lezione" data-testid="ask-page">
+                <Icon name="sparkles" />
+                Chiedi
+              </button>
+            )}
             {!readOnly && (
               <button type="button" className="btn ghost xs" onClick={() => actions.removePage(page.id)} title={page.kind === "slide" ? "Togli questa slide dalla lezione" : "Togli questa pagina"} aria-label="Togli questa pagina" data-testid="remove-page">
               <Icon name="trash" />

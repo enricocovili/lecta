@@ -13,6 +13,8 @@ export interface MessageCtx {
   /** a lab's conversation: open one of its files, and name the file a message was about */
   onFile?: (path: string) => void;
   fileName?: (fileId: number) => string | null;
+  /** a lesson's conversation: name the page a question was about («Slide 12») */
+  pageName?: (pageId: number) => string | null;
 }
 
 const chapterName = (ctx: MessageCtx, id: number | null | undefined) => {
@@ -26,15 +28,16 @@ const chapterName = (ctx: MessageCtx, id: number | null | undefined) => {
 function UserMessage({ m, ctx }: { m: Message; ctx: MessageCtx }) {
   const ch = chapterName(ctx, m.scope.chapter_id);
   const file = m.scope.file_id != null ? (ctx.fileName?.(m.scope.file_id) ?? "File") : null;
+  const page = m.scope.page_id != null ? (ctx.pageName?.(m.scope.page_id) ?? "Pagina tolta") : null;
   const sel = m.scope.selection;
   const review = m.scope.mode === "review";
   return (
     <div className="ai-msg user" data-testid="ai-message" data-role="user">
-      {(review || ch || sel || file) && (
-        <div className="ai-scope-chip" title={ch?.title ?? file ?? undefined}>
-          <Icon name={review ? "sparkles" : sel ? "pencil" : file ? "code" : "file-text"} />
+      {(review || ch || sel || file || page) && (
+        <div className="ai-scope-chip" title={ch?.title ?? file ?? page ?? undefined}>
+          <Icon name={review ? "sparkles" : sel ? "pencil" : file ? "code" : page ? "image" : "file-text"} />
           <span>
-            {review ? "Revisione del corso" : file ? file : ch ? `Capitolo ${ch.n}` : "Capitolo"}
+            {review ? "Revisione del corso" : file ? file : page ? page : ch ? `Capitolo ${ch.n}` : "Capitolo"}
             {sel && !review && <> · «{sel.text.replace(/\s+/g, " ").slice(0, 70)}{sel.text.length > 70 ? "…" : ""}»</>}
           </span>
         </div>

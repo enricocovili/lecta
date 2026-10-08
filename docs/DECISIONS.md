@@ -547,6 +547,15 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 
 ## Assistant
 
+110. **A question about a slide carries the pictures of the pages around it, and the rest of the lesson as text (#64).**
+     A derivation on a slide usually starts a slide or two earlier and its notation is defined further back, and slide text
+     extracted from a PDF garbles formulas: so the pages from ten before to ten after the asked one go with every question as
+     pictures (with the student's strokes, since what was circled or written in the margin is often the doubt), and every
+     page's slide text and typed notes go in the prompt. Pages further away are a `view_page` call. Nothing is cached by the
+     providers here, so the pictures are sent again with each question: 21 pictures (about 15–20k tokens) bound the cost
+     whatever the length of the lesson. The assistant only explains; bringing an answer into the notes is the student's
+     choice. *Alternatives:* every page as a picture (cost grows with the lesson, and providers cap the pictures per
+     request); text only (formulas unreadable).
 108. **A picture the import left out is taken back by the assistant, not by loosening the filters (#61).** The import's
      decoration filters (logos, repeated theme graphics, header/footer pictures, pictures too small or too large) stay as
      they are: they drop far more junk than figures. When a figure is missing, the course assistant looks at the page,

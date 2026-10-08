@@ -246,6 +246,8 @@ class FakeAdapter(Adapter):
 
         if m.get("lab"):
             return self._lab_agent(req, msg, low, mode, results, done, call)
+        if m.get("lesson"):
+            return self._lesson_agent(req, msg, low, results, done, call)
         # Test hooks.
         if "FAKE:LOOP" in msg:
             return done("Continuo a leggere. ", [call("course_overview")])
@@ -323,3 +325,25 @@ class FakeAdapter(Adapter):
         if sel:
             return done(f"Queste righe («{sel[:60]}») fanno il lavoro principale del programma: te le spiego passo per passo." + suggestions)
         return done("Ho letto il file: è un programma di esempio del laboratorio." + suggestions)
+
+    def _lesson_agent(self, req: Prepared, msg: str, low: str, results: list[Any], done: Any, call: Any) -> Completion:
+        """The lesson assistant, scripted: says what it was given; looks at another page or reads the chapter when asked."""
+        m = req.meta
+        suggestions = '\n\n```suggestions\n["Fammi un esempio numerico", "Spiega la slide successiva"]\n```'
+        if not results:
+            asked = re.search(r"FAKE:VIEW (\d+)", msg)
+            if asked:
+                return done("Guardo quella pagina. ", [call("view_page", page=int(asked.group(1)))])
+            if "capitolo" in low:
+                return done("Leggo il capitolo. ", [call("read_chapter")])
+        else:
+            last = results[-1]
+            if last.is_error:
+                return done("Non ci sono riuscito: " + (last.text or "")[:120])
+            return done(f"Ho usato {last.tool_name}: " + (last.text or "")[:80].replace("\n", " ") + suggestions)
+        pics = m.get("pictures") or []
+        seen = f"le immagini di {len(pics)} pagine ({pics[0]} … {pics[-1]})" if pics else "nessuna immagine"
+        page = m.get("page") or "nessuna pagina"
+        outline = "Student's notes:" in req.system
+        return done(f"Domanda su {page}: ho {seen} e la lezione intera ({m.get('pages')} pagine{', con gli appunti' if outline else ''}). "
+                    "Il passaggio si spiega così: $f_s > 2B$, perché ogni replica dello spettro non deve sovrapporsi." + suggestions)

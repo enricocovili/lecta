@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import config
 from ..db import get_db
-from ..models import Chapter, Course, Job, Lesson, LessonPage, LessonShare, Upload
+from ..models import Chapter, ChatSession, Course, Job, Lesson, LessonPage, LessonShare, Upload
 from ..security.auth import require_admin
 from ..services import blobs
 from ..services import jobs as jobs_svc
@@ -172,6 +172,8 @@ async def patch_lesson(lesson_id: int, body: LessonPatch, db: AsyncSession = Dep
         lesson.number = await _next_number(db, target.id)  # before the move: the query flushes the lesson
         lesson.course_id = target.id
         lesson.chapter_id = None  # its text stays where it was written; the new course has no chapter of this lesson
+        # The questions asked about its slides go with it.
+        await db.execute(update(ChatSession).where(ChatSession.lesson_id == lesson.id).values(course_id=target.id))
     lesson.updated_at = _now()
     await db.commit()
     return lesson_out(lesson)

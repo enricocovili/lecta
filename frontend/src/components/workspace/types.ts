@@ -98,6 +98,8 @@ export interface Scope {
   chapter_id?: number | null;
   /** the lab file being looked at (a lab's conversation) */
   file_id?: number | null;
+  /** the lesson's page asked about (a lesson's conversation) */
+  page_id?: number | null;
   selection?: SelectionScope;
   mode?: Mode;
   attachments?: { source_file_id: number; page?: number }[];

@@ -1,4 +1,4 @@
-"""The AI assistant: chat sessions per course (or per lesson's lab), turns that run in the background (streamed as events), undo."""
+"""The AI assistant: chat sessions per course (or per lesson's lab, or per lesson), turns that run in the background (streamed as events), undo."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..egress import gate
-from ..models import Chapter, ChatMessage, ChatSession, Course, Lab, LabFile, Lesson
-from ..pipeline import agent, lab_agent
+from ..models import Chapter, ChatMessage, ChatSession, Course, Lab, LabFile, Lesson, LessonPage
+from ..pipeline import agent, lab_agent, lesson_agent
 from ..security.auth import require_admin
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -24,10 +24,12 @@ message_out = agent.message_out
 
 
 def session_out(s: ChatSession) -> dict[str, Any]:
-    return {"id": s.id, "course_id": s.course_id, "chapter_id": s.chapter_id, "lab_id": s.lab_id, "title": s.title, "created_at": s.created_at, "updated_at": s.updated_at}
+    return {"id": s.id, "course_id": s.course_id, "chapter_id": s.chapter_id, "lab_id": s.lab_id, "lesson_id": s.lesson_id, "title": s.title, "created_at": s.created_at, "updated_at": s.updated_at}
 
 
 def _running(s: ChatSession) -> agent.Turn | None:
+    if s.lesson_id:
+        return lesson_agent.running_turn(s.lesson_id)
     return lab_agent.running_turn(s.lab_id) if s.lab_id else agent.running_turn(s.course_id)
 
 
@@ -39,10 +41,12 @@ async def _session(db: AsyncSession, sid: int) -> ChatSession:
 
 
 @router.get("/chat/sessions")
-async def list_sessions(course_id: int, chapter_id: int | None = None, lab_id: int | None = None, db: AsyncSession = Depends(get_db)) -> list[dict]:
-    """The conversations about the course's text, or (with `lab_id`) those of one of its labs."""
+async def list_sessions(course_id: int, chapter_id: int | None = None, lab_id: int | None = None, lesson_id: int | None = None,
+                        db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """The conversations about the course's text, or (with `lab_id`) those of one of its labs, or (with `lesson_id`) of a lesson."""
     q = select(ChatSession).where(ChatSession.course_id == course_id).order_by(ChatSession.updated_at.desc())
     q = q.where(ChatSession.lab_id == lab_id) if lab_id is not None else q.where(ChatSession.lab_id.is_(None))
+    q = q.where(ChatSession.lesson_id == lesson_id) if lesson_id is not None else q.where(ChatSession.lesson_id.is_(None))
     if chapter_id is not None:
         q = q.where(ChatSession.chapter_id == chapter_id)
     return [session_out(s) for s in (await db.execute(q)).scalars()]
@@ -52,6 +56,7 @@ class SessionIn(BaseModel):
     course_id: int
     chapter_id: int | None = None
     lab_id: int | None = None  # a conversation of the lab of one of the course's lessons
+    lesson_id: int | None = None  # a conversation about the slides of one of the course's lessons
     title: str | None = Field(None, max_length=200)
 
 
@@ -69,7 +74,12 @@ async def create_session(body: SessionIn, db: AsyncSession = Depends(get_db)) ->
         lesson = await db.get(Lesson, lab.lesson_id) if lab else None
         if lesson is None or lesson.course_id != course.id:
             raise HTTPException(status_code=404, detail="Not Found")
-    s = ChatSession(course_id=course.id, chapter_id=None if body.lab_id else body.chapter_id, lab_id=body.lab_id, title=body.title or "Nuova conversazione")
+    if body.lesson_id:
+        lesson = await db.get(Lesson, body.lesson_id)
+        if lesson is None or lesson.course_id != course.id or body.lab_id:
+            raise HTTPException(status_code=404, detail="Not Found")
+    s = ChatSession(course_id=course.id, chapter_id=None if body.lab_id or body.lesson_id else body.chapter_id, lab_id=body.lab_id,
+                    lesson_id=body.lesson_id, title=body.title or "Nuova conversazione")
     db.add(s)
     await db.commit()
     return session_out(s)
@@ -104,6 +114,7 @@ class SelectionIn(BaseModel):
 class ScopeIn(BaseModel):
     chapter_id: int | None = None
     file_id: int | None = None  # the lab file being looked at (a lab's conversation)
+    page_id: int | None = None  # the page of the lesson asked about (a lesson's conversation)
     selection: SelectionIn | None = None
     attachments: list[dict[str, Any]] = Field(default_factory=list, max_length=20)  # [{source_file_id, page}]
     mode: Literal["ask", "edit", "explain", "review"] = "ask"
@@ -123,9 +134,19 @@ async def post_message(sid: int, body: MessageIn, db: AsyncSession = Depends(get
     except gate.GateRefused as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     if _running(s) is not None:
-        raise HTTPException(status_code=409, detail="L'assistente sta ancora lavorando su questo laboratorio" if s.lab_id else "L'assistente sta ancora lavorando su questa materia")
+        where = "questa lezione" if s.lesson_id else "questo laboratorio" if s.lab_id else "questa materia"
+        raise HTTPException(status_code=409, detail=f"L'assistente sta ancora lavorando su {where}")
     scope = body.scope.model_dump(exclude_none=True)
-    if s.lab_id:
+    if s.lesson_id:
+        # It only explains: no other mode, no chapter, file or source.
+        if scope.get("mode") in ("edit", "review"):
+            raise HTTPException(status_code=422, detail="L'assistente della lezione spiega soltanto")
+        scope = {k: v for k, v in scope.items() if k in ("page_id", "mode")}
+        if scope.get("page_id"):
+            page = await db.get(LessonPage, int(scope["page_id"]))
+            if page is None or page.lesson_id != s.lesson_id:
+                raise HTTPException(status_code=404, detail="Not Found")
+    elif s.lab_id:
         if scope.get("mode") == "review":
             raise HTTPException(status_code=422, detail="La revisione è solo per il testo della materia")
         scope.pop("chapter_id", None)
@@ -147,7 +168,7 @@ async def post_message(sid: int, body: MessageIn, db: AsyncSession = Depends(get
     if s.title in ("", "Nuova conversazione", "Review chat"):
         s.title = body.content[:80]
     await db.commit()
-    await (lab_agent.start_turn if s.lab_id else agent.start_turn)(s, msg, reply)
+    await (lesson_agent.start_turn if s.lesson_id else lab_agent.start_turn if s.lab_id else agent.start_turn)(s, msg, reply)
     return {"message": message_out(msg), "reply": message_out(reply)}
 
 
@@ -203,6 +224,8 @@ async def undo_reply(rid: int, db: AsyncSession = Depends(get_db)) -> dict:
     if m.status == "streaming":
         raise HTTPException(status_code=409, detail="la risposta è ancora in corso")
     s = await _session(db, m.session_id)
+    if s.lesson_id:
+        raise HTTPException(status_code=409, detail="niente da annullare")
     return await (lab_agent.undo_turn if s.lab_id else agent.undo_turn)(db, m)
 
 
