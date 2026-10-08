@@ -115,6 +115,8 @@ class ScopeIn(BaseModel):
     chapter_id: int | None = None
     file_id: int | None = None  # the lab file being looked at (a lab's conversation)
     page_id: int | None = None  # the page of the lesson asked about (a lesson's conversation)
+    # the area of that page asked about: x0, y0, x1, y1 in page widths (as the ink), from the top-left corner
+    region: list[float] | None = Field(None, min_length=4, max_length=4)
     selection: SelectionIn | None = None
     attachments: list[dict[str, Any]] = Field(default_factory=list, max_length=20)  # [{source_file_id, page}]
     mode: Literal["ask", "edit", "explain", "review"] = "ask"
@@ -141,7 +143,11 @@ async def post_message(sid: int, body: MessageIn, db: AsyncSession = Depends(get
         # It only explains: no other mode, no chapter, file or source.
         if scope.get("mode") in ("edit", "review"):
             raise HTTPException(status_code=422, detail="L'assistente della lezione spiega soltanto")
-        scope = {k: v for k, v in scope.items() if k in ("page_id", "mode")}
+        scope = {k: v for k, v in scope.items() if k in ("page_id", "region", "mode")}
+        if "region" in scope:
+            x0, y0, x1, y1 = scope["region"]
+            if not scope.get("page_id") or not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 5):
+                raise HTTPException(status_code=422, detail="Area della pagina non valida")
         if scope.get("page_id"):
             page = await db.get(LessonPage, int(scope["page_id"]))
             if page is None or page.lesson_id != s.lesson_id:

@@ -30,7 +30,7 @@ const chapterName = (ctx: MessageCtx, id: number | null | undefined) => {
 function UserMessage({ m, ctx }: { m: Message; ctx: MessageCtx }) {
   const ch = chapterName(ctx, m.scope.chapter_id);
   const file = m.scope.file_id != null ? (ctx.fileName?.(m.scope.file_id) ?? "File") : null;
-  const page = m.scope.page_id != null ? (ctx.pageName?.(m.scope.page_id) ?? "Pagina tolta") : null;
+  const page = m.scope.page_id != null ? `${ctx.pageName?.(m.scope.page_id) ?? "Pagina tolta"}${m.scope.region ? " · area scelta" : ""}` : null;
   const sel = m.scope.selection;
   const review = m.scope.mode === "review";
   return (

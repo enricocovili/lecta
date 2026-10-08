@@ -3,7 +3,8 @@ nothing in the course or the lesson is changed (the student brings an answer int
 
 Every question comes with the whole lesson in the prompt (each page's slide text, typed notes, whether it carries
 handwriting) and the pictures of the pages from ten before to ten after the one asked about, with the strokes drawn on them
-(the asked page at full size); the model looks at any other page with view_page and reads the lesson's chapter.
+(the asked page at full size), and a sharp cut of the area the user picked on it, if any; the model looks at any other page
+with view_page and reads the lesson's chapter.
 """
 
 from __future__ import annotations
@@ -42,6 +43,11 @@ async def _user_parts(ctx: tools.LessonContext, lesson: Any, pages: list[dict[st
         for i, im in zip(near, imgs, strict=True):
             parts.append(Part(type="text", text=tools.tag(pages, i) + (" ← the page asked about" if i == index else "")))
             parts.append(Part(type="image", blob=im["blob"], mime=im["mime"], width=im["width"], height=im["height"], label=im["label"]))
+        if scope.get("region"):
+            im = await tools.area_picture(lesson, pages, index, scope["region"])
+            parts.append(Part(type="text", text=f"The user picked this area of {tools.tag(pages, index)}: the question is about what it shows "
+                                                "(read it in the context of the whole page)."))
+            parts.append(Part(type="image", blob=im["blob"], mime=im["mime"], width=im["width"], height=im["height"], label=im["label"]))
     parts.append(Part(type="text", text=content))
     return parts
 
@@ -68,7 +74,8 @@ async def _prepare(turn: agent.Turn, user_msg_id: int) -> agent.Bench:
     messages.append(Message(role="user", parts=await _user_parts(ctx, lesson, pages, user_msg.content, scope)))
     meta = {"agent": True, "lesson": True, "mode": "explain", "user_message": user_msg.content,
             "page": tools.tag(pages, index) if index is not None else None,
-            "pictures": [p.label for p in messages[-1].parts if p.type == "image"], "pages": len(pages)}
+            "pictures": [p.label for p in messages[-1].parts if p.type == "image"], "pages": len(pages),
+            "area": next((f"{p.width}×{p.height}" for p in messages[-1].parts if p.type == "image" and (p.label or "").endswith("area picked")), None)}
     return agent.Bench(
         system=system, messages=messages, meta=meta, mode="explain", specs=tools.SPECS,
         run_tool=lambda name, args: tools.run_tool(ctx, name, args), label_for=tools.label_for,

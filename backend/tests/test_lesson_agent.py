@@ -97,3 +97,17 @@ async def test_the_conversations_follow_the_lesson_to_another_course(admin):
     other = (await admin.post("/api/courses", json={"name": "Analisi", "language": "it"})).json()
     assert (await admin.patch(f"/api/lessons/{lesson['id']}", json={"course_id": other["id"]})).status_code == 200
     assert [x["id"] for x in (await admin.get("/api/chat/sessions", params={"course_id": other["id"], "lesson_id": lesson["id"]})).json()] == [s["id"]]
+
+
+async def test_an_area_picked_on_the_page_comes_as_a_sharp_cut(admin):
+    _, lesson, s = await _lesson(admin, n=3)
+    page = lesson["pages"][0]
+    reply, _ = await _ask(admin, s, "Cosa vuol dire questa formula?", page_id=page["id"], region=[0.05, 0.05, 0.55, 0.25])
+    # Cut from a 2400 px picture of the slide, with 0.01 page widths of room around it.
+    assert "e l'area scelta (1248×528)" in reply["content"]
+    stored = (await admin.get(f"/api/chat/sessions/{s['id']}")).json()["messages"]
+    assert stored[0]["scope"]["region"] == [0.05, 0.05, 0.55, 0.25]
+    for bad in ({"page_id": page["id"], "region": [0.5, 0.1, 0.2, 0.3]}, {"page_id": page["id"], "region": [0, 0, 2, 1]},
+                {"region": [0.1, 0.1, 0.2, 0.2]}, {"page_id": page["id"], "region": [0.1, 0.1, 0.2]}):
+        r = await admin.post(f"/api/chat/sessions/{s['id']}/messages", json={"content": "x", "scope": bad})
+        assert r.status_code == 422, bad

@@ -4,7 +4,7 @@ import { Icon } from "../icons";
 import { Markdown } from "../workspace/Markdown";
 import { zooming } from "./gestures";
 import InkLayer from "./InkLayer";
-import type { Stroke, Tool } from "./ink";
+import type { Rect, Stroke, Tool } from "./ink";
 import NotesField from "./NotesField";
 import SlideView, { type PdfDoc } from "./SlideView";
 import type { PageState } from "./useLesson";
@@ -33,6 +33,8 @@ export interface Actions {
   visible: (index: number) => void;
   /** open the assistant on this page (the owner only) */
   ask?: (pid: number) => void;
+  /** a rectangle drawn with the select tool on this page is an area to ask about (null: let go); the owner only */
+  area?: (pid: number, r: Rect | null) => void;
 }
 
 interface Props {
@@ -52,9 +54,11 @@ interface Props {
   label: string;
   /** the strokes of this page that are selected (null: none here) */
   selected: Stroke[] | null;
+  /** the area picked on this page to ask about (null: none here) */
+  area?: Rect | null;
 }
 
-function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = false, scroller, actions, label, selected }: Props) {
+function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = false, scroller, actions, label, selected, area = null }: Props) {
   const row = useRef<HTMLElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -124,6 +128,9 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
           selected={selected}
           onSelect={(strokes) => actions.select(page.id, strokes)}
           onMoveStrokes={(moves) => actions.moveStrokes(page.id, moves)}
+          area={area}
+          onArea={actions.area && ((r) => actions.area!(page.id, r))}
+          onAskArea={actions.ask && (() => actions.ask!(page.id))}
         />
         <span className="les-tag">{label}</span>
         {/* Without the notes column its buttons sit on the slide's corner. */}

@@ -2,6 +2,7 @@
 // around it (ten before and after, with the strokes) and the text and notes of the whole lesson; it only explains. An answer
 // goes into the page's notes with a click, as a step of the lesson's history.
 import { useMemo } from "react";
+import type { Rect } from "./ink";
 import AiPanel from "../workspace/AiPanel";
 import type { QuickAction, ScopeView } from "../workspace/Composer";
 import type { MessageCtx } from "../workspace/MessageView";
@@ -30,6 +31,7 @@ export default function LessonAssistant({
   courseId,
   page,
   pinned,
+  area,
   open,
   focusNonce,
   pageName,
@@ -43,6 +45,8 @@ export default function LessonAssistant({
   page: AskedPage | null;
   /** picked with «Chiedi» (it stays while scrolling); otherwise the page follows the scroll */
   pinned: boolean;
+  /** the area picked on that page with the select tool, if any */
+  area: Rect | null;
   open: boolean;
   focusNonce: number;
   pageName: (id: number) => string | null;
@@ -52,12 +56,15 @@ export default function LessonAssistant({
   onKeep: (pageId: number | null, text: string) => boolean;
 }) {
   const assistant = useAssistant({ courseId, lessonId, onChange: () => undefined });
-  const scope = useMemo<ScopeView | null>(() => (page ? { chapterId: null, chapterLabel: page.label, selection: null, pinned } : null), [page, pinned]);
+  const scope = useMemo<ScopeView | null>(
+    () => (page ? { chapterId: null, chapterLabel: area ? `${page.label} · area scelta` : page.label, selection: null, pinned } : null),
+    [page, pinned, area],
+  );
   const ctx: MessageCtx = {
     chapters: [],
     onJump: () => undefined,
     onAsk: (text, opts = {}) => {
-      const s: Scope = opts.scope ?? { mode: opts.mode ?? "explain", page_id: page?.id ?? null };
+      const s: Scope = opts.scope ?? { mode: opts.mode ?? "explain", page_id: page?.id ?? null, ...(page && area ? { region: [area.x0, area.y0, area.x1, area.y1] } : {}) };
       return assistant.send(text, s);
     },
     onUndo: assistant.undo,

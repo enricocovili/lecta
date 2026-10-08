@@ -25,6 +25,9 @@ _I = {"type": "integer"}
 # The asked page is seen at the size the import reads handwriting; the pages around it smaller (still legible).
 ASKED_SIDE = ls.RENDER_SIDE
 NEAR_SIDE = 1100
+# An area picked on the asked page is cut from a picture this large, with this much room around it (page widths).
+AREA_SIDE = 2400
+AREA_MARGIN = 0.01
 # Pages on each side of the asked one that come with the question as pictures.
 WINDOW = 10
 MAX_SLIDE_CHARS = 3000
@@ -109,6 +112,16 @@ async def pictures(lesson: Lesson, pages: list[dict[str, Any]], indexes: list[in
     ims = await asyncio.to_thread(ls.render_pages, pdf_path(lesson), [pages[i] for i in indexes], sides)
     return [{"blob": blobs.put_bytes(_jpeg(im)), "mime": "image/jpeg", "width": im.width, "height": im.height, "label": tag(pages, i)}
             for i, im in zip(indexes, ims, strict=True)]
+
+
+async def area_picture(lesson: Lesson, pages: list[dict[str, Any]], index: int, region: list[float]) -> dict[str, Any]:
+    """The area of a page picked by the user (x0, y0, x1, y1 in page widths), cut from a large picture of the page with its strokes."""
+    im = (await asyncio.to_thread(ls.render_pages, pdf_path(lesson), [pages[index]], [AREA_SIDE]))[0]
+    w = im.width
+    x0, y0, x1, y1 = (round(max(0.0, v - AREA_MARGIN) * w) if i < 2 else round((v + AREA_MARGIN) * w) for i, v in enumerate(region))
+    crop = im.crop((x0, y0, min(im.width, max(x1, x0 + 1)), min(im.height, max(y1, y0 + 1))))
+    return {"blob": blobs.put_bytes(_jpeg(crop)), "mime": "image/jpeg", "width": crop.width, "height": crop.height,
+            "label": f"{tag(pages, index)}, area picked"}
 
 
 async def view_page(ctx: LessonContext, args: dict[str, Any]) -> ToolResult:

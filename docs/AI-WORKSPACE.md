@@ -140,7 +140,8 @@ own snapshot and undo by file versions. See [LABS.md](LABS.md#the-assistant).
 
 Asked about a page of a lesson, the assistant explains it on the same machinery: conversations with `lesson_id`
 (`POST /api/chat/sessions {course_id, lesson_id}`, `GET /api/chat/sessions?course_id=&lesson_id=`; the course's list leaves
-them out), messages with `scope: {page_id, mode}` (`ask` or `explain`, both only explain; `edit` and `review` are 422, a page of
+them out), messages with `scope: {page_id, region?, mode}` (`region`: the area of the page asked about, x0, y0, x1, y1 in page widths;
+422 when it is not inside the page or comes without `page_id`) (`ask` or `explain`, both only explain; `edit` and `review` are 422, a page of
 another lesson 404), no `change` and nothing to undo (409). The turn is prepared by `pipeline/lesson_agent.py`: the whole
 lesson in the system prompt, the pictures of the pages around `page_id` in the question. See
 [LESSONS.md](LESSONS.md#asking-about-a-slide).

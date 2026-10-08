@@ -10,7 +10,7 @@ import GenerateDialog from "./GenerateDialog";
 import LessonAssistant from "./LessonAssistant";
 import { clampZoom, stepZoom, useGestures, ZOOM_MAX, ZOOM_MIN, type GestureOptions } from "./gestures";
 import ShareDialog from "./ShareDialog";
-import { COLORS, HL_COLORS, HL_WIDTHS, PEN_WIDTHS, TEXT_SIZES, type Stroke, type Tool } from "./ink";
+import { COLORS, HL_COLORS, HL_WIDTHS, PEN_WIDTHS, TEXT_SIZES, type Rect, type Stroke, type Tool } from "./ink";
 import LessonStatusPill, { type LessonStatus } from "./LessonStatus";
 import PageRow, { type Actions, type DrawSettings } from "./PageRow";
 import { usePdfDoc } from "./SlideView";
@@ -122,6 +122,8 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   const showAi = owner && aiOpen;
   const [aiMounted, setAiMounted] = useState(false);
   const [askPin, setAskPin] = useState<number | null>(null);
+  // The last rectangle drawn with the select tool: an area of a page to ask the assistant about.
+  const [area, setArea] = useState<{ pid: number; rect: Rect } | null>(null);
   const [aiFocus, setAiFocus] = useState(0);
   useEffect(() => {
     if (showAi) setAiMounted(true);
@@ -228,6 +230,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
             setAiFocus((n) => n + 1);
           }
         : undefined,
+      area: owner ? (pid, rect) => setArea(rect ? { pid, rect } : null) : undefined,
       addBlankAfter: (pid) => {
         addBlankAfter(pid)
           .then((id) => setTimeout(() => reveal(id, true), 80))
@@ -246,7 +249,10 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   // The selection is let go when another tool is picked, and keeps only the strokes that are still there (undo, erasing,
   // someone else's save).
   useEffect(() => {
-    if (tool !== "select") setSelection(null);
+    if (tool !== "select") {
+      setSelection(null);
+      setArea(null);
+    }
   }, [tool]);
   useEffect(() => {
     if (!selection) return;
@@ -305,8 +311,9 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
       } else if ((e.key === "Delete" || e.key === "Backspace") && selection) {
         e.preventDefault();
         deleteSelection();
-      } else if (e.key === "Escape" && selection) {
+      } else if (e.key === "Escape" && (selection || area)) {
         setSelection(null);
+        setArea(null);
       } else if (!mod && !e.altKey) {
         const k = e.key.toLowerCase();
         if (k === "p") setTool("pen");
@@ -319,7 +326,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, save, readOnly, selection, deleteSelection]);
+  }, [undo, redo, save, readOnly, selection, area, deleteSelection]);
 
   // Keep the screen on while taking notes in class.
   useEffect(() => {
@@ -715,6 +722,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
                 actions={actions}
                 label={labels[i]}
                 selected={selection?.pid === p.id ? selection.strokes : null}
+                area={area?.pid === p.id ? area.rect : null}
               />
             ))}
             {!readOnly && (
@@ -731,11 +739,15 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
             courseId={lesson.course_id}
             page={askedPage}
             pinned={pinnedIndex >= 0}
+            area={area && area.pid === askedPage?.id ? area.rect : null}
             open={showAi}
             focusNonce={aiFocus}
             pageName={pageName}
             onClose={() => setAiOpen(false)}
-            onUnpin={() => setAskPin(null)}
+            onUnpin={() => {
+              setAskPin(null);
+              setArea(null);
+            }}
             onKeep={keepAnswer}
           />
         )}

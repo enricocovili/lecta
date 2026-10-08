@@ -457,6 +457,43 @@ test.describe.serial("Lezioni", () => {
     con.assertClean(EXPECTED);
   });
 
+  test("a rectangle drawn with the select tool is an area to ask the assistant about", async ({ page }) => {
+    test.setTimeout(180_000);
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`/admin/courses/${courseId}/lessons/1`);
+    await page.getByTestId("tool-select").click();
+    const surface = page.getByTestId("ink-surface").nth(2);
+    await surface.scrollIntoViewIfNeeded();
+    const box = (await surface.boundingBox())!;
+    await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.55);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.85, { steps: 8 });
+    await page.mouse.up();
+    // Esc lets it go; drawn again, its «Chiedi» opens the assistant on that area.
+    await expect(page.getByTestId("ask-area")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("ask-area")).toHaveCount(0);
+    await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.55);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.85, { steps: 8 });
+    await page.mouse.up();
+    await page.getByTestId("ask-area-button").click();
+    const label = await page.getByTestId("lesson-page").nth(2).locator(".les-tag").innerText();
+    const panel = page.getByTestId("lesson-ai");
+    await expect(panel.locator(".ai-scope-pill")).toContainText(`${label} · area scelta`);
+    await page.getByTestId("ai-composer").fill("Cosa dice questa parte?");
+    await page.getByTestId("ai-composer").press("Enter");
+    await expect(panel.getByTestId("ai-message").last()).toContainText("e l'area scelta (", { timeout: 60_000 });
+    await expect(panel.locator(".ai-scope-chip").last()).toContainText(`${label} · area scelta`);
+    await page.screenshot({ path: "/e2e/.results/lesson-assistant-area.png" });
+    // Another tool lets the area go: the next question is about the page.
+    await page.getByTestId("tool-pen").click();
+    await expect(page.getByTestId("ask-area")).toHaveCount(0);
+    await expect(panel.locator(".ai-scope-pill")).not.toContainText("area scelta");
+    con.assertClean(EXPECTED);
+  });
+
   test("the course page lists the lessons with their state and the chapters, each one click away", async ({ page }) => {
     const con = watchConsole(page);
     await login(page);

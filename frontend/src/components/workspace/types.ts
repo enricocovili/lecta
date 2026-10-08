@@ -100,6 +100,8 @@ export interface Scope {
   file_id?: number | null;
   /** the lesson's page asked about (a lesson's conversation) */
   page_id?: number | null;
+  /** the area of that page asked about: x0, y0, x1, y1 in page widths */
+  region?: number[];
   selection?: SelectionScope;
   mode?: Mode;
   attachments?: { source_file_id: number; page?: number }[];

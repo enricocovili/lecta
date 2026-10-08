@@ -41,6 +41,11 @@ interface Props {
   onErase: (indices: number[]) => void;
   onSelect: (strokes: Stroke[]) => void;
   onMoveStrokes: (moves: { from: Stroke; to: Stroke }[]) => void;
+  /** the area picked on this page to ask the assistant about (the owner's): the last rectangle drawn with the select tool */
+  area?: Rect | null;
+  /** a rectangle was drawn with the select tool (null: a click let it go); absent: no areas here */
+  onArea?: (r: Rect | null) => void;
+  onAskArea?: () => void;
 }
 
 /** Room around the selected strokes, in page widths: the box drawn, and where a press grabs the selection. */
@@ -149,6 +154,28 @@ function SelectionControls({ r, width, height, onDelete, onHandle, onRotate }: {
   );
 }
 
+/** The area picked to ask about: a dashed box with «Chiedi» on its corner (above it, or inside it at the top of the page). */
+function AreaBox({ r, width, onAsk }: { r: Rect; width: number; onAsk: () => void }) {
+  const top = r.y0 * width;
+  return (
+    <div className="les-ink-ui" data-testid="ask-area">
+      <span className="les-area" style={{ left: r.x0 * width, top, width: (r.x1 - r.x0) * width, height: (r.y1 - r.y0) * width }} />
+      <button
+        type="button"
+        className="btn sm les-area-ask"
+        style={{ left: r.x0 * width, top: top >= 36 ? top - 34 : top + 4 }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={onAsk}
+        title="Chiedi all’assistente di quest’area della pagina"
+        data-testid="ask-area-button"
+      >
+        <Icon name="sparkles" />
+        Chiedi
+      </button>
+    </div>
+  );
+}
+
 /** A text being typed: a new one (`from` null) or one on the page, which is hidden on the canvas meanwhile. */
 interface Editing {
   from: Stroke | null;
@@ -219,7 +246,7 @@ function drawBox(ctx: CanvasRenderingContext2D, r: Rect, scale: number, dpr: num
   ctx.restore();
 }
 
-export default function InkLayer({ strokes, width, height, active, tool, color, hlColor, penWidth, hlWidth, textSize, fingerDraws, shapes, selected, onAdd, onErase, onSelect, onMoveStrokes }: Props) {
+export default function InkLayer({ strokes, width, height, active, tool, color, hlColor, penWidth, hlWidth, textSize, fingerDraws, shapes, selected, onAdd, onErase, onSelect, onMoveStrokes, area, onArea, onAskArea }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLCanvasElement>(null);
   const live = useRef<HTMLCanvasElement>(null);
@@ -578,6 +605,12 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
         // A click on an empty spot lets go of the selection (with Shift it keeps it).
         if (c.add) onSelect([...sel, ...picked.filter((s) => !sel.includes(s))]);
         else onSelect(picked);
+        // The rectangle is also an area to ask about (kept on the page); a click lets it go.
+        const h = props.current.height / Math.max(1, props.current.width);
+        onArea?.(tiny ? null : {
+          x0: Math.max(0, Math.min(c.x0, c.x1)), y0: Math.max(0, Math.min(c.y0, c.y1)),
+          x1: Math.min(1, Math.max(c.x0, c.x1)), y1: Math.min(h, Math.max(c.y0, c.y1)),
+        });
       }
       schedule();
     } else if (c.kind === "erase") {
@@ -665,6 +698,7 @@ export default function InkLayer({ strokes, width, height, active, tool, color, 
     >
       <canvas ref={base} />
       <canvas ref={live} />
+      {area && active && !busy && onAskArea && <AreaBox r={area} width={width} onAsk={onAskArea} />}
       {selBox && <SelectionControls r={pad(selBox, SEL_PAD)} width={width} height={height} onDelete={deleteSelected} onHandle={startScale} onRotate={startRotate} />}
       {editing && (
         <TextField

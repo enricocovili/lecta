@@ -41,7 +41,10 @@ and comes back on the next visit if the server has not changed that page meanwhi
 «Chiedi» (owner only) opens the **lesson's assistant** beside the pages (over them under ~860 px): on a page's notes header
 (on the slide's corner with slides only) it asks about that page and keeps it while scrolling; the top bar's «Chiedi» opens and
 closes the panel, asking about the page being looked at. The scope pill names the page; removing it goes back to the page being
-looked at. Quick actions: explain the slide, the procedure step by step, a numerical example, what to know first.
+looked at. **An area** of a page is asked about with the select tool: the last rectangle drawn with it stays on the page as a
+dashed box with «Chiedi» on its corner (a click elsewhere, Esc or another tool lets it go), and the questions about that page
+then carry it (`scope.region`: x0, y0, x1, y1 in page widths, as the ink); the model gets it as a sharp cut (from a 2400 px
+picture of the page, 0.01 page widths of room around it) next to the pictures of the pages. Quick actions: explain the slide, the procedure step by step, a numerical example, what to know first.
 
 Every question is sent with the **whole lesson** in the prompt (every page: the text printed on its slide, the typed notes, whether
 it carries handwriting) and the **pictures of the pages from ten before to ten after** the one asked about, strokes and typed text
