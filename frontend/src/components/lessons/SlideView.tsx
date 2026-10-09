@@ -4,6 +4,7 @@ import * as pdfjs from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useEffect, useRef, useState } from "react";
 import { canvasScale } from "./ink";
+import type { SlideItem, SlideText } from "./search";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -32,6 +33,33 @@ export function usePdfDoc(url: string | null): { doc: PdfDoc | null; error: stri
     };
   }, [url]);
   return { doc, error };
+}
+
+// ------------------------------------------------------------------ the text of the slides (for the search)
+
+const texts = new WeakMap<PdfDoc, Map<number, Promise<SlideText>>>();
+
+/** The text printed on a slide, read once per document: its pieces, and how a point of the PDF lands on the page (in page widths). */
+export function slideTextOf(doc: PdfDoc, pageNo: number): Promise<SlideText> {
+  let byPage = texts.get(doc);
+  if (!byPage) texts.set(doc, (byPage = new Map()));
+  let t = byPage.get(pageNo);
+  if (!t) {
+    t = doc.getPage(pageNo).then(async (page) => {
+      const vp = page.getViewport({ scale: 1 });
+      const content = await page.getTextContent();
+      const items: SlideItem[] = [];
+      for (const it of content.items) if ("str" in it) items.push({ str: it.str, transform: it.transform, width: it.width, hasEOL: it.hasEOL });
+      const toPage = (x: number, y: number): [number, number] => {
+        const [px, py] = vp.convertToViewportPoint(x, y);
+        return [px / vp.width, py / vp.width];
+      };
+      return { items, toPage };
+    });
+    t.catch(() => byPage!.delete(pageNo)); // read again next time
+    byPage.set(pageNo, t);
+  }
+  return t;
 }
 
 // ------------------------------------------------------------------ small pictures

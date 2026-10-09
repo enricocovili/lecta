@@ -36,6 +36,15 @@ words in the tooltip, and can be clicked to save; «Scarica» is a download icon
 page is added. Edits are mirrored in `localStorage` as they are made. Work that could not be sent stays in memory and in `localStorage`, is retried with a growing delay
 and comes back on the next visit if the server has not changed that page meanwhile.
 
+**Searching the lesson**: Ctrl+F (which replaces the browser's, that cannot read the slides: they are pictures; also while typing
+in a note and in a shared lesson) or the magnifier in the toolbar opens a bar under the tools. It looks in the text printed on
+the slides (read with pdf.js the first time the bar opens), in the text typed on the pages and in the notes, without minding
+capitals, accents or runs of spaces (`components/lessons/search.ts`, tested with `npm test`). The occurrences are marked where
+they are: on the slide, over the notes field, in the rendered notes of the preview. The count says which one is being looked at and
+where («2 / 5 · Slide 4, appunti»); the first is the one on the page being looked at or after it, Enter / Shift+Enter (also F3 and
+Ctrl+G) go to the next / previous one, round, and bring it into view. Esc closes the bar and goes back to writing: in the note,
+with the occurrence selected, when the one looked at was in the notes. Ctrl+F with words selected looks for them.
+
 ## Asking about a slide
 
 «Chiedi» (owner only) opens the **lesson's assistant** beside the pages (over them under ~860 px): on a page's notes header

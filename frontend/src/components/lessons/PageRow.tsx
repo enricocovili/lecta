@@ -2,6 +2,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { Icon } from "../icons";
 import { Markdown } from "../workspace/Markdown";
+import { bringIntoView, noteMarks, SlideMarks, useRenderedMarks, type PageFind } from "./FindBar";
 import { zooming } from "./gestures";
 import InkLayer from "./InkLayer";
 import type { Rect, Stroke, Tool } from "./ink";
@@ -56,11 +57,14 @@ interface Props {
   selected: Stroke[] | null;
   /** the area picked on this page to ask about (null: none here) */
   area?: Rect | null;
+  /** what the search (Ctrl+F) found on this page (null: nothing here) */
+  find?: PageFind | null;
 }
 
-function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = false, scroller, actions, label, selected, area = null }: Props) {
+function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = false, scroller, actions, label, selected, area = null, find = null }: Props) {
   const row = useRef<HTMLElement>(null);
   const box = useRef<HTMLDivElement>(null);
+  const rendered = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [near, setNear] = useState(index < 3);
 
@@ -104,12 +108,28 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
     };
   }, [scroller, index, actions]);
 
+  // The occurrence of the search being looked at is brought into view when the bar moves to it.
+  const showing = layout !== "slides" && preview;
+  const renderedHit = useRenderedMarks(rendered, page.id, find, showing);
+  const seek = find?.current ? find.seek : 0;
+  useEffect(() => {
+    const root = scroller.current;
+    if (!seek || !root) return;
+    const frame = requestAnimationFrame(() => {
+      const el = row.current?.querySelector("[data-find-current]");
+      const r = el?.getBoundingClientRect() ?? renderedHit.current?.getBoundingClientRect() ?? row.current?.getBoundingClientRect();
+      if (r) bringIntoView(root, r);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [seek, scroller, renderedHit]);
+
   const height = width * page.ratio;
   const isSlide = page.kind === "slide" && doc && page.slide_page;
   return (
     <section ref={row} id={`lesson-page-${page.id}`} className={`les-row ${layout}`} data-testid="lesson-page" data-page-index={index}>
       <div className="les-slide" ref={box} style={{ aspectRatio: `${1 / page.ratio}` }}>
         {isSlide && <SlideView doc={doc} pageNo={page.slide_page!} width={width} height={height} active={near} />}
+        {find && <SlideMarks find={find} ratio={page.ratio} />}
         <InkLayer
           strokes={page.ink}
           width={width}
@@ -162,7 +182,7 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
             )}
           </div>
           {preview ? (
-            <div className="les-notes-md" style={{ minHeight: Math.max(120, height) }}>
+            <div className="les-notes-md" ref={rendered} style={{ minHeight: Math.max(120, height) }}>
               {page.notes.trim() ? <Markdown text={page.notes} /> : <span className="muted small">Nessun appunto.</span>}
             </div>
           ) : (
@@ -173,6 +193,7 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
               width={width}
               placeholder="Scrivi qui gli appunti in Markdown: elenchi con -, **grassetto**, formule con $…$"
               label={`Appunti di ${label}`}
+              marks={noteMarks(find)}
             />
           )}
           {!readOnly && (

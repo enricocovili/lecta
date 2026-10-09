@@ -494,6 +494,65 @@ test.describe.serial("Lezioni", () => {
     con.assertClean(EXPECTED);
   });
 
+  test("Ctrl+F searches the slides, the typed text and the notes, also while writing, and goes back to the note found", async ({ page }) => {
+    test.setTimeout(120_000);
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`/admin/courses/${courseId}/lessons/1`);
+    const pages = page.getByTestId("lesson-page");
+    const bar = page.getByTestId("find-bar");
+    const input = page.getByTestId("find-input");
+    const count = page.getByTestId("find-count");
+
+    // In a note, Ctrl+F opens the lesson's search, not the browser's; capitals and accents do not count.
+    await pages.first().locator("textarea").click();
+    await page.keyboard.press("Control+f");
+    await expect(bar).toBeVisible();
+    await expect(input).toBeFocused();
+    await input.fill("LINEARITÀ");
+    await expect(count).toContainText("1 / 1");
+    await expect(count).toContainText("Slide 1");
+    const mark = pages.first().locator(".les-find-marks > span.on");
+    await expect(mark).toHaveCount(1);
+    const slide = (await pages.first().getByTestId("ink-surface").boundingBox())!;
+    const m = (await mark.boundingBox())!;
+    expect(m.x).toBeGreaterThan(slide.x);
+    expect(m.y + m.height).toBeLessThan(slide.y + slide.height * 0.45);
+
+    // An occurrence on another slide is brought into view; Enter and Shift+Enter go through them, round.
+    await input.fill("Convoluzione");
+    await expect(count).toContainText("1 / 1");
+    await expect(page.locator(".les-find-marks > span.on")).toBeInViewport();
+    await input.fill("x(t");
+    await expect(count).toContainText("/ 3");
+    const at = Number((await count.innerText()).split("/")[0]);
+    await input.press("Enter");
+    await expect(count).toContainText(`${(at % 3) + 1} / 3`);
+    await input.press("Shift+Enter");
+    await expect(count).toContainText(`${at} / 3`);
+    await expect(page.locator(".les-find-marks > span")).toHaveCount(3);
+
+    // In the notes: the occurrence is marked over the field; Esc goes back to writing there, with it selected.
+    await input.fill("nyquist");
+    await expect(count).toContainText("Slide 1, appunti");
+    await expect(pages.first().locator(".les-notes-marks > mark.on")).toHaveText("Nyquist");
+    await input.press("Escape");
+    await expect(bar).toBeHidden();
+    const notes = pages.first().locator("textarea");
+    await expect(notes).toBeFocused();
+    expect(await notes.evaluate((el: HTMLTextAreaElement) => el.value.slice(el.selectionStart, el.selectionEnd))).toBe("Nyquist");
+    // Ctrl+F again starts from the words selected; the rendered notes (preview) are marked too.
+    await page.keyboard.press("Control+f");
+    await expect(input).toHaveValue("Nyquist");
+    await page.getByRole("button", { name: "Anteprima degli appunti" }).click();
+    await expect.poll(() => page.evaluate(() => CSS.highlights.get("lecta-find-current")?.size ?? 0)).toBe(1);
+    await page.getByRole("button", { name: "Anteprima degli appunti" }).click();
+    await page.getByTestId("find-close").click();
+    await expect(bar).toBeHidden();
+    await expect(page.locator(".les-find-marks, .les-notes-marks")).toHaveCount(0);
+    con.assertClean(EXPECTED);
+  });
+
   test("the course page lists the lessons with their state and the chapters, each one click away", async ({ page }) => {
     const con = watchConsole(page);
     await login(page);

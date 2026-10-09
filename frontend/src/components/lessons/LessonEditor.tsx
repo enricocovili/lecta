@@ -6,6 +6,7 @@ import { courseText } from "../../lib/links";
 import { Icon } from "../icons";
 import Pop from "../workspace/Pop";
 import { Confirm, Seg, toast, toastError, useLocalStorage } from "../ui";
+import { FindBar, selectedWords, useLessonFind } from "./FindBar";
 import GenerateDialog from "./GenerateDialog";
 import LessonAssistant from "./LessonAssistant";
 import { clampZoom, stepZoom, useGestures, ZOOM_MAX, ZOOM_MIN, type GestureOptions } from "./gestures";
@@ -283,6 +284,42 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
     return () => window.removeEventListener("keydown", onKey);
   }, [current, goTo]);
 
+  // Ctrl+F searches the lesson instead of the browser (which cannot read the slides), also while typing in a note and in a
+  // shared lesson; F3 / Ctrl+G go to the next occurrence (with Shift the previous one) while the bar is open.
+  const find = useLessonFind(pages, doc, current);
+  const findRef = useRef(find);
+  findRef.current = find;
+  const findFrom = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      const k = e.key.toLowerCase();
+      if (document.querySelector(".modal-backdrop")) return;
+      if (mod && !e.altKey && k === "f") {
+        e.preventDefault();
+        const t = document.activeElement;
+        if (t instanceof HTMLElement && !t.closest(".les-find")) findFrom.current = t;
+        findRef.current.show(selectedWords());
+      } else if (findRef.current.open && (e.key === "F3" || (mod && !e.altKey && k === "g"))) {
+        e.preventDefault();
+        findRef.current.step(e.shiftKey ? -1 : 1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  // Closing the bar goes back to writing: at the occurrence when it is in the notes, else where the cursor was.
+  const closeFind = useCallback(() => {
+    const { hit, close } = findRef.current;
+    close();
+    const field = hit?.where === "notes" ? document.querySelector<HTMLTextAreaElement>(`#lesson-page-${hit.pid} textarea.les-notes-field`) : null;
+    if (field && hit?.range) {
+      field.focus({ preventScroll: true });
+      field.setSelectionRange(hit.range[0], hit.range[1]);
+    } else if (findFrom.current?.isConnected) findFrom.current.focus({ preventScroll: true });
+    findFrom.current = null;
+  }, []);
+
   // Keyboard: undo/redo (also in a note: one history) and tool letters (not while typing).
   useEffect(() => {
     if (readOnly) return;
@@ -377,6 +414,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   );
 
   const labels = useMemo(() => pages.map((_, i) => pageLabel(pages, i)), [pages]);
+  const findWhere = find.hit ? `${labels[pages.findIndex((p) => p.id === find.hit!.pid)] ?? ""}${find.hit.where === "notes" ? ", appunti" : ""}` : null;
   const pinnedIndex = askPin === null ? -1 : pages.findIndex((p) => p.id === askPin);
   const askedIndex = pinnedIndex >= 0 ? pinnedIndex : current;
   const askedPage = useMemo(() => (pages[askedIndex] ? { id: pages[askedIndex].id, label: labels[askedIndex] } : null), [pages, labels, askedIndex]);
@@ -646,6 +684,17 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
           </>
         )}
         <span className="grow" />
+        <button
+          type="button"
+          className={`btn icon ${find.open ? "active" : ""}`}
+          aria-pressed={find.open}
+          onClick={() => (find.open ? closeFind() : find.show())}
+          aria-label="Cerca nella lezione"
+          title="Cerca nelle slide e negli appunti (Ctrl+F)"
+          data-testid="find-open"
+        >
+          <Icon name="search" />
+        </button>
         <div className="btn-group les-pager">
           <button type="button" className="btn icon" onClick={() => goTo(Math.max(0, current - 1))} disabled={current <= 0} aria-label="Pagina precedente" title="Pagina precedente">
             <Icon name="chevron-up" />
@@ -697,6 +746,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
         </div>
       </div>
 
+      {find.open && <FindBar find={find} where={findWhere} onClose={closeFind} />}
       <div className="les-body">
         <div className="les-scroll" ref={scroller} data-testid="lesson-scroll">
           {pdfError && <div className="alert danger">Non riesco a leggere le slide: {pdfError}</div>}
@@ -723,6 +773,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
                 label={labels[i]}
                 selected={selection?.pid === p.id ? selection.strokes : null}
                 area={area?.pid === p.id ? area.rect : null}
+                find={find.byPage.get(p.id) ?? null}
               />
             ))}
             {!readOnly && (

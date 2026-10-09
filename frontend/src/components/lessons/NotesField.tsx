@@ -1,6 +1,28 @@
 // The Markdown notes of one page: a plain text field that helps with lists (Enter continues them, Tab indents)
 // and grows with what is written, so a slide can have as much room as it needs.
 import { useEffect, useLayoutEffect, useRef } from "react";
+import type { Range } from "./search";
+
+/** Marks drawn over the field (Ctrl+F): the same text, invisible, with the occurrences coloured where the field shows them. */
+function NotesMarks({ value, marks }: { value: string; marks: { ranges: Range[]; current: number } }) {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  marks.ranges.forEach(([a, b], i) => {
+    if (a > last) parts.push(value.slice(last, a));
+    parts.push(
+      <mark key={i} className={i === marks.current ? "on" : undefined} data-find-current={i === marks.current ? "" : undefined}>
+        {value.slice(a, b)}
+      </mark>,
+    );
+    last = b;
+  });
+  parts.push(value.slice(last));
+  return (
+    <div className="les-notes-marks" aria-hidden>
+      {parts}
+    </div>
+  );
+}
 
 const LIST = /^(\s*)([-*+]|\d+[.)])(\s+)(\[[ xX]\]\s+)?/;
 
@@ -28,6 +50,7 @@ export default function NotesField({
   width,
   placeholder,
   label,
+  marks = null,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -36,6 +59,8 @@ export default function NotesField({
   width?: number;
   placeholder: string;
   label: string;
+  /** what the search found in the notes, marked over the text */
+  marks?: { ranges: Range[]; current: number } | null;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fit = () => {
@@ -95,18 +120,22 @@ export default function NotesField({
     }
   };
 
+  // The wrapper is always there: the field must not be remounted (and lose the focus) when the search marks it.
   return (
-    <textarea
-      ref={ref}
-      className="les-notes-field"
-      value={value}
-      placeholder={placeholder}
-      aria-label={label}
-      spellCheck
-      lang="it"
-      style={{ minHeight }}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={onKeyDown}
-    />
+    <div className="les-notes-box">
+      <textarea
+        ref={ref}
+        className="les-notes-field"
+        value={value}
+        placeholder={placeholder}
+        aria-label={label}
+        spellCheck
+        lang="it"
+        style={{ minHeight }}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+      />
+      {marks && <NotesMarks value={value} marks={marks} />}
+    </div>
   );
 }
