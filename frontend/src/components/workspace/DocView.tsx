@@ -1,7 +1,9 @@
 // The draft of the whole document: every chapter typeset by LaTeX, block by block (paragraphs, headings, environments
 // as SVG pictures), in one continuous scroll. A click picks a block (Shift+click extends the pick) and opens the
-// toolbar to ask the AI about it; blocks are flashed where the AI just worked.
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+// toolbar to ask the AI about it; a double click (or F2) opens the block's text in place, to write anything there.
+// Blocks are flashed where the AI just worked.
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { put } from "../../lib/api";
 import { Icon } from "../icons";
 import { pickBlock, pickScope, type BlockPick, type DraftSelection } from "./selection";
 import SelectionToolbar, { type SelectionAction } from "./SelectionToolbar";
@@ -54,6 +56,85 @@ const Block = memo(function Block({ b, index, width, picked }: { b: DraftBlock; 
   );
 });
 
+interface Editing {
+  chapterId: number;
+  index: number;
+  block: DraftBlock;
+}
+
+/** A block's text written in place: Ctrl+Enter (or «Salva») writes it into the chapter, Esc leaves it as it was. */
+function BlockEditor({ courseId, edit, onDone }: { courseId: number; edit: Editing; onDone: (d: DraftChapter | null) => void }) {
+  const [text, setText] = useState(edit.block.src ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const area = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [text]);
+  useEffect(() => {
+    const el = area.current;
+    el?.focus({ preventScroll: true });
+    el?.setSelectionRange(el.value.length, el.value.length);
+  }, []);
+
+  const save = async () => {
+    if (saving) return;
+    if (text === (edit.block.src ?? "")) return onDone(null);
+    setSaving(true);
+    setError(null);
+    try {
+      const { start, end, src } = edit.block;
+      onDone(await put<DraftChapter>(`/api/courses/${courseId}/chapters/${edit.chapterId}/block`, { start, end, src: src ?? "", text }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="doc-edit" data-testid="block-editor">
+      <textarea
+        ref={area}
+        value={text}
+        spellCheck
+        aria-label="Testo del blocco"
+        disabled={saving}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            onDone(null);
+          } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            void save();
+          }
+        }}
+      />
+      <div className="doc-edit-bar">
+        {error ? (
+          <span className="doc-edit-error small">
+            <Icon name="alert-triangle" /> {error}
+          </span>
+        ) : (
+          <span className="muted small">Ctrl+Invio salva · Esc annulla · vuoto toglie il blocco</span>
+        )}
+        <button type="button" className="btn ghost sm" disabled={saving} onClick={() => onDone(null)}>
+          Annulla
+        </button>
+        <button type="button" className="btn primary sm" disabled={saving} onClick={() => void save()}>
+          {saving ? <Icon name="loader" className="spin" /> : null}
+          Salva
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Nothing written yet: at most the chapter title. */
 const isHollow = (c: DraftChapter) => !!c.blocks && c.blocks.every((b) => b.heading === "chapter" || (!b.pages.length && !b.error));
 
@@ -74,6 +155,7 @@ function pickRect(root: HTMLElement, pick: BlockPick): DraftSelection["rect"] | 
 }
 
 export default function DocView({
+  courseId,
   chapters,
   loading,
   error,
@@ -82,7 +164,9 @@ export default function DocView({
   empty,
   onActiveChapter,
   onSelectionAction,
+  onBlockWritten,
 }: {
+  courseId: number;
   chapters: DraftChapter[] | null;
   loading: boolean;
   error: string | null;
@@ -91,11 +175,14 @@ export default function DocView({
   empty: ReactNode;
   onActiveChapter: (id: number) => void;
   onSelectionAction: (a: SelectionAction, sel: DraftSelection) => void;
+  /** A block was written in place: the chapter typeset again. */
+  onBlockWritten: (d: DraftChapter) => void;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const article = useRef<HTMLElement>(null);
   const [pick, setPick] = useState<BlockPick | null>(null);
   const [rect, setRect] = useState<DraftSelection["rect"] | null>(null);
+  const [editing, setEditing] = useState<Editing | null>(null);
   const activeRef = useRef<number | null>(null);
 
   // -- which chapter is being read
@@ -190,6 +277,31 @@ export default function DocView({
     setPick((cur) => pickBlock(cur, Number(sec.dataset.chapterId), Number(el.dataset.index), extend));
   };
 
+  const editAt = (target: EventTarget | null) => {
+    const el = target instanceof Element ? target.closest<HTMLElement>(".doc-block") : null;
+    const sec = el?.closest<HTMLElement>("[data-chapter-id]");
+    if (!el || !sec || el.tabIndex < 0) return;
+    const chapterId = Number(sec.dataset.chapterId);
+    const index = Number(el.dataset.index);
+    const block = chapters?.find((c) => c.chapter.id === chapterId)?.blocks?.[index];
+    if (!block) return;
+    setPick(null);
+    window.getSelection()?.removeAllRanges();
+    setEditing({ chapterId, index, block });
+  };
+
+  const edited = (d: DraftChapter | null) => {
+    const at = editing;
+    setEditing(null);
+    if (d) onBlockWritten(d);
+    // back on the block (or where it was) for the keyboard
+    if (!at) return;
+    requestAnimationFrame(() => {
+      const sec = article.current?.querySelector<HTMLElement>(`[data-chapter-id="${at.chapterId}"]`);
+      sec?.querySelector<HTMLElement>(`.doc-block[data-index="${at.index}"]`)?.focus({ preventScroll: true });
+    });
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setPick(null);
@@ -219,11 +331,18 @@ export default function DocView({
         data-testid="doc-preview"
         aria-label="Bozza del documento"
         aria-busy={loading}
-        onClick={(e) => pickAt(e.target, e.shiftKey)}
+        onClick={(e) => {
+          if (!(e.target instanceof Element && e.target.closest(".doc-edit"))) pickAt(e.target, e.shiftKey);
+        }}
+        onDoubleClick={(e) => editAt(e.target)}
         onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && e.target instanceof HTMLElement && e.target.classList.contains("doc-block")) {
+          if (!(e.target instanceof HTMLElement && e.target.classList.contains("doc-block"))) return;
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             pickAt(e.target, e.shiftKey);
+          } else if (e.key === "F2") {
+            e.preventDefault();
+            editAt(e.target);
           }
         }}
       >
@@ -262,9 +381,13 @@ export default function DocView({
                 Composizione LaTeX…
               </div>
             ) : (
-              c.blocks.map((b, k) => (
-                <Block key={`${b.start}:${b.pages[0]?.url ?? b.error ?? ""}`} b={b} index={k} width={c.width} picked={!!pick && pick.chapterId === c.chapter.id && k >= pick.from && k <= pick.to} />
-              ))
+              c.blocks.map((b, k) =>
+                editing && editing.chapterId === c.chapter.id && editing.index === k ? (
+                  <BlockEditor key={`edit:${b.start}`} courseId={courseId} edit={editing} onDone={edited} />
+                ) : (
+                  <Block key={`${b.start}:${b.pages[0]?.url ?? b.error ?? ""}`} b={b} index={k} width={c.width} picked={!!pick && pick.chapterId === c.chapter.id && k >= pick.from && k <= pick.to} />
+                ),
+              )
             )}
             {isHollow(c) && <p className="doc-ch-empty muted">Questo capitolo è ancora vuoto. Chiedi all’assistente di scriverlo.</p>}
           </section>

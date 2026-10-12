@@ -26,6 +26,10 @@ the top left goes back to the course page.
   version: every change (imports, assistant) is rebuilt automatically about 2 minutes after the course stops changing
   (`LECTA_REPUBLISH_QUIET_S`). The public build is a clean full build without `\review` markers, split per chapter for
   the reader. If a rebuild fails, the previous PDF stays online and the course shows the error.
+* **Writing by hand**: a double click on a block of the draft (or F2 on it) opens its text in place, as LaTeX: write
+  anything there, blank lines make new paragraphs, empty removes the block. Ctrl+Enter (or *Salva*) writes it into the
+  chapter and shows it typeset; Esc leaves it as it was. If the assistant changed that block meanwhile, the write is
+  refused.
 * There is no revision history: edits and imports write straight into the files; the only safety net is **Annulla** on
   the assistant's last answers.
 

@@ -171,4 +171,31 @@ test.describe.serial("workspace", () => {
     await page.waitForURL(new RegExp(`/admin/courses/${id}/testo\\?chapter=${chapter}$`));
     await expect(page.getByTestId("doc-preview")).toBeVisible();
   });
+
+  test("a double click on the draft opens the block's text in place, to write anything there", async ({ page }) => {
+    const con = watchConsole(page);
+    await login(page);
+    await openCourse(page, /Algebra Lineare/);
+    const doc = page.getByTestId("doc-preview");
+    const head = doc.locator(".doc-block.doc-heading").first();
+    await expect(head.locator("img")).toBeVisible({ timeout: 60_000 });
+
+    await head.dblclick();
+    const box = page.getByTestId("block-editor").getByLabel("Testo del blocco");
+    await expect(box).toBeFocused();
+    await expect(box).toHaveValue(/^\\chapter\{Spazi vettoriali\}/);
+    await box.pressSequentially("\n\nUn vettore è un elemento di uno spazio vettoriale.");
+    await box.press("Control+Enter");
+    await expect(page.getByTestId("block-editor")).toHaveCount(0);
+    const para = doc.locator('.doc-block img[alt^="Un vettore"]');
+    await expect(para).toBeVisible({ timeout: 30_000 });
+
+    // Esc leaves it as it was.
+    await para.dblclick();
+    await box.fill("Cambiato");
+    await box.press("Escape");
+    await expect(page.getByTestId("block-editor")).toHaveCount(0);
+    await expect(para).toBeVisible();
+    con.assertClean(EXPECTED);
+  });
 });

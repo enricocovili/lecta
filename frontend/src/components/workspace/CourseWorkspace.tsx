@@ -154,6 +154,15 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
     [refresh],
   );
   const assistant = useAssistant({ courseId, onChange: onAiChange });
+
+  // A block written in place: its chapter is shown at once, the rest (references, the PDF) catches up.
+  const blockWritten = useCallback(
+    (d: DraftChapter) => {
+      setPreview((prev) => prev && prev.map((p) => (p.chapter.id === d.chapter.id ? d : p)));
+      void refresh();
+    },
+    [refresh],
+  );
   const aiChanged = useMemo(() => recentAiChapters(assistant.messages), [assistant.messages]);
 
   // ------------------------------------------------------------------ navigation
@@ -434,6 +443,7 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
           <div className="doc-stages">
           <div className={`doc-stage ${view === "draft" ? "" : "off"}`}>
             <DocView
+              courseId={courseId}
               chapters={preview}
               loading={preview === null}
               error={previewError}
@@ -442,6 +452,7 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
               empty={empty}
               onActiveChapter={setActiveChapter}
               onSelectionAction={askSelection}
+              onBlockWritten={blockWritten}
             />
           </div>
           {pdfSeen && (

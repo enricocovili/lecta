@@ -451,6 +451,14 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
     LaTeX-rendered islands for what it gets wrong (the prose would still not look like the PDF). *Costs:* text in the
     draft is pictures (not selectable as text, and small on a phone), and the first view of a course typesets every
     chapter (a couple of seconds each).
+113. **A block of the draft can be written by hand, in place** (amends 70). A double click (or F2) on a block turns it
+     into a text box holding its LaTeX; whatever is written replaces the block's lines in the chapter (`PUT
+     …/chapters/{id}/block`), empty removes it, blank lines make new paragraphs. Small fixes and a sentence of one's own
+     no longer need a round trip through the assistant. The write carries the block as it was shown and is refused if
+     those lines changed meanwhile (the assistant, an import), and it answers with the chapter typeset again, so the
+     block shows up at once. Still no editor of whole files: the unit is the block the draft already shows.
+     *Alternatives:* a plain-text box whose text is escaped (no formulas, and every existing block would need its LaTeX
+     turned back into text); editing the whole chapter file (the CodeMirror editor that 70 removed).
 
 ## A simpler interface (#17)
 

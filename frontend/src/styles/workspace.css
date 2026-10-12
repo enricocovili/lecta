@@ -514,6 +514,34 @@ body.ws-page {
   font-size: 0.82rem;
   color: var(--fg);
 }
+/* A block's text written in place (double click or F2 on it). */
+.doc-edit {
+  margin: 0 -6px 0.5rem;
+}
+.doc-edit textarea {
+  display: block;
+  width: 100%;
+  min-height: 4.5rem;
+  resize: none;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+.doc-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  font-family: var(--font);
+}
+.doc-edit-bar > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.doc-edit-error {
+  color: var(--danger-fg);
+}
 /* The pictures are black ink on nothing: the dark theme inverts them, except those holding a photo. */
 :root[data-mode="dark"] .doc-block img:not(.raster) {
   filter: invert(0.88) hue-rotate(180deg);

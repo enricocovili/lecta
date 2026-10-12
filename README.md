@@ -7,7 +7,8 @@ Self-hosted platform for university notes, worked on with an AI assistant.
   lesson); a lesson's **lab** holds the files explained in class, to read and comment.
 * **Study text**: «Integra appunti» turns a lesson into the study text of its course, typeset by LaTeX. You read it as a
   draft, and an **AI assistant** that reads and changes everything in the course does the editing (one click undoes an
-  answer). There is no LaTeX editor; the LaTeX project can be downloaded whenever you want.
+  answer); a double click on a passage lets you write it yourself, in place. The LaTeX project can be downloaded
+  whenever you want.
 * **Public site**: only the courses you switch ON, always in their latest version (PDF and LaTeX source).
 
 One admin, everything in Docker, every setting in the web UI.

@@ -176,3 +176,32 @@ async def test_a_block_with_an_error_says_where_and_the_others_are_shown(admin):
     assert len(blocks) == 4 and blocks[1]["error"] is None and blocks[3]["pages"]
     assert blocks[2]["error"] and "riga 5" in blocks[2]["error"] and "Undefined control sequence" in blocks[2]["error"]
     assert blocks[2]["src"].startswith("Rotto")
+
+
+async def test_a_block_written_in_place_replaces_its_lines_and_comes_back_typeset(admin, anon):
+    c = await _course(admin)
+    cid, ch = c["id"], c["chapters"][0]
+    await _put(admin, cid, ch["path"], CHAPTER)
+    url = f"/api/courses/{cid}/chapters/{ch['id']}/block"
+    blocks = (await admin.get(f"/api/courses/{cid}/chapters/{ch['id']}/draft")).json()["blocks"]
+    para = blocks[2]
+
+    async def source():
+        return (await admin.get(f"/api/courses/{cid}/files/content", params={"path": ch["path"]})).json()["content"]
+
+    # Anything can be written, a new paragraph too: the answer is the chapter typeset again.
+    body = {"start": para["start"], "end": para["end"], "src": para["src"], "text": "Scritto a mano.\n\nE un altro paragrafo.\n"}
+    r = await admin.put(url, json=body)
+    assert r.status_code == 200, r.text
+    assert [b["src"] for b in r.json()["blocks"]][2:4] == ["Scritto a mano.", "E un altro paragrafo."]
+    assert await source() == CHAPTER.replace("Un paragrafo con $x^2$.", "Scritto a mano.\n\nE un altro paragrafo.")
+
+    # The block shown is no longer there: refused, nothing written.
+    assert (await admin.put(url, json=body)).status_code == 409
+    assert (await admin.put(url, json={**body, "start": 99, "end": 99})).status_code == 409
+    assert (await anon.put(url, json=body)).status_code in (401, 403, 404)
+
+    # Emptied, the block goes away with one blank line.
+    gone = {"start": 5, "end": 5, "src": "Scritto a mano.", "text": "  \n"}
+    assert (await admin.put(url, json=gone)).status_code == 200
+    assert await source() == CHAPTER.replace("Un paragrafo con $x^2$.\n\n", "E un altro paragrafo.\n\n")

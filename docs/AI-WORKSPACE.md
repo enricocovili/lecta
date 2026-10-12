@@ -2,7 +2,7 @@
 
 Lecta is no longer a LaTeX editor. The user reads a **draft** of the document and works on it with an
 **AI assistant** that can read and change everything in the course. LaTeX stays the storage format (public PDF,
-`.tex` download) but nobody edits it by hand in the UI.
+`.tex` download); by hand, only one block of the draft at a time, written in place (double click).
 
 All endpoints below are admin-only (`/api`, cookie + CSRF like the rest) unless stated otherwise.
 
@@ -40,6 +40,10 @@ All endpoints below are admin-only (`/api`, cookie + CSRF like the rest) unless 
 * With pdflatex the run starts from the course preamble precompiled once (mylatexformat, remade when the preamble
   changes): an edit of one block typesets in well under a second even with TikZ, pgfplots and tcolorbox loaded.
 * `GET /api/courses/{cid}/draft/svg/{name}`: a picture (`image/svg+xml`, immutable, strict CSP).
+* `PUT /api/courses/{cid}/chapters/{chid}/block` `{"start", "end", "src", "text"}`: a block written in place (double
+  click on it in the draft). `text` replaces the lines `start`–`end` (blank or empty removes them, with one blank line
+  around); `src` is the block as it was shown, and the write is refused with 409 if those lines no longer hold it.
+  Answers with the chapter's draft, typeset again.
 
 ## The assistant (chat sessions with tools)
 

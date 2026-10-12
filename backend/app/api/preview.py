@@ -6,6 +6,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
@@ -42,6 +44,35 @@ async def course_draft(course_id: int, db: AsyncSession = Depends(get_db)) -> di
     c = await load_course(db, course_id)
     inputs = await draft.inputs_for(db, c)
     return {"chapters": [await _draft(db, c, ch, inputs) for ch in await projects.chapters_of(db, c.id)]}
+
+
+class BlockIn(BaseModel):
+    start: int = Field(ge=1)
+    end: int = Field(ge=1)
+    src: str = Field(max_length=1024 * 1024)  # the block as it was shown: the edit is refused if it changed since
+    text: str = Field(max_length=1024 * 1024)
+
+
+@router.put("/courses/{course_id}/chapters/{chapter_id}/block")
+async def write_block(course_id: int, chapter_id: int, body: BlockIn, db: AsyncSession = Depends(get_db)) -> dict:
+    """Replace the lines of one block of the draft with the text written in place (nothing: the block goes away)."""
+    c = await load_course(db, course_id)
+    ch = await load_chapter(db, c, chapter_id)
+    # Serialise with the assistant and the imports writing into the same course (they lock the course row too).
+    await db.execute(select(Course.id).where(Course.id == c.id).with_for_update())
+    pf = await projects.get_file(db, c.id, ch.path)
+    lines = ((pf.text_content if pf is not None else None) or "").split("\n")
+    if body.end < body.start or body.end > len(lines) or "\n".join(lines[body.start - 1 : body.end]) != body.src:
+        raise HTTPException(status_code=409, detail="Il testo è cambiato da quando l'hai aperto: ricarica e riprova")
+    text = body.text.strip("\n")
+    before, after = lines[: body.start - 1], lines[body.end :]
+    if not text.strip() and before and not before[-1].strip() and after and not after[0].strip():
+        after = after[1:]  # the block goes away with one of the blank lines around it
+    new = before + (text.split("\n") if text.strip() else []) + after
+    if new != lines:
+        await projects.write_file(db, c, ch.path, "\n".join(new).encode(), validated=True)
+    await db.commit()
+    return await _draft(db, c, ch, await draft.inputs_for(db, c))
 
 
 @router.get("/courses/{course_id}/draft/svg/{name}")
