@@ -103,6 +103,8 @@ class Course(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str] = mapped_column(String(120), unique=True)
+    # Who made it: they and the admins change it (security/access.py). A user with courses can't be deleted.
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), index=True)
     academic_year: Mapped[str | None] = mapped_column(String(20))
     language: Mapped[str] = mapped_column(String(16), default="it", server_default="it")
     tags: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default="[]")

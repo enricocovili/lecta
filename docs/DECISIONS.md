@@ -604,3 +604,13 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      holds the route-by-method table and fails on any route not in it, so a new route's level is always a choice
      made on purpose. *Alternatives:* a role check inside each endpoint (easy to forget, nothing to test against); a
      separate router per level (content routers would split in two along the method).
+116. **Every course has an owner, and one helper decides who reads and changes it (#72).** `courses.owner_id` is
+     whoever created the course (existing courses become the admin's; a user who owns courses can't be deleted).
+     `security/access.py` reads: owner, admins, viewers, and anybody signed in when the course is published; changes:
+     the owner (if still an editor) and admins. A course that can't be read answers 404 like an unknown one, so an
+     editor can't probe what others have; one that can be read but not changed answers 403. The content routers
+     depend on `access`, which checks the `{course_id}` of any route before its body is read, so a new route under a
+     course can't skip the check; lists (`/courses`, `/tree`) are filtered the same way, and each course says its owner
+     and whether the user can change it. Course slugs stay unique across users, since public URLs are
+     `/courses/<slug>`. *Alternatives:* a check inside each endpoint only (a forgotten one is a leak, and a
+     malformed body would answer 422 before it); per-user slugs (public URLs would need the user).

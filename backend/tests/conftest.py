@@ -191,6 +191,13 @@ async def editor(app):
 
 
 @pytest_asyncio.fixture
+async def other_editor(app):
+    """A second signed-in editor, to check what one editor sees of another's courses."""
+    async for c in _signed_in(app, "editor-b", "editor"):
+        yield c
+
+
+@pytest_asyncio.fixture
 async def viewer(app):
     """A signed-in viewer."""
     async for c in _signed_in(app, "viewer", "viewer"):

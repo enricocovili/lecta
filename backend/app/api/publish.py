@@ -11,11 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..models import Course, Job, Publication
 from ..pipeline.publish import enqueue_publish
-from ..security.auth import require_admin, require_content
+from ..security.access import Access, access
+from ..security.auth import require_admin
 from ..services import jobs as jobs_svc
 from .courses import load_course
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(access)])
+# Publishing is for admins: the role is checked before the course, so others get 403 rather than 404.
+admin_router = APIRouter(dependencies=[Depends(require_admin), Depends(access)])
 
 
 async def publish_state(db: AsyncSession, c: Course) -> dict[str, Any]:
@@ -47,15 +50,15 @@ async def publish_state(db: AsyncSession, c: Course) -> dict[str, Any]:
 
 
 @router.get("/courses/{course_id}/publish")
-async def get_publish(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def get_publish(course_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     return await publish_state(db, c)
 
 
-@router.post("/courses/{course_id}/publish", dependencies=[Depends(require_admin)])
-async def publish(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
+@admin_router.post("/courses/{course_id}/publish")
+async def publish(course_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
     """Switch ON (or retry): the course is public from now on and a build is queued."""
-    c = await load_course(db, course_id)
+    c = await load_course(db, course_id, acc)
     c.published = True
     await db.commit()
     job = await enqueue_publish(db, c, auto=False)
@@ -63,9 +66,9 @@ async def publish(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
     return {**await publish_state(db, c), "job_id": job.id if job else None}
 
 
-@router.post("/courses/{course_id}/unpublish", dependencies=[Depends(require_admin)])
-async def unpublish(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+@admin_router.post("/courses/{course_id}/unpublish")
+async def unpublish(course_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     c.published = False
     await db.commit()
     return await publish_state(db, c)

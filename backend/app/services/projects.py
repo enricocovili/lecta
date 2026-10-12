@@ -170,6 +170,7 @@ async def unique_course_slug(db: AsyncSession, name: str, wanted: str | None = N
 async def create_course(
     db: AsyncSession,
     *,
+    owner_id: int,
     name: str,
     slug: str | None = None,
     academic_year: str | None = None,
@@ -179,6 +180,7 @@ async def create_course(
     chapter_titles: list[str] | None = None,
 ) -> Course:
     course = Course(
+        owner_id=owner_id,
         name=name,
         slug=await unique_course_slug(db, name, slug),
         academic_year=academic_year,

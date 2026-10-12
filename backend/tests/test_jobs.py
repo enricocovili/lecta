@@ -102,9 +102,12 @@ async def test_active_job_cannot_be_deleted(admin):
 
 async def test_bulk_delete_with_purge_removes_test_outputs(admin):
     from app.models import Course, IngestItem, SourceFile, Upload
+    from app.security.auth import user_by_username
+
+    from .conftest import ADMIN_USER
 
     async with SessionLocal() as db:
-        course = Course(name="Purge test", slug="purge-test")
+        course = Course(name="Purge test", slug="purge-test", owner_id=(await user_by_username(db, ADMIN_USER)).id)
         db.add(course)
         await db.flush()
         jobs = [Job(kind="ingest", title=f"test {n}", status="cancelled") for n in range(2)]

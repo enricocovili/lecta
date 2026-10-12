@@ -9,7 +9,7 @@ def extra_routers() -> list[APIRouter]:
     from . import chat, concepts, costs, editor, labs, lessons, passkeys, preview, providers, publish, search, settings, shared, uploads
 
     return [
-        editor.router, publish.router, settings.router, providers.router, costs.router,
+        editor.router, publish.router, publish.admin_router, settings.router, providers.router, costs.router,
         uploads.router, chat.router, search.router,
         concepts.router, preview.router, lessons.router, labs.router, shared.router, passkeys.router, settings.template_router,
     ]

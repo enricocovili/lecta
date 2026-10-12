@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 import pyotp
 import pytest
 
@@ -11,12 +13,20 @@ from app.security.auth import login_global_limiter, login_limiter
 from .conftest import ADMIN_PASSWORD, ADMIN_USER, ensure_admin, make_client
 
 
-async def _wipe_admin() -> None:
-    from sqlalchemy import delete
+@asynccontextmanager
+async def _no_admin():
+    """No admin for the duration (setup is needed again): the admins are demoted, then promoted back."""
+    from sqlalchemy import update
 
     async with SessionLocal() as db:
-        await db.execute(delete(User))
+        ids = (await db.execute(update(User).where(User.role == "admin").values(role="editor").returning(User.id))).scalars().all()
         await db.commit()
+    try:
+        yield
+    finally:
+        async with SessionLocal() as db:
+            await db.execute(update(User).where(User.id.in_(ids)).values(role="admin"))
+            await db.commit()
 
 
 @pytest.fixture(autouse=True)
@@ -27,38 +37,42 @@ async def _reset_limits():
     from sqlalchemy import delete
 
     async with SessionLocal() as db:  # the users a test added
-        await db.execute(delete(User).where(User.username != ADMIN_USER))
+        await db.execute(delete(User).where(User.username.in_(_added)))
         await db.commit()
+    _added.clear()
+
+
+_added: list[str] = []
 
 
 async def test_setup_wizard_requires_code_and_csrf(app):
-    await _wipe_admin()
-    async with make_client(app) as c:
-        assert (await c.get("/api/setup/status")).json() == {"needs_setup": True}
-        body = {"setup_code": appsecrets.setup_code(), "username": "me", "password": "a-long-password-123"}
-        # No CSRF cookie/header -> refused.
-        r = await c.post("/api/setup", json=body, headers={"x-csrf-token": ""})
-        assert r.status_code == 403
-        await c.get("/api/auth/csrf")
-        r = await c.post("/api/setup", json={**body, "setup_code": "wrong"})
-        assert r.status_code == 403
-        r = await c.post("/api/setup", json={**body, "password": "short"})
-        assert r.status_code == 422
-        r = await c.post("/api/setup", json=body)
-        assert r.status_code == 200, r.text
-        me = (await c.get("/api/auth/me")).json()
-        assert me["authenticated"] and me["username"] == "me"
-        # Session cookie is httpOnly + SameSite=Lax.
-        set_cookie = r.headers.get_list("set-cookie")
-        session_cookie = next(h for h in set_cookie if h.startswith("lecta_session="))
-        assert "HttpOnly" in session_cookie and "samesite=lax" in session_cookie.lower()
-    # Setup can't run twice (and looks like an unknown route afterwards).
-    async with make_client(app) as c:
-        await c.get("/api/auth/csrf")
-        r = await c.post("/api/setup", json=body)
-        assert r.status_code == 404
-    await _wipe_admin()
     await ensure_admin(app)
+    _added.append("me")
+    async with _no_admin():
+        async with make_client(app) as c:
+            assert (await c.get("/api/setup/status")).json() == {"needs_setup": True}
+            body = {"setup_code": appsecrets.setup_code(), "username": "me", "password": "a-long-password-123"}
+            # No CSRF cookie/header -> refused.
+            r = await c.post("/api/setup", json=body, headers={"x-csrf-token": ""})
+            assert r.status_code == 403
+            await c.get("/api/auth/csrf")
+            r = await c.post("/api/setup", json={**body, "setup_code": "wrong"})
+            assert r.status_code == 403
+            r = await c.post("/api/setup", json={**body, "password": "short"})
+            assert r.status_code == 422
+            r = await c.post("/api/setup", json=body)
+            assert r.status_code == 200, r.text
+            me = (await c.get("/api/auth/me")).json()
+            assert me["authenticated"] and me["username"] == "me"
+            # Session cookie is httpOnly + SameSite=Lax.
+            set_cookie = r.headers.get_list("set-cookie")
+            session_cookie = next(h for h in set_cookie if h.startswith("lecta_session="))
+            assert "HttpOnly" in session_cookie and "samesite=lax" in session_cookie.lower()
+        # Setup can't run twice (and looks like an unknown route afterwards).
+        async with make_client(app) as c:
+            await c.get("/api/auth/csrf")
+            r = await c.post("/api/setup", json=body)
+            assert r.status_code == 404
 
 
 async def test_login_logout_and_rate_limit(app):
@@ -191,6 +205,7 @@ async def _add_user(username: str, role: str, password: str | None = None) -> in
             await db.delete(old)
             await db.flush()
         user = User(username=username, role=role, password_hash=hash_password(password) if password else None)
+        _added.append(username)
         db.add(user)
         await db.commit()
         return user.id
@@ -236,12 +251,10 @@ async def test_a_disabled_user_is_signed_out_and_cannot_sign_in(app):
 
 
 async def test_setup_is_needed_until_an_admin_exists(app):
-    await _wipe_admin()
-    await _add_user("not-an-admin", "editor", "editors-password-123")
-    async with make_client(app) as c:
-        assert (await c.get("/api/setup/status")).json() == {"needs_setup": True}
-    await _wipe_admin()
     await ensure_admin(app)
+    await _add_user("not-an-admin", "editor", "editors-password-123")
+    async with _no_admin(), make_client(app) as c:
+        assert (await c.get("/api/setup/status")).json() == {"needs_setup": True}
     async with make_client(app) as c:
         assert (await c.get("/api/setup/status")).json() == {"needs_setup": False}
 

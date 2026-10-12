@@ -16,12 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import config
 from ..db import get_db
 from ..models import Build, Course
-from ..security.auth import require_content
+from ..security.access import Access, access
 from ..services import blobs, compile as compile_svc, latex, projects
 from ..services.sniff import sniff_bytes
 from .courses import load_course
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(access)])
 
 MAX_IMAGE_UPLOAD = 50 * 1024 * 1024
 IMAGE_TYPES = {"png": ".png", "jpeg": ".jpg", "pdf": ".pdf"}
@@ -39,15 +39,15 @@ def file_out(pf) -> dict[str, Any]:  # noqa: ANN001
 
 
 @router.get("/courses/{course_id}/files")
-async def list_files(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def list_files(course_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     files = [file_out(pf) for pf in await projects.get_files(db, c.id)]
     return {"files": files, "generated": ["preamble.tex"]}
 
 
 @router.get("/courses/{course_id}/files/content")
-async def get_content(course_id: int, path: str = Query(max_length=300), db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def get_content(course_id: int, path: str = Query(max_length=300), acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     if path == "preamble.tex":
         return {"path": path, "content": await projects.preamble_for(db, c), "blob": None, "generated": True,
                 "overridden": bool(c.preamble_override)}
@@ -60,8 +60,8 @@ async def get_content(course_id: int, path: str = Query(max_length=300), db: Asy
 
 
 @router.get("/courses/{course_id}/files/raw")
-async def get_raw(course_id: int, path: str = Query(max_length=300), db: AsyncSession = Depends(get_db)) -> Response:
-    c = await load_course(db, course_id)
+async def get_raw(course_id: int, path: str = Query(max_length=300), acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> Response:
+    c = await load_course(db, course_id, acc)
     pf = await projects.get_file(db, c.id, path)
     if pf is None:
         raise HTTPException(status_code=404, detail="Not Found")
@@ -78,8 +78,8 @@ class SaveIn(BaseModel):
 
 
 @router.put("/courses/{course_id}/files/content")
-async def save_content(course_id: int, body: SaveIn, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def save_content(course_id: int, body: SaveIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     # Serialise with AI imports writing into the same course (they lock the course row too).
     await db.execute(select(Course.id).where(Course.id == c.id).with_for_update())
     if body.path == "preamble.tex":
@@ -107,8 +107,8 @@ class CreateIn(BaseModel):
 
 
 @router.post("/courses/{course_id}/files", status_code=201)
-async def create_file(course_id: int, body: CreateIn, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def create_file(course_id: int, body: CreateIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     path = projects.validate_path(body.path)
     if not projects.is_text_path(path):
         raise HTTPException(status_code=400, detail="per i file binari usa il caricamento")
@@ -130,8 +130,8 @@ class RenameIn(BaseModel):
 
 
 @router.post("/courses/{course_id}/files/rename")
-async def rename_file(course_id: int, body: RenameIn, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def rename_file(course_id: int, body: RenameIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     if body.old.startswith("chapters/") or body.old == "main.tex":
         raise HTTPException(status_code=400, detail="rinomina i capitoli dalla pagina della materia")
     pf = await projects.rename_file(db, c, body.old, body.new)
@@ -144,8 +144,8 @@ class DeleteIn(BaseModel):
 
 
 @router.post("/courses/{course_id}/files/delete")
-async def delete_file(course_id: int, body: DeleteIn, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def delete_file(course_id: int, body: DeleteIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     if body.path.startswith("chapters/") or body.path == "main.tex":
         raise HTTPException(status_code=400, detail="elimina i capitoli dalla pagina della materia")
     if not await projects.get_file(db, c.id, body.path):
@@ -157,10 +157,10 @@ async def delete_file(course_id: int, body: DeleteIn, db: AsyncSession = Depends
 
 @router.post("/courses/{course_id}/files/upload")
 async def upload_image(
-    course_id: int, request: Request, name: str = Query(max_length=120), db: AsyncSession = Depends(get_db)
+    course_id: int, request: Request, name: str = Query(max_length=120), acc: Access = Depends(access), db: AsyncSession = Depends(get_db)
 ) -> dict:
     """Upload an image into images/ (raw body, validated by magic bytes)."""
-    c = await load_course(db, course_id)
+    c = await load_course(db, course_id, acc)
     data = bytearray()
     async for chunk in request.stream():
         data += chunk
@@ -187,8 +187,8 @@ class CompileIn(BaseModel):
 
 
 @router.post("/courses/{course_id}/compile")
-async def compile_course(course_id: int, body: CompileIn, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def compile_course(course_id: int, body: CompileIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     try:
         res = await compile_svc.run_build(db, c, file=body.file, full=body.full, priority="interactive")
     except latex.CompileServiceError as e:
@@ -200,8 +200,8 @@ async def compile_course(course_id: int, body: CompileIn, db: AsyncSession = Dep
 
 
 @router.get("/courses/{course_id}/builds/latest")
-async def latest_build(course_id: int, kind: str = "draft", db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def latest_build(course_id: int, kind: str = "draft", acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     b = (
         await db.execute(
             select(Build).where(Build.course_id == c.id, Build.kind == kind).order_by(Build.id.desc()).limit(1)
@@ -225,7 +225,8 @@ async def latest_build(course_id: int, kind: str = "draft", db: AsyncSession = D
 
 
 @router.get("/courses/{course_id}/builds/{build_id}/log")
-async def build_log(course_id: int, build_id: int, db: AsyncSession = Depends(get_db)) -> Response:
+async def build_log(course_id: int, build_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> Response:
+    await load_course(db, course_id, acc)
     b = await db.get(Build, build_id)
     if b is None or b.course_id != course_id:
         raise HTTPException(status_code=404, detail="Not Found")
@@ -261,8 +262,8 @@ def stream_output(path, filename: str) -> StreamingResponse:  # noqa: ANN001
 
 
 @router.get("/courses/{course_id}/pdf")
-async def draft_pdf(course_id: int, db: AsyncSession = Depends(get_db)) -> StreamingResponse:
-    c: Course = await load_course(db, course_id)
+async def draft_pdf(course_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> StreamingResponse:
+    c: Course = await load_course(db, course_id, acc)
     return stream_output(compile_svc.draft_pdf_path(c.id), f"{c.slug}-draft.pdf")
 
 
@@ -273,8 +274,8 @@ class SynctexIn(BaseModel):
 
 
 @router.post("/courses/{course_id}/synctex")
-async def synctex(course_id: int, body: SynctexIn, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def synctex(course_id: int, body: SynctexIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     wd = projects.work_dir(c.id, "draft")
     try:
         res = await latex.synctex({"workdir": latex.rel(wd), "page": body.page, "x": body.x, "y": body.y})

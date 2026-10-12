@@ -12,12 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..models import Chapter, Course
-from ..security.auth import require_content
+from ..security.access import Access, access
 from ..services import draft, latex, projects
 from ..services.source_export import build_source_zip, project_files, zip_name
 from .courses import chapter_out, load_chapter, load_course
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(access)])
 
 
 # --------------------------------------------------------------------------- draft typeset by LaTeX
@@ -33,15 +33,15 @@ async def _draft(db: AsyncSession, course: Course, ch: Chapter, inputs: draft.In
 
 
 @router.get("/courses/{course_id}/chapters/{chapter_id}/draft")
-async def chapter_draft(course_id: int, chapter_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def chapter_draft(course_id: int, chapter_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     ch = await load_chapter(db, c, chapter_id)
     return await _draft(db, c, ch, await draft.inputs_for(db, c))
 
 
 @router.get("/courses/{course_id}/draft")
-async def course_draft(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def course_draft(course_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     inputs = await draft.inputs_for(db, c)
     return {"chapters": [await _draft(db, c, ch, inputs) for ch in await projects.chapters_of(db, c.id)]}
 
@@ -54,9 +54,9 @@ class BlockIn(BaseModel):
 
 
 @router.put("/courses/{course_id}/chapters/{chapter_id}/block")
-async def write_block(course_id: int, chapter_id: int, body: BlockIn, db: AsyncSession = Depends(get_db)) -> dict:
+async def write_block(course_id: int, chapter_id: int, body: BlockIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
     """Replace the lines of one block of the draft with the text written in place (nothing: the block goes away)."""
-    c = await load_course(db, course_id)
+    c = await load_course(db, course_id, acc)
     ch = await load_chapter(db, c, chapter_id)
     # Serialise with the assistant and the imports writing into the same course (they lock the course row too).
     await db.execute(select(Course.id).where(Course.id == c.id).with_for_update())
@@ -76,8 +76,8 @@ async def write_block(course_id: int, chapter_id: int, body: BlockIn, db: AsyncS
 
 
 @router.get("/courses/{course_id}/draft/svg/{name}")
-async def draft_svg(course_id: int, name: str, db: AsyncSession = Depends(get_db)) -> FileResponse:
-    await load_course(db, course_id)
+async def draft_svg(course_id: int, name: str, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> FileResponse:
+    await load_course(db, course_id, acc)
     path = draft.svg_path(course_id, name)
     if path is None or not path.is_file():
         raise HTTPException(status_code=404, detail="Not Found")
@@ -92,9 +92,9 @@ async def draft_svg(course_id: int, name: str, db: AsyncSession = Depends(get_db
 # --------------------------------------------------------------------------- source download
 
 @router.get("/courses/{course_id}/source.zip")
-async def source_zip(course_id: int, db: AsyncSession = Depends(get_db)) -> Response:
+async def source_zip(course_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> Response:
     """The LaTeX project of the working version."""
-    c = await load_course(db, course_id)
+    c = await load_course(db, course_id, acc)
     if not await projects.chapters_of(db, c.id):
         raise HTTPException(status_code=404, detail="Not Found")
     data = build_source_zip(await project_files(db, c), name=c.name)

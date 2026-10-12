@@ -49,6 +49,10 @@ reasoning behind every change since.
   editors write), `require_editor` or `require_admin`; a signed-in user below it gets 403. Private admin pages also
   404. `tests/test_boundary.py` sweeps every route × method anonymously; `tests/test_access.py` lists every route's
   level and fails on a route it doesn't list.
+* **Ownership**: every course has an owner (`security/access.py`). Editors read their own courses and the published
+  ones and change only their own; viewers read every course; admins read and change everything. A course the user
+  can't read is 404, one they can't change 403. `tests/test_ownership.py` calls every route under a course as another
+  editor.
 * **Sessions**: accounts live in `users`, each with a role (`viewer`, `editor`, `admin`) and possibly disabled (a
   disabled user's sessions stop working); argon2id password (optional: invited users have only passkeys), httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe
   methods, login rate limiting, optional TOTP. **Passkeys** (WebAuthn, Settings → Account): add one with the

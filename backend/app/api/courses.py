@@ -1,4 +1,4 @@
-"""Courses and chapters (admin)."""
+"""Courses and chapters: everyone reads those they may (security/access.py), owners and admins change them."""
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..models import Chapter, Course, ProjectFile, Publication
-from ..security.auth import require_content
+from ..models import Chapter, Course, ProjectFile, Publication, User
+from ..security.access import Access, access, can_write, check, readable
 from ..services import overview, projects
 from ..services.texttools import slugify
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(access)])
 
 LANG_PATTERN = r"^[a-z]{2,3}$"
 GUIDELINES_MAX = 8000
@@ -73,9 +73,14 @@ def chapter_out(ch: Chapter) -> dict[str, Any]:
     }
 
 
-def course_out(c: Course, chapters: list[Chapter] | None = None, pub: Publication | None = None) -> dict[str, Any]:
+def course_out(
+    c: Course, acc: Access, owner: str | None, chapters: list[Chapter] | None = None, pub: Publication | None = None
+) -> dict[str, Any]:
     out: dict[str, Any] = {
         "id": c.id,
+        "owner_id": c.owner_id,
+        "owner": owner,
+        "can_write": can_write(acc.user, c),
         "name": c.name,
         "slug": c.slug,
         "academic_year": c.academic_year,
@@ -96,11 +101,13 @@ def course_out(c: Course, chapters: list[Chapter] | None = None, pub: Publicatio
     return out
 
 
-async def load_course(db: AsyncSession, course_id: int) -> Course:
-    c = await db.get(Course, course_id)
-    if c is None:
-        raise HTTPException(status_code=404, detail="Not Found")
-    return c
+async def load_course(db: AsyncSession, course_id: int, acc: Access, *, write: bool | None = None) -> Course:
+    """The course, if `acc` may read it (and change it, on an unsafe request or with `write=True`): else 404/403."""
+    return check(acc, await db.get(Course, course_id), write=write)
+
+
+async def usernames(db: AsyncSession) -> dict[int, str]:
+    return dict((await db.execute(select(User.id, User.username))).all())
 
 
 async def load_chapter(db: AsyncSession, course: Course, chapter_id: int) -> Chapter:
@@ -111,23 +118,25 @@ async def load_chapter(db: AsyncSession, course: Course, chapter_id: int) -> Cha
 
 
 @router.get("/courses")
-async def list_courses(db: AsyncSession = Depends(get_db)) -> list[dict]:
-    courses = (await db.execute(select(Course).order_by(Course.updated_at.desc()))).scalars().all()
+async def list_courses(acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> list[dict]:
+    courses = (await db.execute(select(Course).where(readable(acc.user)).order_by(Course.updated_at.desc()))).scalars().all()
     counts = dict(
         (await db.execute(select(Chapter.course_id, func.count()).group_by(Chapter.course_id))).all()
     )
+    names = await usernames(db)
     out = []
     for c in courses:
-        d = course_out(c)
+        d = course_out(c, acc, names.get(c.owner_id))
         d["chapter_count"] = counts.get(c.id, 0)
         out.append(d)
     return out
 
 
 @router.post("/courses", status_code=201)
-async def create_course(body: CourseIn, db: AsyncSession = Depends(get_db)) -> dict:
+async def create_course(body: CourseIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
     course = await projects.create_course(
         db,
+        owner_id=acc.user.id,
         name=body.name,
         slug=body.slug,
         academic_year=body.academic_year,
@@ -137,21 +146,22 @@ async def create_course(body: CourseIn, db: AsyncSession = Depends(get_db)) -> d
         chapter_titles=body.chapters,
     )
     await db.commit()
-    return course_out(course, await projects.chapters_of(db, course.id))
+    return course_out(course, acc, acc.user.username, await projects.chapters_of(db, course.id))
 
 
 @router.get("/courses/{course_id}")
-async def get_course(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def get_course(course_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     pub = await db.get(Publication, c.current_publication_id) if c.current_publication_id else None
-    out = course_out(c, await projects.chapters_of(db, c.id), pub)
+    owner = await db.get(User, c.owner_id)
+    out = course_out(c, acc, owner.username if owner else None, await projects.chapters_of(db, c.id), pub)
     out["preamble_override"] = c.preamble_override
     return out
 
 
 @router.patch("/courses/{course_id}")
-async def patch_course(course_id: int, body: CoursePatch, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def patch_course(course_id: int, body: CoursePatch, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     data = body.model_dump(exclude_unset=True)
     if "slug" in data and data["slug"]:
         new_slug = slugify(data["slug"])
@@ -176,7 +186,7 @@ async def patch_course(course_id: int, body: CoursePatch, db: AsyncSession = Dep
         c.preamble_override = data["preamble_override"]
     c.updated_at = datetime.now().astimezone()
     await db.commit()
-    return await get_course(course_id, db)
+    return await get_course(course_id, acc, db)
 
 
 class DeleteIn(BaseModel):
@@ -184,8 +194,8 @@ class DeleteIn(BaseModel):
 
 
 @router.post("/courses/{course_id}/delete")
-async def delete_course(course_id: int, body: DeleteIn, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def delete_course(course_id: int, body: DeleteIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     if body.confirm_slug != c.slug:
         raise HTTPException(status_code=400, detail="Scrivi lo slug della materia per confermare")
     await db.delete(c)
@@ -194,16 +204,18 @@ async def delete_course(course_id: int, body: DeleteIn, db: AsyncSession = Depen
 
 
 @router.post("/courses/{course_id}/chapters", status_code=201)
-async def add_chapter(course_id: int, body: ChapterIn, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def add_chapter(course_id: int, body: ChapterIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     ch = await projects.add_chapter(db, c, body.title, position=body.position, slug=body.slug)
     await db.commit()
     return chapter_out(ch)
 
 
 @router.patch("/courses/{course_id}/chapters/{chapter_id}")
-async def patch_chapter(course_id: int, chapter_id: int, body: ChapterPatch, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def patch_chapter(
+    course_id: int, chapter_id: int, body: ChapterPatch, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)
+) -> dict:
+    c = await load_course(db, course_id, acc)
     ch = await load_chapter(db, c, chapter_id)
     await projects.update_chapter(db, c, ch, title=body.title, slug=body.slug)
     await db.commit()
@@ -211,8 +223,8 @@ async def patch_chapter(course_id: int, chapter_id: int, body: ChapterPatch, db:
 
 
 @router.delete("/courses/{course_id}/chapters/{chapter_id}")
-async def delete_chapter(course_id: int, chapter_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def delete_chapter(course_id: int, chapter_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     ch = await load_chapter(db, c, chapter_id)
     await projects.delete_chapter(db, c, ch)
     await db.commit()
@@ -220,16 +232,16 @@ async def delete_chapter(course_id: int, chapter_id: int, db: AsyncSession = Dep
 
 
 @router.post("/courses/{course_id}/chapters/reorder")
-async def reorder(course_id: int, body: ReorderIn, db: AsyncSession = Depends(get_db)) -> list[dict]:
-    c = await load_course(db, course_id)
+async def reorder(course_id: int, body: ReorderIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> list[dict]:
+    c = await load_course(db, course_id, acc)
     await projects.reorder_chapters(db, c, body.ids)
     await db.commit()
     return [chapter_out(ch) for ch in await projects.chapters_of(db, c.id)]
 
 
 @router.get("/tree")
-async def tree(db: AsyncSession = Depends(get_db)) -> list[dict]:
-    courses = (await db.execute(select(Course).order_by(Course.name))).scalars().all()
+async def tree(acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> list[dict]:
+    courses = (await db.execute(select(Course).where(readable(acc.user)).order_by(Course.name))).scalars().all()
     chapters = (await db.execute(select(Chapter).order_by(Chapter.course_id, Chapter.position))).scalars().all()
     by_course: dict[int, list[dict]] = {}
     for ch in chapters:
@@ -243,6 +255,7 @@ async def tree(db: AsyncSession = Depends(get_db)) -> list[dict]:
             "name": c.name,
             "slug": c.slug,
             "published": c.published,
+            "can_write": can_write(acc.user, c),
             "chapters": by_course.get(c.id, []),
             "status": states.get(c.id, {}).get("status", "ok"),
             "sources": states.get(c.id, {}).get("sources", 0),
@@ -253,8 +266,8 @@ async def tree(db: AsyncSession = Depends(get_db)) -> list[dict]:
 
 
 @router.get("/courses/{course_id}/chapters/{chapter_id}")
-async def get_chapter(course_id: int, chapter_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    c = await load_course(db, course_id)
+async def get_chapter(course_id: int, chapter_id: int, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
+    c = await load_course(db, course_id, acc)
     ch = await load_chapter(db, c, chapter_id)
     out = chapter_out(ch)
     out["course"] = {"id": c.id, "name": c.name, "slug": c.slug}
