@@ -77,10 +77,18 @@ VIEWER = """
     POST   /api/account/passkeys
     PATCH  /api/account/passkeys/{passkey_id}
     DELETE /api/account/passkeys/{passkey_id}
+    GET    /api/courses/{course_id}/notes
+    GET    /api/courses/{course_id}/chapters/{chapter_id}/notes
+    POST   /api/courses/{course_id}/chapters/{chapter_id}/notes
+    PATCH  /api/notes/{note_id}
+    DELETE /api/notes/{note_id}
 """
 
 EDITOR = """
     POST   /api/courses
+    POST   /api/notes/{note_id}/accept
+    POST   /api/notes/{note_id}/reject
+    POST   /api/notes/{note_id}/resolve
     PATCH  /api/courses/{course_id}
     POST   /api/courses/{course_id}/delete
     POST   /api/courses/{course_id}/chapters

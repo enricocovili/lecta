@@ -2,8 +2,8 @@
 
 The sweeps call every route under a course (its chapters and files, its lessons and labs, what its imports read) as
 another editor: on an unpublished course everything is 404 (an editor can't tell it exists); on a published one the
-text reads and changes are 403, while lessons, labs, import material, jobs and conversations stay 404 (they are never
-published).
+text reads and changes are 403 (but for draft notes, which any reader writes), while lessons, labs, import material,
+jobs and conversations stay 404 (they are never published).
 """
 
 from __future__ import annotations
@@ -148,6 +148,8 @@ async def test_every_change_to_a_published_course_is_403_to_another_editor(app, 
             assert res.status_code == 404, f"{method} {url} -> {res.status_code} {res.text[:200]}"
         elif method == "GET":
             assert res.status_code != 403, f"{method} {url} -> 403"
+        elif r.path.endswith("/notes"):  # any reader writes notes on a published course (here: a body is missing)
+            assert res.status_code == 422, f"{method} {url} -> {res.status_code} {res.text[:200]}"
         else:
             assert res.status_code == 403, f"{method} {url} -> {res.status_code} {res.text[:200]}"
 

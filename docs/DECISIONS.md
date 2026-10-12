@@ -741,3 +741,29 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      Only admins ask for the lesson's share links to decide whether to follow them, so an editor's own lab no longer
      gets a 403 on opening. *Alternatives:* letting viewers poll the lab (cheap, but the one page of the app that moves
      by itself for a reader, and the lesson next to it doesn't).
+128. **Readers leave comments and suggestions on a block of a published course; its owner accepts, rejects or
+     resolves them (#84).** A *draft note* (`draft_notes`, `api/notes.py`) is a comment or a suggestion (the block's
+     new LaTeX, with an optional reason) on one block of a chapter, anchored to the block as the reader saw it: its
+     text (`src`) and its lines, as `services/blocks` splits the chapter. Creating one needs a course the user can read
+     (else 404) that is **published** (else 409: viewers and admins read unpublished courses, but those take no notes)
+     and the block still there with that text at those lines (409, like writing in place). The **owner** can't note
+     their own course (403: they change the text instead); an admin who isn't the owner can. Notes are seen by their
+     author and by whoever may change the course (owner, admins); to anyone else a note is a 404. The author changes
+     the text of their note, or deletes it, while it is open (409 once closed); the owner and admins delete any note at
+     any time (to clear the list), but don't edit others' words. Closing is for the course's writers (`require_editor`
+     on the route, then 403): accept or reject a suggestion, resolve a comment (the wrong kind, or a note already
+     closed, is 409; the close is a conditional update, so two at once can't both win). **Accepting** writes the
+     proposed LaTeX through the same function as `PUT …/block` (`preview.replace_block`, under the course lock), at the
+     block found again: 409 if its text changed since, and the note stays open. **Re-anchoring** happens on every read
+     of an open note: the blocks whose text is exactly `src`, the nearest to the stored `start`, give the current
+     `start`/`end`; none, and the note says `changed` («testo cambiato») with its old lines. Closed notes keep where
+     they were. Unpublishing keeps the notes (the author still sees and edits theirs if they can read the course, which
+     an editor no longer can); deleting the course or the chapter deletes them, and so does deleting the author's
+     account (like their conversations: an account with notes can be deleted, one with courses can't). The routes
+     don't use `access` (which leaves unsafe methods to editors) but `note_access`: any signed-in user, the path's
+     course readable and its note visible before the body is read. *Alternatives:* keeping a deleted author's notes
+     with no name (`SET NULL`: the owner might still want them, but a nameless note can't be answered, and an account
+     is deleted rarely and only without courses); letting the owner note their own text (they have the editor and the
+     assistant); notes on unpublished courses for viewers (the product says published content, and an author working
+     on a private draft hasn't asked for readers yet); re-anchoring by a fuzzy match (an edited block may mean the note
+     no longer applies: the author decides, seeing «testo cambiato»).

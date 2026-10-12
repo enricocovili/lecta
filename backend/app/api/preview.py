@@ -53,24 +53,30 @@ class BlockIn(BaseModel):
     text: str = Field(max_length=1024 * 1024)
 
 
+async def replace_block(db: AsyncSession, course: Course, ch: Chapter, start: int, end: int, src: str, text: str) -> None:
+    """Replace lines `start`–`end` of the chapter, which must still read `src`, with `text` (nothing: the block goes
+    away); 409 if they changed. Not committed: the caller commits (with whatever else it records)."""
+    # Serialise with the assistant and the imports writing into the same course (they lock the course row too).
+    await db.execute(select(Course.id).where(Course.id == course.id).with_for_update())
+    pf = await projects.get_file(db, course.id, ch.path)
+    lines = ((pf.text_content if pf is not None else None) or "").split("\n")
+    if end < start or end > len(lines) or "\n".join(lines[start - 1 : end]) != src:
+        raise HTTPException(status_code=409, detail="Il testo è cambiato da quando l'hai aperto: ricarica e riprova")
+    text = text.strip("\n")
+    before, after = lines[: start - 1], lines[end:]
+    if not text.strip() and before and not before[-1].strip() and after and not after[0].strip():
+        after = after[1:]  # the block goes away with one of the blank lines around it
+    new = before + (text.split("\n") if text.strip() else []) + after
+    if new != lines:
+        await projects.write_file(db, course, ch.path, "\n".join(new).encode(), validated=True)
+
+
 @router.put("/courses/{course_id}/chapters/{chapter_id}/block")
 async def write_block(course_id: int, chapter_id: int, body: BlockIn, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
     """Replace the lines of one block of the draft with the text written in place (nothing: the block goes away)."""
     c = await load_course(db, course_id, acc)
     ch = await load_chapter(db, c, chapter_id)
-    # Serialise with the assistant and the imports writing into the same course (they lock the course row too).
-    await db.execute(select(Course.id).where(Course.id == c.id).with_for_update())
-    pf = await projects.get_file(db, c.id, ch.path)
-    lines = ((pf.text_content if pf is not None else None) or "").split("\n")
-    if body.end < body.start or body.end > len(lines) or "\n".join(lines[body.start - 1 : body.end]) != body.src:
-        raise HTTPException(status_code=409, detail="Il testo è cambiato da quando l'hai aperto: ricarica e riprova")
-    text = body.text.strip("\n")
-    before, after = lines[: body.start - 1], lines[body.end :]
-    if not text.strip() and before and not before[-1].strip() and after and not after[0].strip():
-        after = after[1:]  # the block goes away with one of the blank lines around it
-    new = before + (text.split("\n") if text.strip() else []) + after
-    if new != lines:
-        await projects.write_file(db, c, ch.path, "\n".join(new).encode(), validated=True)
+    await replace_block(db, c, ch, body.start, body.end, body.src, body.text)
     await db.commit()
     return await _draft(db, c, ch, await draft.inputs_for(db, c))
 

@@ -12,10 +12,13 @@ deleted) by whoever started it, the course's owner and admins.
 A conversation with the assistant is its author's (admins see and continue them all); asking the assistant needs the
 right to change the course.
 
+A draft note (a comment or a suggestion on a block) is seen by its author and by whoever may change its course; any
+reader of a published course writes them, so their routes don't leave unsafe methods to editors.
+
 A course that can't be read is answered with 404, like an unknown one (an editor can't probe what others have);
 one that can be read but not changed with 403.
 
-The routers depend on `access`, `private_access`, `job_access` or `chat_access`, which check the course (or job) named by the
+The routers depend on `access`, `private_access`, `job_access`, `chat_access` or `note_access`, which check the course (or job) named by the
 route's path before its body is read, so no route under a course can forget it.
 """
 
@@ -28,8 +31,8 @@ from sqlalchemy import ColumnElement, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..models import ChatMessage, ChatSession, Course, IngestFigure, IngestItem, Job, Lesson, SourceFile, Upload, User
-from .auth import UNSAFE, AuthContext, forbidden, has_role, require_content
+from ..models import ChatMessage, ChatSession, Course, DraftNote, IngestFigure, IngestItem, Job, Lesson, SourceFile, Upload, User
+from .auth import UNSAFE, AuthContext, forbidden, has_role, require_content, require_user
 
 
 @dataclass
@@ -112,6 +115,16 @@ async def check_chat(acc: Access, db: AsyncSession, session: ChatSession | None)
     return session
 
 
+async def check_note(acc: Access, db: AsyncSession, note: DraftNote | None) -> tuple[DraftNote, Course]:
+    """The note and its course if `acc` may read the course and the note is theirs or they may change the course, else 404."""
+    course = await db.get(Course, note.course_id) if note is not None else None
+    if note is None or course is None or not can_read(acc.user, course):
+        raise _not_found()
+    if note.author_id != acc.user.id and not can_write(acc.user, course):
+        raise _not_found()
+    return note, course
+
+
 # --------------------------------------------------------------------------- the routers' dependencies
 
 
@@ -187,4 +200,15 @@ async def chat_access(request: Request, ctx: AuthContext = Depends(require_conte
         await check_chat(acc, db, await db.get(ChatSession, reply.session_id) if reply is not None else None)
     if "course_id" in request.path_params:
         check(acc, await db.get(Course, _param(request, "course_id")))
+    return acc
+
+
+async def note_access(request: Request, ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)) -> Access:
+    """Draft notes: a `{course_id}` must be readable, a `{note_id}` the user's to see (`check_note`). Writing a note is
+    any reader's, so the role isn't checked here: closing one (accept, reject, resolve) adds `require_editor`."""
+    acc = _access(request, ctx)
+    if "course_id" in request.path_params:
+        check(acc, await db.get(Course, _param(request, "course_id")), write=False)
+    if "note_id" in request.path_params:
+        await check_note(acc, db, await db.get(DraftNote, _param(request, "note_id")))
     return acc

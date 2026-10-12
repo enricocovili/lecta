@@ -128,6 +128,6 @@ async def delete_user(user_id: int, ctx: AuthContext = Depends(require_admin), d
     await _keep_an_admin(db, user)
     if await db.scalar(select(func.count()).select_from(Course).where(Course.owner_id == user.id)):
         raise HTTPException(status_code=409, detail="Ha delle materie: disattivalo invece di eliminarlo")
-    await db.delete(user)  # passkeys, sessions and conversations go by cascade; jobs and invites keep a NULL user
+    await db.delete(user)  # passkeys, sessions, conversations and draft notes go by cascade; jobs and invites keep a NULL user
     await db.commit()
     return {"ok": True}

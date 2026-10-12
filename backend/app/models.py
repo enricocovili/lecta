@@ -160,6 +160,37 @@ class Chapter(Base):
     course: Mapped[Course] = relationship(back_populates="chapters")
 
 
+class DraftNote(Base):
+    """A comment or a suggestion (a replacement of the block's LaTeX) left by a reader on a block of a published course.
+    Anchored to the block's text as it was shown (`src`, lines `start`–`end` of the chapter file then): it is found
+    again by that text after the chapter changes, and flagged when the text itself changed (api/notes)."""
+
+    __tablename__ = "draft_notes"
+    __table_args__ = (
+        CheckConstraint("kind IN ('comment', 'suggestion')", name="ck_draft_notes_kind"),
+        CheckConstraint("status IN ('open', 'accepted', 'rejected', 'resolved')", name="ck_draft_notes_status"),
+        CheckConstraint("kind = 'comment' OR proposed IS NOT NULL", name="ck_draft_notes_proposed"),
+        Index("ix_draft_notes_chapter", "chapter_id", "status"),
+        Index("ix_draft_notes_course", "course_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
+    chapter_id: Mapped[int] = mapped_column(ForeignKey("chapters.id", ondelete="CASCADE"))
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    src: Mapped[str] = mapped_column(Text)
+    start: Mapped[int] = mapped_column(Integer)
+    end: Mapped[int] = mapped_column(Integer)
+    body: Mapped[str] = mapped_column(Text, default="", server_default="")  # the comment, or a suggestion's reason
+    proposed: Mapped[str | None] = mapped_column(Text)  # a suggestion's LaTeX for the block
+    status: Mapped[str] = mapped_column(String(16), default="open", server_default="open")
+    resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = _now()
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ProjectFile(Base):
     """Current state of one file of a course's LaTeX project."""
 
