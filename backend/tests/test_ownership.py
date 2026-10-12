@@ -161,7 +161,10 @@ async def test_lessons_and_labs_are_their_course_owners(editor, other_editor, vi
         # The editor learns from the lesson whether it may change it: the viewer gets it read-only.
         assert r.json()["can_write"] is writes
         assert (await client.get(f"/api/courses/{course_id}/lessons/{ids['number']}")).json()["can_write"] is writes
-        assert (await client.get(f"/api/lessons/{lesson}/lab")).status_code == 200
+        # So does the lab, by the lesson and by its address.
+        r = await client.get(f"/api/lessons/{lesson}/lab")
+        assert r.status_code == 200 and r.json()["can_write"] is writes
+        assert (await client.get(f"/api/courses/{course_id}/lessons/{ids['number']}/lab")).json()["can_write"] is writes
         assert (await client.get(f"/api/sources/{ids['sid']}")).status_code == 200
         assert (await client.get(f"/api/jobs/{ids['job_id']}/ingest")).status_code == 200
         assert [l["can_write"] for l in (await client.get("/api/lessons")).json() if l["id"] == lesson] == [writes]

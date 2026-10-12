@@ -63,6 +63,9 @@ reasoning behind every change since.
   Lessons (`/api/lessons`, `/api/lessons/{id}`) carry `can_write` too: a viewer opens them read-only, like a share
   link's read mode (no tools, notes, pages, assistant, «Integra appunti», nor any unsafe request), and share links are
   offered only to admins.
+  Labs (`/api/lessons/{id}/lab` and its address by number) carry `can_write` as well: a viewer reads the files, their
+  comments and the notes, with no upload, rename, delete, editing, comments, assistant or lab to create, and sends
+  nothing but reads.
 * **Sessions**: accounts live in `users`, each with a role (`viewer`, `editor`, `admin`) and possibly disabled (a
   disabled user's sessions stop working); argon2id password (optional: invited users have only passkeys), httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe
   methods, login rate limiting, optional TOTP. **Passkeys** (WebAuthn, Settings → Account): add one with the

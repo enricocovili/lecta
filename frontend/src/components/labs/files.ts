@@ -20,10 +20,13 @@ export interface LabData {
   notes_version: number;
   files: LabFile[];
   comments: LabComment[];
+  /** whether the signed-in user may change the lab (its lesson's course's owner, an admin); false: a viewer, who only reads it */
+  can_write?: boolean;
 }
 
-/** owner: the signed-in author; write: a share link that can edit; read: a share link that only looks. */
-export type LabAccess = "owner" | "write" | "read";
+/** owner: signed in and may change the lab (its course's owner or an admin); reader: signed in, only reads it (a viewer);
+ * write: a share link that can edit; read: a share link that only looks. */
+export type LabAccess = "owner" | "reader" | "write" | "read";
 
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 

@@ -729,3 +729,15 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      admin on someone else's lesson, and the next role change would have to remember it); letting viewers sync (a
      reader of the app is not following a lecture live, and a POST open to viewers would be the one exception of
      `require_content`).
+127. **A lab the user may not change opens read-only, like a lesson (#83).** The lab JSON (`/api/lessons/{id}/lab`, its
+     address by number, and what creating it answers) says `can_write`, from the lesson's course like the lesson (126);
+     the share link's lab doesn't (its mode says it). The lab editor gets the same `reader` mode as the lesson: the
+     share link's `read` (no upload, rename or delete, no editing a file, no comments to write, change or delete, the
+     notes shown rendered, no assistant nor «Chiedi» on lines, no Ctrl+S) with the app's links kept, «Sola lettura» in
+     the bar. A lab that doesn't exist yet says so to a reader instead of offering «Crea il laboratorio», and the
+     lesson shows «Laboratorio» to a reader only when there is one (126). A reader sends nothing but reads: unsaved work
+     a browser kept from an earlier visit is neither restored nor sent, and following others' changes is left out like
+     in the lesson (here it would be a GET, but a viewer is not following a class live, and reloading brings the news).
+     Only admins ask for the lesson's share links to decide whether to follow them, so an editor's own lab no longer
+     gets a 403 on opening. *Alternatives:* letting viewers poll the lab (cheap, but the one page of the app that moves
+     by itself for a reader, and the lesson next to it doesn't).

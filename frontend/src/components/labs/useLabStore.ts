@@ -51,6 +51,8 @@ export interface StoreEvents {
   onFileSaved?: (f: SavedFile) => void;
   /** a file changed elsewhere while it was edited here: the edit is dropped, the file must be read again */
   onFileConflict?: (fileId: number) => void;
+  /** the page only reads the lab (a viewer, a read link): unsaved work of an earlier visit is neither brought back nor sent */
+  readOnly?: boolean;
 }
 
 const backupKey = (key: string) => `lecta:lab:${key}:unsaved`;
@@ -246,6 +248,7 @@ export function useLabStore(
 
   // Unsaved work of an earlier visit comes back if the server has not moved on meanwhile.
   useEffect(() => {
+    if (on.current.readOnly) return;
     const b = readBackup(key);
     let restored = 0;
     if (b.notes && b.notes.base === versions.current.get(NOTES)) {

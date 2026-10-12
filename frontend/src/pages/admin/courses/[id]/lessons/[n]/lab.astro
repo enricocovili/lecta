@@ -4,9 +4,10 @@ import LabPage from "../../../../../../components/labs/LabEditor";
 import { backendGet } from "../../../../../../lib/server";
 const courseId = Number(Astro.params.id);
 const number = Number(Astro.params.n);
+const role = Astro.locals.auth.role;
 const r = await backendGet<{ title: string }>(Astro, `/api/courses/${courseId}/lessons/${number}?pages=false`);
 if (!r.data) return Astro.rewrite("/404");
 ---
 <Workspace title={`Laboratorio · ${r.data.title}`}>
-  <LabPage client:only="react" courseId={courseId} number={number} />
+  <LabPage client:only="react" courseId={courseId} number={number} role={role} />
 </Workspace>

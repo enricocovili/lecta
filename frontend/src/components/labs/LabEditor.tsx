@@ -3,6 +3,7 @@
 // Nothing is ever run: text is shown as text.
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { ApiError, api, del, fmtSize, get, patch, post, uploadRaw } from "../../lib/api";
+import { isAdmin, type Role } from "../../lib/roles";
 import { Icon } from "../icons";
 import NotesField from "../lessons/NotesField";
 import { Markdown } from "../workspace/Markdown";
@@ -19,16 +20,16 @@ type Store = ReturnType<typeof useLabStore>;
 
 const SAVE_LABEL: Record<SaveState, string> = { saved: "Salvato", pending: "Da salvare", saving: "Salvataggio…", offline: "Non salvato · riprovo" };
 
-export default function LabPage({ courseId, number }: { courseId: number; number: number }) {
+export default function LabPage({ courseId, number, role }: { courseId: number; number: number; role?: Role }) {
   const [lab, setLab] = useState<LabData | null>(null);
-  const [missing, setMissing] = useState<{ id: number; title: string } | null>(null);
+  const [missing, setMissing] = useState<{ id: number; title: string; can_write?: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     try {
       setLab(await get<LabData>(`/api/courses/${courseId}/lessons/${number}/lab`));
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) {
-        const lesson = await get<{ id: number; title: string }>(`/api/courses/${courseId}/lessons/${number}?pages=false`).catch(() => null);
+        const lesson = await get<{ id: number; title: string; can_write?: boolean }>(`/api/courses/${courseId}/lessons/${number}?pages=false`).catch(() => null);
         if (lesson) return setMissing(lesson);
       }
       setError(e instanceof Error ? e.message : String(e));
@@ -37,6 +38,20 @@ export default function LabPage({ courseId, number }: { courseId: number; number
   useEffect(() => void load(), [load]);
 
   if (error) return <div className="lab lab-loading"><div className="alert danger">{error}</div></div>;
+  if (missing && !lab && !missing.can_write) {
+    return (
+      <div className="lab lab-loading">
+        <div className="card lab-create">
+          <span className="status-ico pg-kind-ico"><Icon name="flask" /></span>
+          <h2>Laboratorio di «{missing.title}»</h2>
+          <p className="muted">Questa lezione non ha un laboratorio.</p>
+          <div className="row">
+            <a className="btn ghost" href={`/admin/courses/${courseId}/lessons/${number}`}>Torna alla lezione</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (missing && !lab) {
     return (
       <div className="lab lab-loading">
@@ -60,7 +75,15 @@ export default function LabPage({ courseId, number }: { courseId: number; number
     );
   }
   if (!lab) return <div className="lab lab-loading"><Loading /></div>;
-  return <LabEditor lab={lab} access="owner" base={`/api/lessons/${lab.lesson.id}`} lessonHref={`/admin/courses/${courseId}/lessons/${number}`} />;
+  return (
+    <LabEditor
+      lab={lab}
+      access={lab.can_write ? "owner" : "reader"}
+      admin={isAdmin(role)}
+      base={`/api/lessons/${lab.lesson.id}`}
+      lessonHref={`/admin/courses/${courseId}/lessons/${number}`}
+    />
+  );
 }
 
 /** What is open: a file or the lab's notes, kept in the address (`?file=src/main.c`, `?notes`) so a link or a reload opens it again. */
@@ -90,9 +113,12 @@ export function LabEditor({
   base,
   lessonHref,
   storeKey = String(lab.id),
+  admin = false,
 }: {
   lab: LabData;
   access: LabAccess;
+  /** an admin: the only one who makes share links (decision 115), so the only one whose lab may be followed by them */
+  admin?: boolean;
   base: string;
   lessonHref: string | null;
   /** names the lab's unsaved work in localStorage */
@@ -100,7 +126,8 @@ export function LabEditor({
 }) {
   const owner = access === "owner";
   // Comments, notes and editing text: the owner and a write link. Uploading, renaming, deleting files: the owner only.
-  const canEdit = access !== "read";
+  // A reader (a viewer) and a read link only look.
+  const canEdit = owner || access === "write";
   const canManage = owner;
   const [files, setFiles] = useState<LabFile[]>(lab.files);
   const { open, notes: notesOpen, choose, showNotes } = useOpenFile(files);
@@ -140,6 +167,7 @@ export function LabEditor({
   const store = useLabStore(base, storeKey, lab.comments, { text: lab.notes, version: lab.notes_version }, lab.files, {
     onFileSaved: (f) => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, version: f.version, size: f.size } : x))),
     onFileConflict: (id) => void reloadFile(id),
+    readOnly: !canEdit,
   });
   storeRef.current = store;
 
@@ -168,12 +196,14 @@ export function LabEditor({
     for (const c of store.comments) m.set(c.file_id, (m.get(c.file_id) ?? 0) + 1);
     return m;
   }, [store.comments]);
-  // While the lab is shared, what the others save comes in every few seconds (a reader's page follows the class).
+  // While the lab is shared, what the others save comes in every few seconds (a reader's page follows the class). Only admins
+  // make links, so only they ask for them; a viewer reads the lab as it was when opened, like a lesson (decision 127).
   const [hasShares, setHasShares] = useState(false);
   const [gone, setGone] = useState(false);
+  const shares = owner && admin;
   useEffect(() => {
-    if (owner) get<unknown[]>(`/api/lessons/${lab.lesson.id}/shares`).then((l) => setHasShares(l.length > 0)).catch(() => undefined);
-  }, [owner, lab.lesson.id]);
+    if (shares) get<unknown[]>(`/api/lessons/${lab.lesson.id}/shares`).then((l) => setHasShares(l.length > 0)).catch(() => undefined);
+  }, [shares, lab.lesson.id]);
   const poll = access === "read" ? 5000 : access === "write" ? 6000 : hasShares ? 8000 : null;
   const filesRef = useRef(files);
   filesRef.current = files;
@@ -304,6 +334,12 @@ export function LabEditor({
           <span className="lab-title" data-testid="lab-title">{lab.lesson.title}</span>
         </div>
         <span className="les-course muted small">{lab.lesson.course_name}</span>
+        {access === "reader" && (
+          <span className="badge wsb-ro" data-testid="read-only" title="Puoi leggere questo laboratorio, non modificarlo">
+            <Icon name="eye" />
+            <span className="wsb-lbl">Sola lettura</span>
+          </span>
+        )}
         <div className="wsb-actions">
           {canEdit && (
             <button type="button" className={`btn ghost icon les-save ${store.saveState}`} data-testid="lab-save-state" role="status" aria-live="polite" onClick={() => void save()} title={`${SAVE_LABEL[store.saveState]}. Salva ora (Ctrl+S); il salvataggio automatico avviene ogni minuto.`}>

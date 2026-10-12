@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import config
 from ..db import get_db
 from ..models import Chapter, Course, Lab, LabComment, LabFile, Lesson
-from ..security.access import private_access
+from ..security.access import Access, can_write, private_access
 from ..services import blobs
 from ..services import labs as lb
 
@@ -69,11 +69,13 @@ async def _file(db: AsyncSession, lab: Lab, file_id: int) -> LabFile:
     return f
 
 
-async def lab_out(db: AsyncSession, lab: Lab) -> dict[str, Any]:
+async def lab_out(db: AsyncSession, lab: Lab, acc: Access | None = None) -> dict[str, Any]:
+    """The lab with its files and comments; with the signed-in user's `acc`, `can_write` says whether they may change it
+    (its lesson's course's owner, an admin), else the editor only shows it."""
     lesson = await _lesson(db, lab.lesson_id)
     course = await db.get(Course, lesson.course_id)
     chapter = await db.get(Chapter, lesson.chapter_id) if lesson.chapter_id else None
-    return {
+    out = {
         "id": lab.id, "notes": lab.notes, "notes_version": lab.notes_version, "created_at": lab.created_at, "updated_at": lab.updated_at,
         "lesson": {
             "id": lesson.id, "number": lesson.number, "title": lesson.title, "course_id": lesson.course_id,
@@ -82,6 +84,9 @@ async def lab_out(db: AsyncSession, lab: Lab) -> dict[str, Any]:
         "files": [file_out(f) for f in await _files(db, lab.id)],
         "comments": [comment_out(c) for c in await _comments(db, lab.id)],
     }
+    if acc is not None:
+        out["can_write"] = course is not None and can_write(acc.user, course)
+    return out
 
 
 async def lab_counts(db: AsyncSession, lesson_ids: list[int]) -> dict[int, dict[str, int]]:
@@ -96,20 +101,20 @@ async def lab_counts(db: AsyncSession, lesson_ids: list[int]) -> dict[int, dict[
 
 
 @router.get("/lessons/{lesson_id}/lab")
-async def get_lab(lesson_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    return await lab_out(db, await _lab(db, lesson_id))
+async def get_lab(lesson_id: int, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
+    return await lab_out(db, await _lab(db, lesson_id), acc)
 
 
 @router.get("/courses/{course_id}/lessons/{number}/lab")
-async def get_lab_by_number(course_id: int, number: int, db: AsyncSession = Depends(get_db)) -> dict:
+async def get_lab_by_number(course_id: int, number: int, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
     lesson = (await db.execute(select(Lesson).where(Lesson.course_id == course_id, Lesson.number == number))).scalar_one_or_none()
     if lesson is None:
         raise HTTPException(status_code=404, detail="Not Found")
-    return await lab_out(db, await _lab(db, lesson.id))
+    return await lab_out(db, await _lab(db, lesson.id), acc)
 
 
 @router.post("/lessons/{lesson_id}/lab", status_code=201)
-async def create_lab(lesson_id: int, db: AsyncSession = Depends(get_db)) -> dict:
+async def create_lab(lesson_id: int, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
     """The lesson's lab: made if it has none, else the one it has."""
     lesson = await _lesson(db, lesson_id)
     lab = (await db.execute(select(Lab).where(Lab.lesson_id == lesson.id))).scalar_one_or_none()
@@ -117,7 +122,7 @@ async def create_lab(lesson_id: int, db: AsyncSession = Depends(get_db)) -> dict
         lab = Lab(lesson_id=lesson.id)
         db.add(lab)
         await db.commit()
-    return await lab_out(db, lab)
+    return await lab_out(db, lab, acc)
 
 
 @router.delete("/lessons/{lesson_id}/lab")

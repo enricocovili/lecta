@@ -326,4 +326,81 @@ test.describe("Passkey", () => {
     await expect(page.getByTestId("read-only")).toHaveCount(0);
     await rc.close();
   });
+
+  test("a reader opens the lab of a lesson of the admin's course read-only: files, comments and notes, nothing sent", async ({ page, browser, baseURL }) => {
+    test.setTimeout(120_000);
+    await login(page);
+    // A lesson of the admin's Algebra Lineare with a lab (a file, a comment on its lines, the notes), and one without.
+    const lab = await page.evaluate(async () => {
+      const csrf = document.cookie.match(/lecta_csrf=([^;]+)/)?.[1] ?? "";
+      const headers = { "content-type": "application/json", "x-csrf-token": csrf };
+      const course = ((await (await fetch("/api/courses")).json()) as { id: number; name: string }[]).find((c) => c.name.includes("Algebra Lineare"))!;
+      const make = async (title: string) => (await fetch("/api/lessons", { method: "POST", headers, body: JSON.stringify({ course_id: course.id, title }) })).json();
+      const l = await make("Laboratorio da leggere");
+      const bare = await make("Lezione senza laboratorio");
+      await fetch(`/api/lessons/${l.id}/lab`, { method: "POST", headers });
+      const code = "import numpy as np\nA = np.eye(3)\nprint(np.linalg.det(A))\n";
+      const f = await (
+        await fetch(`/api/lessons/${l.id}/lab/files?path=${encodeURIComponent("src/det.py")}`, { method: "POST", headers: { "content-type": "application/octet-stream", "x-csrf-token": csrf }, body: code })
+      ).json();
+      const body = { file_id: f.id, anchor: { from: 2, to: 3, text: "A = np.eye(3)\nprint(np.linalg.det(A))" }, body: "Il determinante dell’**identità** è 1." };
+      await fetch(`/api/lessons/${l.id}/lab/comments/${crypto.randomUUID()}`, { method: "PUT", headers, body: JSON.stringify(body) });
+      await fetch(`/api/lessons/${l.id}/lab/notes`, { method: "PUT", headers, body: JSON.stringify({ notes: "Consegna entro **venerdì**." }) });
+      return { course_id: course.id as number, number: l.number as number, bare: bare.number as number };
+    });
+
+    const { context: rc, p: reader } = await invited(page, browser, baseURL!, "viewer", "ospite");
+    const con = watchConsole(reader);
+    const sent: string[] = [];
+    reader.on("request", (r) => r.url().includes("/api/") && r.method() !== "GET" && sent.push(`${r.method()} ${r.url()}`));
+    reader.on("response", (r) => r.url().includes("/api/") && r.status() >= 400 && sent.push(`${r.status()} ${r.url()}`));
+    // From the lesson to its lab.
+    await reader.goto(`/admin/courses/${lab.course_id}/lessons/${lab.number}`);
+    await reader.getByTestId("lesson-lab").click();
+    await reader.waitForURL(/\/lab(\?.*)?$/);
+    const editor = reader.getByTestId("lab-editor");
+    await expect(editor.getByTestId("read-only")).toHaveText("Sola lettura");
+    await expect(editor.getByTestId("lab-open-path")).toHaveText("src/det.py");
+    await expect(editor.getByTestId("lab-code").locator(".cm-line").nth(1)).toContainText("np.eye(3)");
+    const comment = editor.getByTestId("lab-comment");
+    await expect(comment).toHaveCount(1);
+    await expect(comment).toContainText("Righe 2–3");
+    await expect(comment).toContainText("Il determinante dell’identità è 1.");
+    // Nothing to change: no upload, rename, delete, edit, comments, assistant; the code is not editable.
+    for (const id of ["lab-upload", "lab-file-input", "lab-save-state", "lab-ai-toggle", "lab-publish", "lab-edit", "lab-comment-file", "lab-comment-selection"]) {
+      await expect(editor.getByTestId(id)).toHaveCount(0);
+    }
+    await expect(editor.getByRole("button", { name: /Rinomina|Elimina/ })).toHaveCount(0);
+    await comment.click();
+    await expect(comment.locator("textarea")).toHaveCount(0);
+    const lines = editor.getByTestId("lab-code").locator(".cm-line");
+    await lines.nth(0).click({ position: { x: 2, y: 5 } });
+    await lines.nth(2).click({ modifiers: ["Shift"] });
+    await expect(editor.getByTestId("lab-comment-selection")).toHaveCount(0);
+    // The code can be selected (to copy it) but not typed into.
+    await reader.keyboard.type("zzz");
+    await expect(lines.nth(0)).toHaveText("import numpy as np");
+    // The notes are shown, not edited.
+    await editor.getByTestId("lab-notes-open").click();
+    await expect(editor.getByTestId("lab-notes")).toContainText("Consegna entro venerdì.");
+    await expect(editor.getByTestId("lab-notes").locator("textarea")).toHaveCount(0);
+    await reader.waitForTimeout(1500);
+    expect(sent).toEqual([]);
+    con.assertClean();
+
+    // A lesson without a lab offers no «Laboratorio», and its lab's address doesn't offer to make one.
+    await reader.goto(`/admin/courses/${lab.course_id}/lessons/${lab.bare}`);
+    await expect(reader.getByTestId("lesson-editor")).toBeVisible();
+    await expect(reader.getByTestId("lesson-lab")).toHaveCount(0);
+    await reader.goto(`/admin/courses/${lab.course_id}/lessons/${lab.bare}/lab`);
+    await expect(reader.getByText("Questa lezione non ha un laboratorio.")).toBeVisible();
+    await expect(reader.getByTestId("lab-create")).toHaveCount(0);
+
+    // The admin's lab keeps everything.
+    await page.goto(`/admin/courses/${lab.course_id}/lessons/${lab.number}/lab`);
+    await expect(page.getByTestId("lab-upload")).toBeVisible();
+    await expect(page.getByTestId("lab-ai-toggle")).toBeVisible();
+    await expect(page.getByTestId("read-only")).toHaveCount(0);
+    await rc.close();
+  });
 });
