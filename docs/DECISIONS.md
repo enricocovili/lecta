@@ -660,3 +660,15 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      **Autore** (editor) and **Amministratore** (admin) everywhere in the UI (`frontend/src/lib/roles.ts`).
      *Alternatives:* a page explaining that the link expired or was used (tells a guesser which tokens were real);
      «Editor» for the middle role (an English word, and it reads like the editing tool rather than a person).
+122. **Settings → «Utenti»: admins invite, change roles, disable and delete; the last active admin always stays (#78).**
+     The section makes invite links (role and note; the full link is shown once with a copy button), lists and revokes
+     the pending ones, and lists the users with role, creation, last seen (latest session activity), passkeys, courses
+     and the «solo passkey» and «disattivato» badges. A new role counts from the user's next request (the role is read
+     with the session). Disabling drops the user's sessions and refuses every sign-in until re-enabled; «Esci ovunque»
+     only drops the sessions. Deleting is allowed only for a user who owns no courses (409 otherwise: disable instead);
+     their passkeys, sessions and conversations go with them, their jobs and invites keep a blank user. Demoting,
+     disabling or deleting the last active (not disabled) admin is a 409, checked under a Postgres transaction-level
+     advisory lock so two admins demoting each other at once leave one. An admin may demote or disable themselves when
+     another active admin remains (disabling signs them out), but **never delete their own account**: someone else does
+     it, so a slip can't remove the account that is acting. *Alternatives:* a row lock on the admins (doesn't see a
+     user becoming admin at the same time); allowing self-delete (an irreversible click on oneself for no real need).

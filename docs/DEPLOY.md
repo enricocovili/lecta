@@ -24,6 +24,9 @@ publishes a host port, and nothing else is attached to `webnet`. The services an
    (or `docker compose exec backend cat /data/secrets/setup-code`).
 2. Open the site: you are redirected to `/setup`. Enter the code, then choose the admin username and password.
 3. Everything else (providers, prompts, LaTeX template, limits, …) is set from **Settings** in the browser.
+4. Further accounts come from invite links: Settings → **Utenti** → *Nuovo invito* (role and an optional note) gives a
+   link shown once, valid seven days; whoever opens it picks a username and creates a passkey. The same section changes
+   roles, disables, signs out and deletes users.
 
 Internal secrets (DB password, encryption key for API keys, setup code) are generated on first boot and stored in the
 `secrets` and `app-data` volumes.

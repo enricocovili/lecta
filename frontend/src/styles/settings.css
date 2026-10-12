@@ -648,6 +648,25 @@
 .set-session-title strong {
   font-weight: 550;
 }
+.set-user {
+  flex-wrap: wrap;
+}
+.set-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.set-user-actions select {
+  width: auto;
+  height: 32px;
+  font-size: 0.87rem;
+}
+.set-users-empty {
+  margin: 0;
+  padding: 0.85rem 1.5rem;
+  border-top: 1px solid var(--border);
+}
 .set-card.flush > .set-card-body > .rows {
   border-top: 1px solid var(--border);
 }

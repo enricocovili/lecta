@@ -51,20 +51,17 @@ test.describe("Passkey", () => {
 
   test("an invite link makes an account with a passkey, once", async ({ page, browser, baseURL }) => {
     test.setTimeout(120_000);
-    // The admin makes an invite (the settings section comes later: the API is enough here).
+    // The admin makes an invite in Settings → Utenti: the link is shown once.
     await login(page);
-    // In the page: the test runner itself can't reach the site as localhost.
-    const { status, path } = await page.evaluate(async () => {
-      const { csrf } = await (await fetch("/api/auth/csrf")).json();
-      const res = await fetch("/api/invites", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-csrf-token": csrf },
-        body: JSON.stringify({ role: "editor", note: "Per la collega di Analisi" }),
-      });
-      return { status: res.status, path: (await res.json()).path as string };
-    });
-    expect(status).toBe(201);
-    expect(path).toMatch(/^\/invito\/.+/);
+    await page.goto("/admin/settings#users");
+    await page.getByTestId("new-invite-role").selectOption("editor");
+    await page.getByTestId("new-invite-note").fill("Per la collega di Analisi");
+    await page.getByTestId("invite-create").click();
+    await expect(page.getByTestId("invite-link")).toContainText("non lo mostreremo più");
+    const url = await page.getByTestId("invite-url").inputValue();
+    expect(url).toMatch(/^http:\/\/localhost:4321\/invito\/.+/);
+    const path = new URL(url).pathname;
+    await expect(page.getByTestId("invite-row")).toContainText("Per la collega di Analisi");
 
     // Signed in, the page says that accepting switches account.
     await page.goto(path);
@@ -96,6 +93,19 @@ test.describe("Passkey", () => {
     expect(again?.status()).toBe(404);
     await expect(guest.getByRole("heading", { name: "Pagina non trovata" })).toBeVisible();
     con.assertClean([/status of 409/, /status of 404/]);
+
+    // The admin sees the new account (passkey only) and the invite gone; disabling it signs the colleague out.
+    await page.goto("/admin/settings#users");
+    await expect(page.getByTestId("invite-row")).toHaveCount(0);
+    const row = page.getByTestId("user-row").filter({ hasText: "collega" });
+    await expect(row).toContainText("solo passkey");
+    await expect(row.getByTestId("user-role")).toHaveValue("editor");
+    await row.getByTestId("user-disable").click();
+    await page.keyboard.press("Enter");
+    await expect(row).toContainText("disattivato");
+    expect(await guest.evaluate(async () => (await (await fetch("/api/auth/me")).json()).authenticated)).toBe(false);
+    await row.getByTestId("user-enable").click();
+    await expect(row).not.toContainText("disattivato");
     await other.close();
   });
 });

@@ -9,10 +9,12 @@ import ModelsSettings from "./settings/ModelsSettings";
 import PromptsSettings from "./settings/PromptsSettings";
 import ProvidersSettings from "./settings/ProvidersSettings";
 import SiteSettings from "./settings/SiteSettings";
+import UsersSettings from "./settings/UsersSettings";
 
 // The keys are the URL hashes (/admin/settings#providers) — keep them stable.
 const SECTIONS = [
   { key: "account", label: "Account", icon: "user", sub: "Password, verifica in due passaggi e sessioni attive." },
+  { key: "users", label: "Utenti", icon: "users", sub: "Inviti, ruoli e accesso delle persone che usano Lecta." },
   { key: "site", label: "Sito", icon: "globe", sub: "Come appare il sito pubblico." },
   { key: "providers", label: "Provider", icon: "cpu", sub: "I servizi AI che leggono il materiale caricato e rispondono in chat." },
   { key: "models", label: "Modelli", icon: "layers", sub: "Quale provider e modello usare per ogni ruolo." },
@@ -67,6 +69,7 @@ export default function SettingsPage() {
             <p className="set-sub">{cur.sub}</p>
           </header>
           {tab === "account" && <AccountSettings />}
+          {tab === "users" && <UsersSettings />}
           {tab === "site" && <SiteSettings />}
           {tab === "providers" && <ProvidersSettings />}
           {tab === "models" && <ModelsSettings />}

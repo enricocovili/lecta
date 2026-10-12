@@ -162,6 +162,12 @@ ADMIN = """
     POST   /api/invites
     GET    /api/invites
     DELETE /api/invites/{invite_id}
+    GET    /api/users
+    PATCH  /api/users/{user_id}
+    POST   /api/users/{user_id}/disable
+    POST   /api/users/{user_id}/enable
+    POST   /api/users/{user_id}/logout
+    DELETE /api/users/{user_id}
 """
 
 # Websockets: the guard needs a session, the route checks the role itself.
