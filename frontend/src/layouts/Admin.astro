@@ -5,6 +5,7 @@ import TopSearch from "../components/TopSearch";
 import Toasts from "../components/Toasts";
 import { Icon, BrandMark } from "../components/icons";
 import { getSite } from "../lib/server";
+import { isAdmin } from "../lib/roles";
 interface Props {
   title: string;
   crumbs?: { label: string; href?: string }[];
@@ -14,6 +15,7 @@ const { title, crumbs = [] } = Astro.props;
 const site = await getSite(Astro);
 const path = Astro.url.pathname;
 const username = Astro.locals.auth?.username ?? "";
+const role = Astro.locals.auth?.role;
 const initials =
   username
     .split(/[\s._-]+/)
@@ -42,7 +44,7 @@ const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/a
           <a href="/admin/lessons" class="show-mobile"><Icon name="notebook" />Lezioni</a>
           <a href="/admin/settings"><Icon name="sliders" />Impostazioni</a>
           <a href="/admin/jobs"><Icon name="activity" />Attività</a>
-          <a href="/admin/settings#ai"><Icon name="coins" />AI e costi</a>
+          {isAdmin(role) && <a href="/admin/settings#ai"><Icon name="coins" />AI e costi</a>}
           <a href="/" target="_blank" rel="noreferrer"><Icon name="eye" />Vista pubblica</a>
           <div class="sep"></div>
           <button type="button" id="logout-btn"><Icon name="logout" />Esci</button>
@@ -52,7 +54,7 @@ const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/a
   </header>
   <div class="shell">
     <aside class="sidebar">
-      <Sidebar client:load currentPath={path} />
+      <Sidebar client:load currentPath={path} role={role} />
     </aside>
     <main class="main">
       <div class="main-inner">

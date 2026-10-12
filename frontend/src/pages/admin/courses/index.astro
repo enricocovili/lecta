@@ -1,7 +1,8 @@
 ---
 import Admin from "../../../layouts/Admin.astro";
 import CoursesBrowser from "../../../components/CoursesBrowser";
+const role = Astro.locals.auth.role;
 ---
 <Admin title="Materie">
-  <CoursesBrowser client:load />
+  <CoursesBrowser client:load role={role} />
 </Admin>

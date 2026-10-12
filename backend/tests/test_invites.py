@@ -88,7 +88,7 @@ async def test_an_invite_makes_a_passkey_only_account_with_its_role(app, admin, 
 
     # Signed in as the new user, who has the invite's role, no password, and the passkey.
     me = (await c.get("/api/auth/me")).json()
-    assert me["authenticated"] and me["username"] == "inv-anna"
+    assert me["authenticated"] and me["username"] == "inv-anna" and me["role"] == "editor" and me["has_password"] is False
     u = await user("inv-anna")
     assert u is not None and u.role == "editor" and u.password_hash is None
     c.csrf = me["csrf"]

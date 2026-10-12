@@ -47,7 +47,9 @@ reasoning behind every change since.
   path that isn't explicitly public (`/api/public/*`, `/api/invite/*`, health, setup and auth endpoints), before routing. Every private
   route also depends on an access level: `require_user` (any signed-in user), `require_content` (everyone reads,
   editors write), `require_editor` or `require_admin`; a signed-in user below it gets 403. Private admin pages also
-  404. `tests/test_boundary.py` sweeps every route × method anonymously; `tests/test_access.py` lists every route's
+  404 to anonymous visitors, and the pages only admins may use (the AI costs page) to everyone but admins
+  (`frontend/src/middleware.ts`); menus and the settings sections hide what the role can't use, but that is only
+  courtesy, the API checks every call. `tests/test_boundary.py` sweeps every route × method anonymously; `tests/test_access.py` lists every route's
   level and fails on a route it doesn't list.
 * **Ownership**: every course has an owner (`security/access.py`). Editors read their own courses and the published
   ones and change only their own; viewers read every course; admins read and change everything. A course the user

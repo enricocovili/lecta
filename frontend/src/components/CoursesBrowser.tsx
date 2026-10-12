@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { get, post } from "../lib/api";
+import { canCreate, type Role } from "../lib/roles";
 import { Icon } from "./icons";
 import { COURSE_TONE, CoursePill, courseStateText, fmtUpdated, PublishedFlag, useCourseStates, type CourseState } from "./pagekit";
 import type { Course } from "./types";
@@ -158,7 +159,7 @@ function CourseCard({ c, st }: { c: Course; st: CourseState | undefined }) {
   );
 }
 
-export default function CoursesBrowser() {
+export default function CoursesBrowser({ role }: { role?: Role }) {
   const { data, error, loading } = useApi(() => get<Course[]>("/api/courses"));
   const states = useCourseStates();
   const [view, setView] = useLocalStorage<"grid" | "list">("lecta.courses.view", "grid");
@@ -166,7 +167,7 @@ export default function CoursesBrowser() {
   const [filter, setFilter] = useState("");
 
   useEffect(() => {
-    if (new URLSearchParams(location.search).get("new")) setShowNew(true);
+    if (canCreate(role) && new URLSearchParams(location.search).get("new")) setShowNew(true);
   }, []);
 
   const stateOf = (id: number) => (states.data ?? []).find((s) => s.id === id);
@@ -180,10 +181,12 @@ export default function CoursesBrowser() {
         <div>
           <h1>Materie</h1>
         </div>
-        <button className="btn primary" onClick={() => setShowNew(true)}>
-          <Icon name="plus" />
-          Nuova materia
-        </button>
+        {canCreate(role) && (
+          <button className="btn primary" onClick={() => setShowNew(true)}>
+            <Icon name="plus" />
+            Nuova materia
+          </button>
+        )}
       </div>
       <div className="pg-toolbar">
         <label className="pg-search">
@@ -204,7 +207,7 @@ export default function CoursesBrowser() {
         <Loading />
       ) : courses.length === 0 ? (
         <Empty icon="folder">
-          {filter ? "Nessuna materia corrisponde al filtro." : "Nessuna materia. Creane una e prendi appunti nelle sue lezioni."}
+          {filter ? "Nessuna materia corrisponde al filtro." : canCreate(role) ? "Nessuna materia. Creane una e prendi appunti nelle sue lezioni." : "Nessuna materia."}
         </Empty>
       ) : view === "grid" ? (
         <div className="pg-course-grid">

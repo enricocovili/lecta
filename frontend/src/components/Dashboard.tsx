@@ -6,6 +6,7 @@ import { jobStage, translateJobTitle, translateProgress } from "./jobtext";
 import { COURSE_LABEL, COURSE_TONE } from "./pagekit";
 import { Confirm, ErrorBox, fmtWhen, Loading, Progress, StatusPill, Switch, toast, toastError, useApi, usePoll, type Tone } from "./ui";
 import { courseText } from "../lib/links";
+import { canCreate, type Role } from "../lib/roles";
 
 interface FirstError {
   file: string | null;
@@ -380,7 +381,7 @@ function ReviewLine({ c }: { c: CourseState }) {
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({ role }: { role?: Role }) {
   const { data, error, loading, reload } = useApi(() => get<DashboardData>("/api/dashboard"));
   const concepts = useApi(() => get<Concepts>("/api/concepts").catch(() => null));
   const [filter, setFilter] = useState<Filter>("all");
@@ -422,7 +423,7 @@ export default function Dashboard() {
         <div className="empty">
           <Icon name="book" />
           <div>
-            Nessuna materia. <a href="/admin/courses?new=1">Creane una</a> e prendi appunti a lezione.
+            Nessuna materia.{canCreate(role) && <> <a href="/admin/courses?new=1">Creane una</a> e prendi appunti a lezione.</>}
           </div>
         </div>
       ) : (
@@ -522,7 +523,13 @@ export default function Dashboard() {
           <div>
             {rows.length === 0 ? (
               <>
-                Ancora nessuna importazione. <a href="/admin/lessons?new=1">Prendi appunti a lezione</a> e Lecta li trasformerà in un testo da studiare.
+                Ancora nessuna importazione.
+                {canCreate(role) && (
+                  <>
+                    {" "}
+                    <a href="/admin/lessons?new=1">Prendi appunti a lezione</a> e Lecta li trasformerà in un testo da studiare.
+                  </>
+                )}
               </>
             ) : (
               "Niente in questa categoria."

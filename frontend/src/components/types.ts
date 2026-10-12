@@ -71,4 +71,6 @@ export interface TreeCourse {
   /** ok | working | error */
   status?: string;
   sources?: number;
+  /** The user may change it (and add lessons to it). */
+  can_write?: boolean;
 }

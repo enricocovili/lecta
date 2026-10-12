@@ -684,3 +684,18 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      the link can't use it to remove it. The user's other passkeys and password stay (the admin or the user removes a
      lost passkey from the settings). *Alternatives:* replacing all the user's passkeys (would also drop a working
      password manager one); keeping the other sessions (a stolen phone would stay signed in).
+124. **Admin pages are a 404 for the other roles, and the menus hide what the role can't use (#80).** `/api/auth/me`
+     also returns `role`, `user_id` and `has_password`; the middleware puts it in `Astro.locals.auth` and the pages pass
+     the role to their islands as a prop (`frontend/src/lib/roles.ts`: `Me`, `isAdmin`, `canCreate`), so the first
+     render is already right. A page is admin-only when its API is (`tests/test_access.py`): the AI costs and call log
+     (`/admin/audit`, which leads to Settings → «AI e costi») answers the generic 404 to editors and viewers, like an
+     unknown address. The admin-only settings sections (Utenti, Sito, Provider, Modelli, Prompt, AI e costi, LaTeX,
+     Indice ed embeddings, File) are tabs of `/admin/settings` behind a URL hash, which the server never sees: the page
+     leaves them out for the other roles and their hash opens Account. Everyone keeps Account (passkeys and sessions;
+     password and 2FA only for users who have a password) and Backup (the export of the courses they can read; the
+     server backup instructions only for admins). Viewers see no «Nuova materia» or «Nuova lezione» and «Prendi
+     appunti a lezione» (sidebar, home, courses and lessons pages, `?new=1` does nothing); an editor's new lesson offers
+     only the courses they may change. The controls inside a course, a lesson or a lab follow its `can_write` instead
+     (#81–#83). Hiding is only courtesy: every call is checked by the backend, which answers 403 anyway. *Alternatives:*
+     a page per settings section (`/admin/settings/providers`) so that each could be a server 404 (breaks every link and
+     bookmark to the hashes for no gain in safety); greying entries out (shows people what they can't have).

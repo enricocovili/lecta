@@ -10,30 +10,33 @@ import PromptsSettings from "./settings/PromptsSettings";
 import ProvidersSettings from "./settings/ProvidersSettings";
 import SiteSettings from "./settings/SiteSettings";
 import UsersSettings from "./settings/UsersSettings";
+import { isAdmin, type Role } from "../lib/roles";
 
-// The keys are the URL hashes (/admin/settings#providers) — keep them stable.
+// The keys are the URL hashes (/admin/settings#providers) — keep them stable. `admin`: the section is only for admins
+// (its API answers 403 to the others), so the other roles don't see it and its hash opens Account (decision 124).
 const SECTIONS = [
   { key: "account", label: "Account", icon: "user", sub: "Password, verifica in due passaggi e sessioni attive." },
-  { key: "users", label: "Utenti", icon: "users", sub: "Inviti, ruoli e accesso delle persone che usano Lecta." },
-  { key: "site", label: "Sito", icon: "globe", sub: "Come appare il sito pubblico." },
-  { key: "providers", label: "Provider", icon: "cpu", sub: "I servizi AI che leggono il materiale caricato e rispondono in chat." },
-  { key: "models", label: "Modelli", icon: "layers", sub: "Quale provider e modello usare per ogni ruolo." },
-  { key: "prompts", label: "Prompt", icon: "message", sub: "Le istruzioni di sistema, modificabili e con cronologia delle versioni." },
-  { key: "ai", label: "AI e costi", icon: "coins", sub: "Limiti delle richieste, costi e registro delle chiamate." },
-  { key: "latex", label: "LaTeX", icon: "code", sub: "Compilazione e preambolo condiviso." },
-  { key: "embeddings", label: "Indice ed embeddings", icon: "database", sub: "Ricerca semantica locale e scelta del capitolo per il testo di una lezione." },
-  { key: "uploads", label: "File", icon: "upload", sub: "Limiti delle slide caricate nelle lezioni." },
+  { key: "users", label: "Utenti", icon: "users", sub: "Inviti, ruoli e accesso delle persone che usano Lecta.", admin: true },
+  { key: "site", label: "Sito", icon: "globe", sub: "Come appare il sito pubblico.", admin: true },
+  { key: "providers", label: "Provider", icon: "cpu", sub: "I servizi AI che leggono il materiale caricato e rispondono in chat.", admin: true },
+  { key: "models", label: "Modelli", icon: "layers", sub: "Quale provider e modello usare per ogni ruolo.", admin: true },
+  { key: "prompts", label: "Prompt", icon: "message", sub: "Le istruzioni di sistema, modificabili e con cronologia delle versioni.", admin: true },
+  { key: "ai", label: "AI e costi", icon: "coins", sub: "Limiti delle richieste, costi e registro delle chiamate.", admin: true },
+  { key: "latex", label: "LaTeX", icon: "code", sub: "Compilazione e preambolo condiviso.", admin: true },
+  { key: "embeddings", label: "Indice ed embeddings", icon: "database", sub: "Ricerca semantica locale e scelta del capitolo per il testo di una lezione.", admin: true },
+  { key: "uploads", label: "File", icon: "upload", sub: "Limiti delle slide caricate nelle lezioni.", admin: true },
   { key: "backup", label: "Backup", icon: "archive", sub: "Esportazione e backup completo." },
 ] as const;
 type Section = (typeof SECTIONS)[number]["key"];
 
-export default function SettingsPage() {
+export default function SettingsPage({ role, hasPassword }: { role?: Role; hasPassword: boolean }) {
+  const sections = SECTIONS.filter((s) => !("admin" in s) || isAdmin(role));
   const [tab, setTab] = useState<Section>("account");
   useEffect(() => {
     const read = () => {
       const raw = location.hash.replace("#", "");
       const h = (raw === "privacy" ? "ai" : raw) as Section;
-      if (SECTIONS.some((t) => t.key === h)) setTab(h);
+      if (sections.some((t) => t.key === h)) setTab(h);
     };
     read();
     window.addEventListener("hashchange", read);
@@ -48,7 +51,9 @@ export default function SettingsPage() {
     setTab(t);
     history.replaceState(null, "", `#${t}`);
   };
-  const cur = SECTIONS.find((s) => s.key === tab)!;
+  const cur = sections.find((s) => s.key === tab)!;
+  const sub =
+    cur.key === "account" && !hasPassword ? "Passkey e sessioni attive." : cur.key === "backup" && !isAdmin(role) ? "Esportazione delle materie." : cur.sub;
   return (
     <div className="set-page">
       <div className="page-head">
@@ -56,7 +61,7 @@ export default function SettingsPage() {
       </div>
       <div className="set-layout">
         <nav className="set-nav" role="tablist" aria-label="Sezioni delle impostazioni" aria-orientation="vertical">
-          {SECTIONS.map((s) => (
+          {sections.map((s) => (
             <button key={s.key} type="button" role="tab" aria-selected={tab === s.key} className={tab === s.key ? "active" : ""} onClick={() => go(s.key)}>
               <Icon name={s.icon} />
               <span>{s.label}</span>
@@ -66,9 +71,9 @@ export default function SettingsPage() {
         <div className="set-body" role="tabpanel" aria-label={cur.label}>
           <header className="set-head">
             <h2 className="set-title">{cur.label}</h2>
-            <p className="set-sub">{cur.sub}</p>
+            <p className="set-sub">{sub}</p>
           </header>
-          {tab === "account" && <AccountSettings />}
+          {tab === "account" && <AccountSettings role={role} hasPassword={hasPassword} />}
           {tab === "users" && <UsersSettings />}
           {tab === "site" && <SiteSettings />}
           {tab === "providers" && <ProvidersSettings />}
@@ -78,7 +83,7 @@ export default function SettingsPage() {
           {tab === "latex" && <LatexSettings />}
           {tab === "embeddings" && <EmbeddingsSettings />}
           {tab === "uploads" && <UploadSettings />}
-          {tab === "backup" && <BackupSettings />}
+          {tab === "backup" && <BackupSettings full={isAdmin(role)} />}
         </div>
       </div>
     </div>

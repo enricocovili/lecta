@@ -137,4 +137,71 @@ test.describe("Passkey", () => {
     await fresh.close();
     await other.close();
   });
+
+  test("a reader sees no admin pages and nothing to create, an author can create", async ({ page, browser, baseURL }) => {
+    test.setTimeout(120_000);
+    await login(page);
+    /** A new account with this role, from an invite the admin makes, signed in in its own browser. */
+    const join = async (role: string, username: string) => {
+      const path = await page.evaluate(async (role) => {
+        const csrf = document.cookie.match(/lecta_csrf=([^;]+)/)?.[1] ?? "";
+        const res = await fetch("/api/invites", { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf }, body: JSON.stringify({ role }) });
+        return (await res.json()).path as string;
+      }, role);
+      const context = await browser.newContext({ baseURL });
+      const p = await context.newPage();
+      await virtualAuthenticator(context, p);
+      await p.goto(path);
+      await p.getByLabel("Nome utente").fill(username);
+      await p.getByTestId("invite-accept").click();
+      await p.waitForURL("**/admin", { timeout: 20_000 });
+      return { context, p };
+    };
+
+    const { context: rc, p: reader } = await join("viewer", "lettore");
+    const con = watchConsole(reader);
+    // No create actions: not on the home page, in the sidebar, among the courses or the lessons.
+    await reader.reload();
+    await expect(reader.getByRole("heading", { name: "Home" })).toBeVisible();
+    await expect(reader.getByRole("link", { name: "Prendi appunti a lezione" })).toHaveCount(0);
+    await expect(reader.getByRole("link", { name: "Nuova materia" })).toHaveCount(0);
+    await reader.goto("/admin/courses");
+    await expect(reader.getByRole("heading", { name: "Materie" })).toBeVisible();
+    await expect(reader.getByRole("button", { name: "Nuova materia" })).toHaveCount(0);
+    await reader.goto("/admin/lessons?new=1");
+    await expect(reader.getByRole("heading", { name: "Lezioni" })).toBeVisible();
+    await expect(reader.getByTestId("new-lesson")).toHaveCount(0);
+    await expect(reader.getByRole("dialog")).toHaveCount(0);
+    // No admin entries: the menu has no costs, the settings only the account (passkeys, no password or 2FA) and the export.
+    await reader.locator("#user-menu summary").click();
+    await expect(reader.locator("#user-menu")).toContainText("Impostazioni");
+    await expect(reader.locator("#user-menu")).not.toContainText("AI e costi");
+    await reader.goto("/admin/settings#providers");
+    await expect(reader.getByRole("tab")).toHaveText(["Account", "Backup"]);
+    await expect(reader.getByRole("tabpanel")).toContainText("Lettore · accesso con passkey");
+    await expect(reader.getByTestId("passkeys")).toBeVisible();
+    await expect(reader.getByRole("button", { name: "Cambia password" })).toHaveCount(0);
+    await expect(reader.getByRole("button", { name: "Configura la 2FA" })).toHaveCount(0);
+    // An admin page is an address like any unknown one.
+    const audit = await reader.goto("/admin/audit");
+    expect(audit?.status()).toBe(404);
+    await expect(reader.getByRole("heading", { name: "Pagina non trovata" })).toBeVisible();
+    con.assertClean([/status of 404/]);
+
+    // An author creates courses and lessons, but has no admin entries either.
+    const { context: ac, p: author } = await join("editor", "autore");
+    await author.goto("/admin/courses");
+    await expect(author.getByRole("button", { name: "Nuova materia" })).toBeVisible();
+    await author.goto("/admin/settings");
+    await expect(author.getByRole("tab")).toHaveText(["Account", "Backup"]);
+    expect((await author.goto("/admin/audit"))?.status()).toBe(404);
+    // The admin keeps every section and the costs page.
+    await page.goto("/admin/settings");
+    await expect(page.getByRole("tab", { name: "Provider" })).toBeVisible();
+    await expect(page.getByRole("tabpanel")).toContainText("Amministratore · accesso con password");
+    expect((await page.goto("/admin/audit"))?.status()).toBe(200);
+    await expect(page).toHaveURL(/\/admin\/settings#ai/);
+    await rc.close();
+    await ac.close();
+  });
 });

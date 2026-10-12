@@ -2,14 +2,9 @@ import { useEffect, useState } from "react";
 import { del, fmtDate, get, patch, post } from "../../lib/api";
 import { Icon } from "../icons";
 import { passkeyError, passkeysSupported, registerPasskey } from "../../lib/passkey";
+import { ROLE_LABEL, type Me, type Role } from "../../lib/roles";
 import { Confirm, fmtWhen, StatusPill, toast, toastError, useApi } from "../ui";
 import { SetCard } from "./common";
-
-interface Me {
-  authenticated: boolean;
-  username: string;
-  totp_enabled: boolean;
-}
 
 interface PasskeyRow {
   id: number;
@@ -56,7 +51,8 @@ function describeUA(ua: string | null): string {
   return os ? `${browser} · ${os}` : browser;
 }
 
-export default function AccountSettings() {
+/** `hasPassword` false: an invited user, who signs in only with passkeys (no password to change, no 2FA). */
+export default function AccountSettings({ role, hasPassword }: { role?: Role; hasPassword: boolean }) {
   const me = useApi(() => get<Me>("/api/auth/me"));
   const sessions = useApi(() => get<SessionRow[]>("/api/account/sessions"));
   const passkeys = useApi(() => get<PasskeyRow[]>("/api/account/passkeys"));
@@ -127,47 +123,51 @@ export default function AccountSettings() {
         </span>
         <div className="grow">
           <div className="set-me-name">{me.data?.username ?? "…"}</div>
-          <div className="small muted">Amministratore · accesso con password{me.data?.totp_enabled ? " e codice 2FA" : ""}</div>
+          <div className="small muted">
+            {role ? ROLE_LABEL[role] : "…"} · {hasPassword ? `accesso con password${me.data?.totp_enabled ? " e codice 2FA" : ""}` : "accesso con passkey"}
+          </div>
         </div>
-        {me.data && (me.data.totp_enabled ? <StatusPill tone="ok" label="2FA attiva" size="sm" /> : <StatusPill tone="warn" label="2FA non attiva" size="sm" />)}
+        {hasPassword && me.data && (me.data.totp_enabled ? <StatusPill tone="ok" label="2FA attiva" size="sm" /> : <StatusPill tone="warn" label="2FA non attiva" size="sm" />)}
       </div>
 
-      <form onSubmit={changePassword}>
-        <SetCard
-          title="Password"
-          actions={
-            <button className="btn primary" type="submit" disabled={!pw.current_password || pw.new_password.length < 12}>
-              Cambia password
-            </button>
-          }
-        >
-          <div className="form-grid">
-            <label className="field">
-              Password attuale
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={pw.current_password}
-                onChange={(e) => setPw({ ...pw, current_password: e.target.value })}
-              />
-            </label>
-            <label className="field">
-              Nuova password <span className="hint">almeno 12 caratteri</span>
-              <input type="password" autoComplete="new-password" minLength={12} value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} />
-            </label>
-            <label className="field">
-              Ripeti la nuova password
-              <input type="password" autoComplete="new-password" minLength={12} value={pw.repeat} onChange={(e) => setPw({ ...pw, repeat: e.target.value })} />
-            </label>
-          </div>
-          <p className="set-help">Cambiando la password vengono chiuse tutte le altre sessioni.</p>
-        </SetCard>
-      </form>
+      {hasPassword && (
+        <form onSubmit={changePassword}>
+          <SetCard
+            title="Password"
+            actions={
+              <button className="btn primary" type="submit" disabled={!pw.current_password || pw.new_password.length < 12}>
+                Cambia password
+              </button>
+            }
+          >
+            <div className="form-grid">
+              <label className="field">
+                Password attuale
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={pw.current_password}
+                  onChange={(e) => setPw({ ...pw, current_password: e.target.value })}
+                />
+              </label>
+              <label className="field">
+                Nuova password <span className="hint">almeno 12 caratteri</span>
+                <input type="password" autoComplete="new-password" minLength={12} value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} />
+              </label>
+              <label className="field">
+                Ripeti la nuova password
+                <input type="password" autoComplete="new-password" minLength={12} value={pw.repeat} onChange={(e) => setPw({ ...pw, repeat: e.target.value })} />
+              </label>
+            </div>
+            <p className="set-help">Cambiando la password vengono chiuse tutte le altre sessioni.</p>
+          </SetCard>
+        </form>
+      )}
 
       <SetCard title={`Passkey · accesso senza password${passkeyList.length ? ` · ${passkeyList.length}` : ""}`}>
         <div className="set-stack" style={{ gap: ".9rem" }} data-testid="passkeys">
           <p className="set-help" style={{ margin: 0 }}>
-            Una passkey ti fa entrare con l'impronta, il PIN o il tuo gestore di password (per esempio Bitwarden), senza digitare password né codice 2FA. La password resta come alternativa.
+            Una passkey ti fa entrare con l'impronta, il PIN o il tuo gestore di password (per esempio Bitwarden), senza digitare password né codice 2FA.{hasPassword ? " La password resta come alternativa." : " È l'unico modo per entrare: tienine almeno una."}
           </p>
           {passkeyList.length > 0 && (
             <div className="rows">
@@ -241,7 +241,7 @@ export default function AccountSettings() {
           title="Elimina la passkey"
           danger
           confirmLabel="Elimina"
-          message={<>«{removing.name}» non potrà più essere usata per accedere. Se è l'unico modo che usi, ti resta la password.</>}
+          message={<>«{removing.name}» non potrà più essere usata per accedere.{hasPassword && " Se è l'unico modo che usi, ti resta la password."}</>}
           onConfirm={async () => {
             await del(`/api/account/passkeys/${removing.id}`);
             passkeys.reload();
@@ -250,112 +250,114 @@ export default function AccountSettings() {
         />
       )}
 
-      <SetCard title="Sicurezza · verifica in due passaggi (2FA)">
-        {me.data?.totp_enabled ? (
-          <div className="set-stack" style={{ gap: ".9rem" }}>
-            <div className="alert ok">
-              <Icon name="shield" />
-              <span>La verifica in due passaggi è attiva: all'accesso ti chiediamo anche il codice dell'app di autenticazione.</span>
-            </div>
-            <div className="form-grid">
-              <label className="field">
-                Password
-                <input type="password" autoComplete="current-password" value={disable.password} onChange={(e) => setDisable({ ...disable, password: e.target.value })} />
-              </label>
-              <label className="field">
-                Codice attuale
-                <input type="text" inputMode="numeric" autoComplete="one-time-code" value={disable.code} onChange={(e) => setDisable({ ...disable, code: e.target.value })} />
-              </label>
-            </div>
-            <div className="set-actions inline">
-              <button
-                className="btn danger"
-                disabled={!disable.password || !disable.code}
-                onClick={async () => {
-                  try {
-                    await post("/api/account/totp/disable", disable);
-                    setDisable({ password: "", code: "" });
-                    toast("2FA disattivata");
-                    me.reload();
-                  } catch (e) {
-                    toastError(e);
-                  }
-                }}
-              >
-                Disattiva 2FA
-              </button>
-            </div>
-          </div>
-        ) : totpSetup ? (
-          <div className="set-totp">
-            <div className="set-totp-qr" dangerouslySetInnerHTML={{ __html: totpSetup.qr_svg }} />
-            <div className="set-stack" style={{ gap: ".75rem" }}>
-              <ol className="set-steps-list">
-                <li>Inquadra il codice QR con la tua app di autenticazione.</li>
-                <li>
-                  Oppure inserisci il segreto a mano: <code className="set-secret">{totpSetup.secret}</code>
-                </li>
-                <li>Scrivi qui il codice a 6 cifre per confermare.</li>
-              </ol>
-              <form
-                className="set-totp-confirm"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  try {
-                    await post("/api/account/totp/enable", { code });
-                    setTotpSetup(null);
-                    setCode("");
-                    toast("2FA attivata");
-                    me.reload();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
+      {hasPassword && (
+        <SetCard title="Sicurezza · verifica in due passaggi (2FA)">
+          {me.data?.totp_enabled ? (
+            <div className="set-stack" style={{ gap: ".9rem" }}>
+              <div className="alert ok">
+                <Icon name="shield" />
+                <span>La verifica in due passaggi è attiva: all'accesso ti chiediamo anche il codice dell'app di autenticazione.</span>
+              </div>
+              <div className="form-grid">
                 <label className="field">
-                  Codice 2FA
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    className="mono"
-                    placeholder="123456"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                  />
+                  Password
+                  <input type="password" autoComplete="current-password" value={disable.password} onChange={(e) => setDisable({ ...disable, password: e.target.value })} />
                 </label>
-                <button className="btn primary" type="submit" disabled={!code.trim()}>
-                  Attiva
+                <label className="field">
+                  Codice attuale
+                  <input type="text" inputMode="numeric" autoComplete="one-time-code" value={disable.code} onChange={(e) => setDisable({ ...disable, code: e.target.value })} />
+                </label>
+              </div>
+              <div className="set-actions inline">
+                <button
+                  className="btn danger"
+                  disabled={!disable.password || !disable.code}
+                  onClick={async () => {
+                    try {
+                      await post("/api/account/totp/disable", disable);
+                      setDisable({ password: "", code: "" });
+                      toast("2FA disattivata");
+                      me.reload();
+                    } catch (e) {
+                      toastError(e);
+                    }
+                  }}
+                >
+                  Disattiva 2FA
                 </button>
-                <button className="btn ghost" type="button" onClick={() => setTotpSetup(null)}>
-                  Annulla
+              </div>
+            </div>
+          ) : totpSetup ? (
+            <div className="set-totp">
+              <div className="set-totp-qr" dangerouslySetInnerHTML={{ __html: totpSetup.qr_svg }} />
+              <div className="set-stack" style={{ gap: ".75rem" }}>
+                <ol className="set-steps-list">
+                  <li>Inquadra il codice QR con la tua app di autenticazione.</li>
+                  <li>
+                    Oppure inserisci il segreto a mano: <code className="set-secret">{totpSetup.secret}</code>
+                  </li>
+                  <li>Scrivi qui il codice a 6 cifre per confermare.</li>
+                </ol>
+                <form
+                  className="set-totp-confirm"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      await post("/api/account/totp/enable", { code });
+                      setTotpSetup(null);
+                      setCode("");
+                      toast("2FA attivata");
+                      me.reload();
+                    } catch (err) {
+                      toastError(err);
+                    }
+                  }}
+                >
+                  <label className="field">
+                    Codice 2FA
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      className="mono"
+                      placeholder="123456"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                    />
+                  </label>
+                  <button className="btn primary" type="submit" disabled={!code.trim()}>
+                    Attiva
+                  </button>
+                  <button className="btn ghost" type="button" onClick={() => setTotpSetup(null)}>
+                    Annulla
+                  </button>
+                </form>
+              </div>
+            </div>
+          ) : (
+            <div className="set-stack" style={{ gap: ".9rem" }}>
+              <p className="set-help" style={{ margin: 0 }}>
+                Aggiungi un codice temporaneo (TOTP) all'accesso, generato da un'app come Aegis, 2FAS o Google Authenticator.
+              </p>
+              <div className="set-actions inline">
+                <button
+                  className="btn primary"
+                  onClick={async () => {
+                    try {
+                      setTotpSetup(await post("/api/account/totp/setup"));
+                    } catch (e) {
+                      toastError(e);
+                    }
+                  }}
+                >
+                  <Icon name="lock" />
+                  Configura la 2FA
                 </button>
-              </form>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="set-stack" style={{ gap: ".9rem" }}>
-            <p className="set-help" style={{ margin: 0 }}>
-              Aggiungi un codice temporaneo (TOTP) all'accesso, generato da un'app come Aegis, 2FAS o Google Authenticator.
-            </p>
-            <div className="set-actions inline">
-              <button
-                className="btn primary"
-                onClick={async () => {
-                  try {
-                    setTotpSetup(await post("/api/account/totp/setup"));
-                  } catch (e) {
-                    toastError(e);
-                  }
-                }}
-              >
-                <Icon name="lock" />
-                Configura la 2FA
-              </button>
-            </div>
-          </div>
-        )}
-      </SetCard>
+          )}
+        </SetCard>
+      )}
 
       <SetCard
         title={`Sessioni attive · ${sessionList.length}`}

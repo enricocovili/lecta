@@ -263,3 +263,18 @@ async def test_a_viewer_reads(app, viewer, editor):
             assert res.status_code != 403, f"GET {url} -> 403"
     assert (await viewer.get("/api/courses")).status_code == 200
     assert (await viewer.get("/api/account/passkeys")).status_code == 200
+
+
+async def test_me_says_the_role(app, anon, viewer, editor, admin):
+    """`/api/auth/me` tells the UI who is signed in, with which role, and whether they have a password (decision 124)."""
+    from app.db import SessionLocal
+    from app.security.auth import user_by_username
+
+    for client, username, role in ((viewer, "viewer", "viewer"), (editor, "editor", "editor"), (admin, None, "admin")):
+        me = (await client.get("/api/auth/me")).json()
+        async with SessionLocal() as db:
+            user = await user_by_username(db, username or me["username"])
+        assert user is not None
+        assert me["authenticated"] and me["role"] == role and me["user_id"] == user.id and me["has_password"] is True, me
+    me = (await anon.get("/api/auth/me")).json()
+    assert me["authenticated"] is False and "role" not in me and "user_id" not in me

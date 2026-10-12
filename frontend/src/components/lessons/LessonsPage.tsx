@@ -1,6 +1,7 @@
 // The list of lessons, and the dialog that starts a new one (a subject, a title and, if there are any, the slides).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { del, fmtDay, fmtSize, get, post, uploadRaw } from "../../lib/api";
+import { canCreate, type Role } from "../../lib/roles";
 import { Icon } from "../icons";
 import type { TreeCourse } from "../types";
 import { Confirm, Empty, Loading, Modal, Progress, toastError } from "../ui";
@@ -16,7 +17,7 @@ interface Row {
 }
 
 
-export default function LessonsPage() {
+export default function LessonsPage({ role }: { role?: Role }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [courses, setCourses] = useState<TreeCourse[]>([]);
   const [filter, setFilter] = useState("");
@@ -35,7 +36,7 @@ export default function LessonsPage() {
     get<TreeCourse[]>("/api/tree").then(setCourses).catch(() => undefined);
     const p = new URLSearchParams(location.search);
     if (p.get("course")) setFilter(p.get("course")!);
-    if (p.get("new")) setCreating(true);
+    if (canCreate(role) && p.get("new")) setCreating(true);
   }, []);
 
   const shown = useMemo(() => (rows ?? []).filter((r) => !filter || String(r.course_id) === filter), [rows, filter]);
@@ -54,10 +55,12 @@ export default function LessonsPage() {
             ))}
           </select>
         </label>
-        <button className="btn primary" onClick={() => setCreating(true)} data-testid="new-lesson">
-          <Icon name="plus" />
-          Nuova lezione
-        </button>
+        {canCreate(role) && (
+          <button className="btn primary" onClick={() => setCreating(true)} data-testid="new-lesson">
+            <Icon name="plus" />
+            Nuova lezione
+          </button>
+        )}
       </div>
 
       {rows === null ? (
@@ -90,7 +93,7 @@ export default function LessonsPage() {
         </div>
       )}
 
-      {creating && <NewLesson courses={courses} initialCourse={filter} onClose={() => setCreating(false)} />}
+      {creating && <NewLesson courses={courses.filter((c) => c.can_write)} initialCourse={filter} onClose={() => setCreating(false)} />}
       {toDelete && (
         <Confirm
           title="Elimina la lezione"

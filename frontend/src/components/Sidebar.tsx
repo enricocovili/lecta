@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { get } from "../lib/api";
+import { canCreate, type Role } from "../lib/roles";
 import { Icon } from "./icons";
 import { COURSE_LABEL, COURSE_TONE } from "./pagekit";
 import type { TreeCourse } from "./types";
@@ -19,7 +20,7 @@ function NavItem({ href, icon, label, active, count, hot }: { href: string; icon
   );
 }
 
-export default function Sidebar({ currentPath }: { currentPath: string }) {
+export default function Sidebar({ currentPath, role }: { currentPath: string; role?: Role }) {
   const [tree, setTree] = useState<TreeCourse[] | null>(null);
   const [counts, setCounts] = useState<Counts | null>(null);
 
@@ -63,10 +64,12 @@ export default function Sidebar({ currentPath }: { currentPath: string }) {
       </div>
 
       <div className="nav-group-title">
-        <span>Le tue materie</span>
-        <a href="/admin/courses?new=1" title="Nuova materia" aria-label="Nuova materia">
-          <Icon name="plus" />
-        </a>
+        <span>{canCreate(role) ? "Le tue materie" : "Materie"}</span>
+        {canCreate(role) && (
+          <a href="/admin/courses?new=1" title="Nuova materia" aria-label="Nuova materia">
+            <Icon name="plus" />
+          </a>
+        )}
       </div>
       <div className="tree">
         {tree === null ? (
@@ -76,7 +79,7 @@ export default function Sidebar({ currentPath }: { currentPath: string }) {
           </div>
         ) : tree.length === 0 ? (
           <div className="small muted" style={{ padding: "0 .75rem" }}>
-            Nessuna materia. <a href="/admin/courses?new=1">Creane una</a>.
+            Nessuna materia.{canCreate(role) && <> <a href="/admin/courses?new=1">Creane una</a>.</>}
           </div>
         ) : (
           tree.map((c) => (

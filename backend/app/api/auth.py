@@ -123,6 +123,8 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
 
 @router.get("/auth/me")
 async def me(request: Request, response: Response, db: AsyncSession = Depends(get_db)) -> dict:
+    """Who is signed in. The frontend picks pages and menus by `role`, and shows password and 2FA only to users who
+    have a password (decision 124); the backend checks every route by itself."""
     ctx = await auth.load_session(request, db)
     needs_setup = not await auth.admin_exists(db)
     if ctx is None:
@@ -130,6 +132,9 @@ async def me(request: Request, response: Response, db: AsyncSession = Depends(ge
     return {
         "authenticated": True,
         "username": ctx.user.username,
+        "user_id": ctx.user.id,
+        "role": ctx.user.role,
+        "has_password": ctx.user.password_hash is not None,
         "csrf": ctx.session.csrf_token,
         "totp_enabled": ctx.user.totp_enabled,
         "needs_setup": False,

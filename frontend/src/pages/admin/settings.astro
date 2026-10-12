@@ -1,7 +1,8 @@
 ---
 import Admin from "../../layouts/Admin.astro";
 import SettingsPage from "../../components/SettingsPage";
+const me = Astro.locals.auth;
 ---
 <Admin title="Impostazioni">
-  <SettingsPage client:load />
+  <SettingsPage client:load role={me.role} hasPassword={me.has_password ?? true} />
 </Admin>

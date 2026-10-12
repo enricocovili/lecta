@@ -1,10 +1,20 @@
 // Page-level access control. The backend enforces the real boundary for data;
 // this makes private *pages* indistinguishable from unknown ones for anonymous
-// visitors (they get the generic 404 page).
+// visitors (they get the generic 404 page), and admin pages for everyone else.
+import type { APIContext } from "astro";
 import { defineMiddleware } from "astro:middleware";
+import type { Me } from "./lib/roles";
 import { backendGet } from "./lib/server";
 
-type Me = { authenticated: boolean; username?: string; csrf?: string; needs_setup?: boolean };
+// Pages only admins may use (decision 124). The admin-only settings sections (providers, models, prompts, AI and
+// costs, LaTeX, index, site, users…) are tabs of /admin/settings behind a URL hash the server never sees: the page
+// leaves them out for the other roles.
+const ADMIN_ONLY = ["/admin/audit"];
+
+const notFound = async (context: APIContext) => {
+  const res = await context.rewrite("/404");
+  return new Response(res.body, { status: 404, headers: res.headers });
+};
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const path = context.url.pathname;
@@ -19,10 +29,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.auth = me;
 
   if (path === "/admin" || path.startsWith("/admin/")) {
-    if (!me.authenticated) {
-      const res = await context.rewrite("/404");
-      return new Response(res.body, { status: 404, headers: res.headers });
-    }
+    const adminOnly = ADMIN_ONLY.some((p) => path === p || path.startsWith(p + "/"));
+    if (!me.authenticated || (adminOnly && me.role !== "admin")) return notFound(context);
     const res = await next();
     res.headers.set("cache-control", "no-store");
     return res;
