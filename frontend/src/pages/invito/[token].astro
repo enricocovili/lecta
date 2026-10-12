@@ -1,7 +1,8 @@
 ---
-// An invite link: whoever opens it picks a username and makes a passkey, and the account exists (decision 121). It works
-// signed out; an unknown, used, revoked or expired link is the generic 404, like any address that doesn't exist. The
-// secret is in the address: noindex (Base), same-origin referrer, never cached.
+// An invite link: whoever opens it picks a username and makes a passkey, and the account exists (decision 121); a recovery
+// link adds a new passkey to the user it was made for (decision 123). It works signed out; an unknown, used, revoked or
+// expired link is the generic 404, like any address that doesn't exist. The secret is in the address: noindex (Base),
+// same-origin referrer, never cached.
 import Base from "../../layouts/Base.astro";
 import { InviteForm, type InviteInfo } from "../../components/AuthForms";
 import { BrandMark, Icon } from "../../components/icons";
@@ -12,7 +13,7 @@ if (!r.data) return Astro.rewrite("/404");
 Astro.response.headers.set("cache-control", "no-store");
 const me = Astro.locals.auth;
 ---
-<Base title="Invito · Lecta">
+<Base title={r.data.recovery ? "Recupero dell'accesso · Lecta" : "Invito · Lecta"}>
   <main class="auth-page">
     <div class="auth-top">
       <a class="brand" href="/"><BrandMark />Lecta</a>

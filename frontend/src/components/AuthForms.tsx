@@ -239,9 +239,13 @@ export interface InviteInfo {
   role: Role;
   note: string | null;
   expires_at: string;
+  /** A recovery link: a new passkey for the existing user `username`, who lost theirs. */
+  recovery: boolean;
+  username: string | null;
 }
 
-/** The page of an invite link: pick a username, make a passkey, and the account exists (and is signed in). */
+/** The page of an invite link: pick a username, make a passkey, and the account exists (and is signed in). A recovery
+ * link asks no username: the passkey is added to its user, who is signed in. */
 export function InviteForm({ token, invite, signedInAs }: { token: string; invite: InviteInfo; signedInAs?: string }) {
   const [username, setUsername] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -255,16 +259,54 @@ export function InviteForm({ token, invite, signedInAs }: { token: string; invit
     setBusy(true);
     setError(null);
     try {
-      await acceptInvite(token, username);
+      await acceptInvite(token, invite.recovery ? undefined : username);
       location.href = "/admin";
     } catch (err) {
       // The link was used, revoked or expired while the page was open.
-      setError(err instanceof ApiError && err.status === 404 ? "Questo invito non è più valido: chiedine uno nuovo a chi te l'ha mandato." : passkeyError(err));
+      const gone = invite.recovery ? "Questo link non è più valido: chiedine uno nuovo all'amministratore." : "Questo invito non è più valido: chiedine uno nuovo a chi te l'ha mandato.";
+      setError(err instanceof ApiError && err.status === 404 ? gone : passkeyError(err));
       setBusy(false);
     }
   };
 
   const expires = new Date(invite.expires_at).toLocaleDateString("it-IT", { day: "numeric", month: "long" });
+  const unsupported = (
+    <div className="alert warn">
+      <Icon name="alert-circle" />
+      <span>Questo browser non supporta le passkey: apri il link con un browser recente (Chrome, Safari, Firefox, Edge).</span>
+    </div>
+  );
+  if (invite.recovery)
+    return (
+      <form className="card auth-card" onSubmit={submit} data-testid="invite-form">
+        <h1 className="auth-title">Recupera l'accesso</h1>
+        <p className="auth-sub">
+          Recupera l'accesso come <strong data-testid="invite-username">{invite.username}</strong>: crea una nuova passkey per il tuo account.
+        </p>
+        {signedInAs && signedInAs !== invite.username && (
+          <div className="alert warn">
+            <Icon name="alert-circle" />
+            <span>
+              Hai già effettuato l'accesso come <strong>{signedInAs}</strong>: continuando entrerai come {invite.username}.
+            </span>
+          </div>
+        )}
+        <FormError error={error} />
+        {canPasskey ? (
+          <>
+            <button className="btn primary lg auth-submit" disabled={busy} type="submit" data-testid="invite-accept">
+              <Icon name="key" />
+              {busy ? "Creazione in corso…" : "Crea una nuova passkey"}
+            </button>
+            <p className="auth-foot">
+              Le passkey che hai già restano valide; gli altri dispositivi su cui eri entrato escono. Il link vale fino al {expires} e si usa una volta sola.
+            </p>
+          </>
+        ) : (
+          unsupported
+        )}
+      </form>
+    );
   return (
     <form className="card auth-card" onSubmit={submit} data-testid="invite-form">
       <h1 className="auth-title">Sei invitato</h1>
@@ -313,10 +355,7 @@ export function InviteForm({ token, invite, signedInAs }: { token: string; invit
           </p>
         </>
       ) : (
-        <div className="alert warn">
-          <Icon name="alert-circle" />
-          <span>Questo browser non supporta le passkey: apri il link con un browser recente (Chrome, Safari, Firefox, Edge).</span>
-        </div>
+        unsupported
       )}
     </form>
   );

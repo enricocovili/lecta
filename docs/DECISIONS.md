@@ -672,3 +672,15 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      another active admin remains (disabling signs them out), but **never delete their own account**: someone else does
      it, so a slip can't remove the account that is acting. *Alternatives:* a row lock on the admins (doesn't see a
      user becoming admin at the same time); allowing self-delete (an irreversible click on oneself for no real need).
+123. **A recovery link gives a new passkey to a user who lost theirs, and signs out their other browsers (#79).** An
+     admin makes it from «Utenti» (`POST /api/users/{id}/recovery`): an invite row bound to the user (`user_id`, their
+     role), shown once, seven days, single use; a new one replaces the user's earlier pending link, and it is listed
+     among the pending invites as «Recupero di <username>» and revoked the same way. A disabled user gets none (409),
+     and disabling drops the pending one. The same public routes serve it: `GET /api/invite/{token}` says `recovery`
+     and the username, the ceremony asks no username (the user's own handle, their remaining passkeys excluded), and
+     accepting consumes the link like an invite, then, under a lock on the user, checks they still exist and are
+     enabled (otherwise 404, the link stays unused), adds the passkey, **deletes all the user's sessions** and signs this
+     browser in. Signing out the others is the point: the lost device may still hold a session, and whoever asked for
+     the link can't use it to remove it. The user's other passkeys and password stay (the admin or the user removes a
+     lost passkey from the settings). *Alternatives:* replacing all the user's passkeys (would also drop a working
+     password manager one); keeping the other sessions (a stolen phone would stay signed in).

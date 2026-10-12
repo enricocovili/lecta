@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { del, fmtDate, get, patch, post } from "../../lib/api";
 import { ROLE_HINT, ROLE_LABEL, type Role } from "../../lib/roles";
 import { Icon } from "../icons";
@@ -23,19 +23,52 @@ interface InviteRow {
   role: Role;
   note: string | null;
   user_id: number | null;
+  recovery: boolean;
+  username: string | null;
   created_at: string;
   expires_at: string;
 }
 
 const ROLES = Object.keys(ROLE_LABEL) as Role[];
 
-/** Settings → Utenti (admins): invite links, the users with their role, disabling, signing out and deleting. */
+/** A link shown this once (only its hash is kept), with a copy button. */
+function OneTimeLink({ url, label, children, onDone, testid }: { url: string; label: string; children: ReactNode; onDone: () => void; testid: string }) {
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("Link copiato");
+    } catch {
+      toast("Seleziona il link e copialo a mano", "error");
+    }
+  };
+  return (
+    <div className="set-stack" style={{ gap: ".6rem" }} data-testid={`${testid}-link`}>
+      <div className="alert warn small">
+        <Icon name="alert-triangle" />
+        <span>{children}</span>
+      </div>
+      <div className="row nowrap les-share-link">
+        <input type="text" readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label={label} data-testid={`${testid}-url`} />
+        <button className="btn sm" type="button" onClick={copy}>
+          <Icon name="copy" />
+          Copia
+        </button>
+        <button className="btn sm ghost" type="button" onClick={onDone}>
+          Fatto
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Settings → Utenti (admins): invite links, the users with their role, recovery links, disabling, signing out and deleting. */
 export default function UsersSettings() {
   const users = useApi(() => get<UserRow[]>("/api/users"));
   const invites = useApi(() => get<InviteRow[]>("/api/invites"));
   const [form, setForm] = useState<{ role: Role; note: string }>({ role: "editor", note: "" });
   const [creating, setCreating] = useState(false);
   const [link, setLink] = useState<{ url: string; role: Role; note: string | null } | null>(null);
+  const [recovery, setRecovery] = useState<{ userId: number; url: string } | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<UserRow | null>(null);
   const [disabling, setDisabling] = useState<UserRow | null>(null);
@@ -53,15 +86,6 @@ export default function UsersSettings() {
       toastError(e);
     } finally {
       setCreating(false);
-    }
-  };
-  const copy = async () => {
-    if (!link) return;
-    try {
-      await navigator.clipboard.writeText(link.url);
-      toast("Link copiato");
-    } catch {
-      toast("Seleziona il link e copialo a mano", "error");
     }
   };
   const revoke = async (inv: InviteRow) => {
@@ -86,6 +110,14 @@ export default function UsersSettings() {
       setBusy(null);
     }
   };
+
+  /** A recovery link for a user who lost their passkey, shown once under their row. */
+  const createRecovery = (u: UserRow) =>
+    act(u, async () => {
+      const inv = await post<InviteRow & { path: string }>(`/api/users/${u.id}/recovery`);
+      setRecovery({ userId: u.id, url: location.origin + inv.path });
+      invites.reload();
+    }, `Link di recupero per ${u.username} creato`);
 
   return (
     <div className="set-stack">
@@ -120,24 +152,9 @@ export default function UsersSettings() {
             </label>
           </div>
           {link && (
-            <div className="set-stack" style={{ gap: ".6rem" }} data-testid="invite-link">
-              <div className="alert warn small">
-                <Icon name="alert-triangle" />
-                <span>
-                  Copia il link ora e mandalo a chi deve entrare{link.note ? ` (${link.note})` : ""} come {ROLE_LABEL[link.role].toLowerCase()}: non lo mostreremo più.
-                </span>
-              </div>
-              <div className="row nowrap les-share-link">
-                <input type="text" readOnly value={link.url} onFocus={(e) => e.currentTarget.select()} aria-label="Link d'invito" data-testid="invite-url" />
-                <button className="btn sm" type="button" onClick={copy}>
-                  <Icon name="copy" />
-                  Copia
-                </button>
-                <button className="btn sm ghost" type="button" onClick={() => setLink(null)}>
-                  Fatto
-                </button>
-              </div>
-            </div>
+            <OneTimeLink url={link.url} label="Link d'invito" onDone={() => setLink(null)} testid="invite">
+              Copia il link ora e mandalo a chi deve entrare{link.note ? ` (${link.note})` : ""} come {ROLE_LABEL[link.role].toLowerCase()}: non lo mostreremo più.
+            </OneTimeLink>
           )}
         </div>
       </SetCard>
@@ -150,12 +167,21 @@ export default function UsersSettings() {
             {inviteList.map((inv) => (
               <div key={inv.id} className="set-session" data-testid="invite-row">
                 <span className="set-session-ico">
-                  <Icon name="link" />
+                  <Icon name={inv.recovery ? "key" : "link"} />
                 </span>
                 <div className="grow" style={{ minWidth: 0 }}>
                   <div className="set-session-title">
-                    <strong>{inv.note || "Invito senza nota"}</strong>
-                    <span className="badge">{ROLE_LABEL[inv.role]}</span>
+                    {inv.recovery ? (
+                      <>
+                        <strong>Recupero di {inv.username}</strong>
+                        <span className="badge accent">link di recupero</span>
+                      </>
+                    ) : (
+                      <>
+                        <strong>{inv.note || "Invito senza nota"}</strong>
+                        <span className="badge">{ROLE_LABEL[inv.role]}</span>
+                      </>
+                    )}
                   </div>
                   <div className="small muted">
                     creato il {fmtDate(inv.created_at, true)} · scade il {fmtDate(inv.expires_at, true)}
@@ -228,6 +254,17 @@ export default function UsersSettings() {
                   <span className="hide-mobile">Esci ovunque</span>
                 </button>
                 <button
+                  className="btn sm ghost"
+                  type="button"
+                  disabled={busy === u.id || !!u.disabled_at}
+                  title="Un link per creare una nuova passkey, se ha perso la sua"
+                  onClick={() => createRecovery(u)}
+                  data-testid="user-recovery"
+                >
+                  <Icon name="key" />
+                  <span className="hide-mobile">Link di recupero</span>
+                </button>
+                <button
                   className="btn sm ghost icon"
                   type="button"
                   disabled={busy === u.id || u.courses > 0 || u.you}
@@ -239,6 +276,14 @@ export default function UsersSettings() {
                   <Icon name="trash" />
                 </button>
               </div>
+              {recovery?.userId === u.id && (
+                <div className="set-user-link">
+                  <OneTimeLink url={recovery.url} label={`Link di recupero di ${u.username}`} onDone={() => setRecovery(null)} testid="recovery">
+                    Manda il link a {u.username}: aprendolo crea una nuova passkey per il suo account ed esce dagli altri dispositivi. Vale sette giorni e una volta
+                    sola; non lo mostreremo più.
+                  </OneTimeLink>
+                </div>
+              )}
             </div>
           ))}
         </div>

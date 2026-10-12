@@ -14,7 +14,7 @@ from app.models import Invite, Passkey, User
 from app.security.auth import login_global_limiter, login_limiter
 
 from .conftest import make_client
-from .test_passkeys import HEADERS, Authenticator, sign_in
+from .test_passkeys import HEADERS, Authenticator, b64u, sign_in
 
 
 @pytest.fixture(autouse=True)
@@ -229,4 +229,130 @@ async def test_a_passkey_only_user_keeps_their_last_passkey(app, admin):
     added = (await c.post("/api/account/passkeys", headers=HEADERS, json={"state": start["state"], "credential": key.create(start["options"])})).json()
     assert (await c.delete(f"/api/account/passkeys/{only['id']}")).status_code == 200
     assert (await c.delete(f"/api/account/passkeys/{added['id']}")).status_code == 409
+    await c.aclose()
+
+
+# --------------------------------------------------------------------------- recovery links
+
+
+async def invited(app, admin, username: str):
+    """A passkey-only user made through an invite: (their signed-in client, their passkey, their id)."""
+    c, key = await browser(app), Authenticator()
+    assert (await accept(c, (await invite(admin))["token"], username, key)).status_code == 200
+    c.csrf = (await c.get("/api/auth/me")).json()["csrf"]
+    return c, key, (await user(username)).id
+
+
+async def recover(c, token: str, key: Authenticator, **extra):
+    start = await c.post(f"/api/invite/{token}/options", headers=HEADERS, json={})
+    assert start.status_code == 200, start.text
+    body = start.json()
+    return await c.post(f"/api/invite/{token}/accept", headers=HEADERS, json={"state": body["state"], "credential": key.create(body["options"]), **extra})
+
+
+async def test_a_recovery_link_adds_a_passkey_to_its_user_and_signs_out_the_others(app, admin, anon):
+    old, lost, uid = await invited(app, admin, "inv-lost")
+    link = (await admin.post(f"/api/users/{uid}/recovery"))
+    assert link.status_code == 201, link.text
+    rec = link.json()
+    assert rec["recovery"] is True and rec["username"] == "inv-lost" and rec["role"] == "editor" and rec["path"] == f"/invito/{rec['token']}"
+    listed = (await admin.get("/api/invites")).json()
+    assert [(i["id"], i["recovery"], i["username"]) for i in listed] == [(rec["id"], True, "inv-lost")] and "token" not in listed[0]
+
+    info = (await anon.get(f"/api/invite/{rec['token']}")).json()
+    assert info["recovery"] is True and info["username"] == "inv-lost" and info["role"] == "editor"
+
+    # No username is asked: the ceremony is for that user, and leaves out the passkeys they still have.
+    c = await browser(app)
+    start = await c.post(f"/api/invite/{rec['token']}/options", headers=HEADERS, json={"username": "inv-other"})
+    opts = start.json()["options"]
+    assert opts["user"]["name"] == "inv-lost" and [x["id"] for x in opts["excludeCredentials"]] == [b64u(lost.cred_id)]
+    new = Authenticator()
+    r = await c.post(f"/api/invite/{rec['token']}/accept", headers=HEADERS,
+                     json={"state": start.json()["state"], "credential": new.create(opts), "name": "Telefono nuovo"})
+    assert r.status_code == 200 and r.json() == {"ok": True, "username": "inv-lost"}, r.text
+
+    # Signed in as that user, who now has both passkeys; no account was made, and the old browser is signed out.
+    me = (await c.get("/api/auth/me")).json()
+    assert me["authenticated"] and me["username"] == "inv-lost"
+    c.csrf = me["csrf"]
+    assert [p["name"] for p in (await c.get("/api/account/passkeys")).json()][1:] == ["Telefono nuovo"]
+    assert (await user("inv-other")) is None and (await user("inv-lost")).role == "editor"
+    assert (await old.get("/api/auth/me")).json()["authenticated"] is False
+    async with SessionLocal() as db:
+        row = await db.get(Invite, rec["id"])
+        assert row is not None and row.used_at is not None and row.used_by == uid
+
+    # Used: gone from the list, dead link; the new passkey signs in.
+    assert (await admin.get("/api/invites")).json() == []
+    assert (await anon.get(f"/api/invite/{rec['token']}")).status_code == 404
+    assert (await c.post(f"/api/invite/{rec['token']}/options", headers=HEADERS, json={})).status_code == 404
+    c2, r2 = await sign_in(app, new)
+    assert r2.status_code == 200 and r2.json()["username"] == "inv-lost"
+    for client in (old, c, c2):
+        await client.aclose()
+
+
+async def test_a_recovery_link_works_once_and_a_new_one_replaces_it(app, admin):
+    old, _, uid = await invited(app, admin, "inv-twice")
+    await old.aclose()
+    first = (await admin.post(f"/api/users/{uid}/recovery")).json()
+    rec = (await admin.post(f"/api/users/{uid}/recovery")).json()
+    assert [i["id"] for i in (await admin.get("/api/invites")).json()] == [rec["id"]]
+    c = await browser(app)
+    assert (await c.get(f"/api/invite/{first['token']}")).status_code == 404
+    a = (await c.post(f"/api/invite/{rec['token']}/options", headers=HEADERS, json={})).json()
+    b = (await c.post(f"/api/invite/{rec['token']}/options", headers=HEADERS, json={})).json()
+    assert (await c.post(f"/api/invite/{rec['token']}/accept", headers=HEADERS, json={"state": a["state"], "credential": Authenticator().create(a["options"])})).status_code == 200
+    r = await c.post(f"/api/invite/{rec['token']}/accept", headers=HEADERS, json={"state": b["state"], "credential": Authenticator().create(b["options"])})
+    assert r.status_code == 404
+    async with SessionLocal() as db:
+        assert len((await db.execute(select(Passkey.id).where(Passkey.user_id == uid))).all()) == 2
+    await c.aclose()
+
+
+async def test_no_recovery_for_a_disabled_or_missing_user(app, admin, anon):
+    old, _, uid = await invited(app, admin, "inv-off")
+    await old.aclose()
+    assert (await admin.post("/api/users/999999/recovery")).status_code == 404
+    # Disabling drops the pending link; a disabled user gets none.
+    assert (await admin.post(f"/api/users/{uid}/recovery")).status_code == 201
+    assert (await admin.post(f"/api/users/{uid}/disable")).status_code == 200
+    assert (await admin.get("/api/invites")).json() == []
+    assert (await admin.post(f"/api/users/{uid}/recovery")).status_code == 409
+    assert (await admin.post(f"/api/users/{uid}/enable")).status_code == 200
+
+    # Disabled after the ceremony started: the accept is a 404 and the link isn't used up.
+    rec = (await admin.post(f"/api/users/{uid}/recovery")).json()
+    c = await browser(app)
+    start = (await c.post(f"/api/invite/{rec['token']}/options", headers=HEADERS, json={})).json()
+    async with SessionLocal() as db:
+        await db.execute(update(User).where(User.id == uid).values(disabled_at=datetime.now(UTC)))
+        await db.commit()
+    r = await c.post(f"/api/invite/{rec['token']}/accept", headers=HEADERS, json={"state": start["state"], "credential": Authenticator().create(start["options"])})
+    assert r.status_code == 404
+    assert (await anon.get(f"/api/invite/{rec['token']}")).status_code == 404
+    assert (await c.post(f"/api/invite/{rec['token']}/options", headers=HEADERS, json={})).status_code == 404
+    async with SessionLocal() as db:
+        assert (await db.get(Invite, rec["id"])).used_at is None
+        assert len((await db.execute(select(Passkey.id).where(Passkey.user_id == uid))).all()) == 1
+        await db.execute(update(User).where(User.id == uid).values(disabled_at=None))
+        await db.commit()
+    assert (await recover(c, rec["token"], Authenticator())).status_code == 200
+    await c.aclose()
+
+
+async def test_a_recovery_link_can_be_revoked_and_only_admins_make_them(app, admin, editor, viewer, anon):
+    old, _, uid = await invited(app, admin, "inv-rev")
+    await old.aclose()
+    rec = (await admin.post(f"/api/users/{uid}/recovery")).json()
+    assert (await admin.delete(f"/api/invites/{rec['id']}")).status_code == 200
+    assert (await admin.get("/api/invites")).json() == []
+    assert (await anon.get(f"/api/invite/{rec['token']}")).status_code == 404
+    for c in (editor, viewer):
+        assert (await c.post(f"/api/users/{uid}/recovery")).status_code == 403
+    assert (await anon.post(f"/api/users/{uid}/recovery")).status_code == 404
+    # A plain invite still needs a username.
+    c = await browser(app)
+    assert (await c.post(f"/api/invite/{(await invite(admin))['token']}/options", headers=HEADERS, json={})).status_code == 422
     await c.aclose()

@@ -657,6 +657,9 @@
   gap: 0.4rem;
   flex-wrap: wrap;
 }
+.set-user-link {
+  flex-basis: 100%;
+}
 .set-user-actions select {
   width: auto;
   height: 32px;

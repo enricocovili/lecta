@@ -167,6 +167,7 @@ ADMIN = """
     POST   /api/users/{user_id}/disable
     POST   /api/users/{user_id}/enable
     POST   /api/users/{user_id}/logout
+    POST   /api/users/{user_id}/recovery
     DELETE /api/users/{user_id}
 """
 

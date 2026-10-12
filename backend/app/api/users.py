@@ -1,6 +1,6 @@
 """The users, for the admins: list, change role, disable and re-enable, sign out everywhere, delete.
 
-Users are disabled rather than deleted (they can't sign in, their sessions go, their content stays); deleting is allowed
+Users are disabled rather than deleted (they can't sign in, their sessions and pending recovery link go, their content stays); deleting is allowed
 only for a user who owns no courses (their conversations go with them, their jobs and invites forget them). The last
 active admin can't be demoted, disabled or deleted: the check runs under a transaction-level advisory lock, so two
 admins demoting each other at the same moment can't both pass. An admin may demote or disable themselves when another
@@ -18,7 +18,7 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..models import Course, Passkey, Session, User
+from ..models import Course, Invite, Passkey, Session, User
 from ..security import auth
 from ..security.auth import AuthContext, require_admin
 
@@ -100,6 +100,7 @@ async def disable_user(user_id: int, ctx: AuthContext = Depends(require_admin), 
     if user.disabled_at is None:
         user.disabled_at = datetime.now(UTC)
     await db.execute(delete(Session).where(Session.user_id == user.id))
+    await db.execute(delete(Invite).where(Invite.user_id == user.id, Invite.used_at.is_(None)))  # and their pending recovery link
     return await _done(db, ctx, user.id)
 
 

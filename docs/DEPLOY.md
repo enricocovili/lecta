@@ -92,3 +92,7 @@ docker compose exec backend python -m app.cli logout-all       # everybody's ses
 
 They act on the only admin; with several admins, or for another account, add `--user NAME` (`logout-all --user NAME`
 signs out only that user).
+
+A user who lost their passkey (invited users have no password) doesn't need the shell: an admin opens Settings →
+Utenti and clicks «Link di recupero» on their row. The link (shown once, seven days, single use) lets them create a new
+passkey for the same account, and signs out their other browsers.

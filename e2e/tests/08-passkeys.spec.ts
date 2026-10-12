@@ -106,6 +106,35 @@ test.describe("Passkey", () => {
     expect(await guest.evaluate(async () => (await (await fetch("/api/auth/me")).json()).authenticated)).toBe(false);
     await row.getByTestId("user-enable").click();
     await expect(row).not.toContainText("disattivato");
+
+    // The colleague signs in again with the passkey, then loses the device: the admin makes a recovery link.
+    await guest.goto("/login");
+    await guest.getByTestId("passkey-login").click();
+    await guest.waitForURL("**/admin", { timeout: 20_000 });
+    await row.getByTestId("user-recovery").click();
+    await expect(row.getByTestId("recovery-link")).toContainText("non lo mostreremo più");
+    const recovery = new URL(await row.getByTestId("recovery-url").inputValue()).pathname;
+    await expect(page.getByTestId("invite-row")).toContainText("Recupero di collega");
+
+    // A new browser with a new authenticator: no username asked, the new passkey signs in as the colleague.
+    const fresh = await browser.newContext({ baseURL });
+    const device = await fresh.newPage();
+    const con2 = watchConsole(device);
+    await virtualAuthenticator(fresh, device);
+    await device.goto(recovery);
+    await expect(device.getByTestId("invite-form")).toContainText("Recupera l'accesso come collega");
+    await expect(device.getByLabel("Nome utente")).toHaveCount(0);
+    await device.getByRole("button", { name: "Crea una nuova passkey" }).click();
+    await device.waitForURL("**/admin", { timeout: 20_000 });
+    expect(await device.evaluate(async () => (await (await fetch("/api/auth/me")).json()).username)).toBe("collega");
+    // The lost device is signed out, the link is used up and gone from the pending list.
+    expect(await guest.evaluate(async () => (await (await fetch("/api/auth/me")).json()).authenticated)).toBe(false);
+    expect((await device.goto(recovery))?.status()).toBe(404);
+    con2.assertClean([/status of 404/]);
+    await page.reload();
+    await expect(page.getByTestId("user-row").filter({ hasText: "collega" })).toContainText("2 passkey");
+    await expect(page.getByTestId("invite-row")).toHaveCount(0);
+    await fresh.close();
     await other.close();
   });
 });

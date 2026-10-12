@@ -64,7 +64,9 @@ reasoning behind every change since.
   fallback. They need HTTPS (or localhost); the site's host is the relying party. **Invites**: there are no sign-ups;
   an admin creates a single-use link with a role (`/api/invites`, shown once, seven days), and whoever opens it
   (`/invito/<token>`, public; a used or expired link is the generic 404) picks a username and creates a passkey: the
-  account has no password and can't remove its last passkey. **Users** (Settings → Utenti, `/api/users`, admins):
+  account has no password and can't remove its last passkey. A **recovery link** (made from «Utenti» for a user who
+  lost their passkey) is the same kind of link bound to that user: it adds a passkey to them and signs out their other
+  sessions. **Users** (Settings → Utenti, `/api/users`, admins):
   change role, disable (drops the sessions), sign out everywhere, delete only without courses; the last active admin
   can't be demoted, disabled or deleted (checked under an advisory lock). `DECISIONS.md` has the details.
 * **Model input and output**: uploaded content (including file and folder names) is wrapped in per-request random
