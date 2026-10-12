@@ -649,3 +649,14 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      sign-ins, so tokens can't be guessed. A user without a password can't remove their last passkey (409), nor set up
      TOTP. *Alternatives:* consuming the link when the ceremony starts (a cancelled passkey prompt would waste it); a
      password for invited users too (one more secret to leak, and the passkey is already two factors).
+121. **The invite page `/invito/<token>` is a sign-in page, and a bad link is just a 404 (#77).** The page asks the
+     backend about the token while rendering: an unknown, used, revoked or expired link renders the generic 404 page,
+     exactly like an address that doesn't exist, so the page never tells whether a token ever existed. A good one shows
+     the role and the admin's note, asks for a username (the setup's pattern) and «Crea la passkey» runs the ceremony
+     and lands in `/admin`, signed in; a taken username or a cancelled passkey prompt is said on the page and the link
+     stays usable. The page works signed out; opened by someone already signed in, it says so and accepting signs in
+     the new account instead (the link may be meant for someone else's browser, but refusing would only make the person
+     sign out first). It is never cached and kept out of search engines. The roles are called **Lettore** (viewer),
+     **Autore** (editor) and **Amministratore** (admin) everywhere in the UI (`frontend/src/lib/roles.ts`).
+     *Alternatives:* a page explaining that the link expired or was used (tells a guesser which tokens were real);
+     «Editor» for the middle role (an English word, and it reads like the editing tool rather than a person).

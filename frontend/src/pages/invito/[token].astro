@@ -1,0 +1,27 @@
+---
+// An invite link: whoever opens it picks a username and makes a passkey, and the account exists (decision 121). It works
+// signed out; an unknown, used, revoked or expired link is the generic 404, like any address that doesn't exist. The
+// secret is in the address: noindex (Base), same-origin referrer, never cached.
+import Base from "../../layouts/Base.astro";
+import { InviteForm, type InviteInfo } from "../../components/AuthForms";
+import { BrandMark, Icon } from "../../components/icons";
+import { backendGet } from "../../lib/server";
+const token = Astro.params.token ?? "";
+const r = await backendGet<InviteInfo>(Astro, `/api/invite/${encodeURIComponent(token)}`);
+if (!r.data) return Astro.rewrite("/404");
+Astro.response.headers.set("cache-control", "no-store");
+const me = Astro.locals.auth;
+---
+<Base title="Invito · Lecta">
+  <main class="auth-page">
+    <div class="auth-top">
+      <a class="brand" href="/"><BrandMark />Lecta</a>
+      <button class="btn ghost icon" data-theme-toggle type="button" aria-label="Cambia tema" title="Tema chiaro / scuro">
+        <Icon name="moon" className="i-moon" /><Icon name="sun" className="i-sun" />
+      </button>
+    </div>
+    <div class="auth-wrap">
+      <InviteForm client:load token={token} invite={r.data} signedInAs={me?.authenticated ? me.username : undefined} />
+    </div>
+  </main>
+</Base>

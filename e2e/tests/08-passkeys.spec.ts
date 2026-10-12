@@ -1,19 +1,23 @@
-import { expect, test } from "@playwright/test";
-import { login, watchConsole } from "./helpers";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { login, USER, watchConsole } from "./helpers";
 
 // WebAuthn needs a secure context: plain HTTP is one only on localhost, so the browser reaches the test site as localhost.
 test.use({ baseURL: "http://localhost:4321", launchOptions: { args: ["--host-resolver-rules=MAP localhost lecta-frontend"] } });
+
+/** A software authenticator that holds discoverable credentials and verifies the user on its own (like a password manager). */
+async function virtualAuthenticator(context: BrowserContext, page: Page) {
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+  });
+}
 
 test.describe("Passkey", () => {
   test("a passkey is added in the settings and then signs in without a password", async ({ page, context }) => {
     test.setTimeout(120_000);
     const con = watchConsole(page);
-    // A software authenticator that holds discoverable credentials and verifies the user on its own (like a password manager).
-    const cdp = await context.newCDPSession(page);
-    await cdp.send("WebAuthn.enable");
-    await cdp.send("WebAuthn.addVirtualAuthenticator", {
-      options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
-    });
+    await virtualAuthenticator(context, page);
 
     await login(page);
     await page.goto("/admin/settings#account");
@@ -43,5 +47,55 @@ test.describe("Passkey", () => {
     await expect(page.getByRole("alert")).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(/\/login/);
     con.assertClean([/status of 401/]);
+  });
+
+  test("an invite link makes an account with a passkey, once", async ({ page, browser, baseURL }) => {
+    test.setTimeout(120_000);
+    // The admin makes an invite (the settings section comes later: the API is enough here).
+    await login(page);
+    // In the page: the test runner itself can't reach the site as localhost.
+    const { status, path } = await page.evaluate(async () => {
+      const { csrf } = await (await fetch("/api/auth/csrf")).json();
+      const res = await fetch("/api/invites", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-csrf-token": csrf },
+        body: JSON.stringify({ role: "editor", note: "Per la collega di Analisi" }),
+      });
+      return { status: res.status, path: (await res.json()).path as string };
+    });
+    expect(status).toBe(201);
+    expect(path).toMatch(/^\/invito\/.+/);
+
+    // Signed in, the page says that accepting switches account.
+    await page.goto(path);
+    await expect(page.getByTestId("invite-form")).toContainText(`accesso come ${USER}`);
+
+    // Someone else, signed out, in their own browser.
+    const other = await browser.newContext({ baseURL });
+    const guest = await other.newPage();
+    const con = watchConsole(guest);
+    await virtualAuthenticator(other, guest);
+    await guest.goto(path);
+    await expect(guest.getByTestId("invite-role")).toHaveText("Autore");
+    await expect(guest.getByTestId("invite-note")).toHaveText("Per la collega di Analisi");
+    await expect(guest.getByTestId("invite-form")).not.toContainText("accesso come");
+
+    // A taken username is said on the spot, and the link stays usable.
+    await guest.getByLabel("Nome utente").fill(USER);
+    await guest.getByTestId("invite-accept").click();
+    await expect(guest.getByRole("alert")).toContainText("già in uso");
+
+    await guest.getByLabel("Nome utente").fill("collega");
+    await guest.getByTestId("invite-accept").click();
+    await guest.waitForURL("**/admin", { timeout: 20_000 });
+    await expect(guest.locator("body")).not.toContainText("404");
+    expect(await guest.evaluate(async () => (await (await fetch("/api/auth/me")).json()).username)).toBe("collega");
+
+    // Used once: the same link is now an address like any unknown one.
+    const again = await guest.goto(path);
+    expect(again?.status()).toBe(404);
+    await expect(guest.getByRole("heading", { name: "Pagina non trovata" })).toBeVisible();
+    con.assertClean([/status of 409/, /status of 404/]);
+    await other.close();
   });
 });

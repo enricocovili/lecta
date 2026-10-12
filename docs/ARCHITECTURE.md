@@ -62,8 +62,9 @@ reasoning behind every change since.
   fingerprint, a PIN or a password manager such as Bitwarden and the sign-in page offers «Accedi con una passkey» — no
   username, password or 2FA code (a passkey with user verification is both factors); the password stays as the
   fallback. They need HTTPS (or localhost); the site's host is the relying party. **Invites**: there are no sign-ups;
-  an admin creates a single-use link with a role (`/api/invites`, shown once, seven days), and whoever opens it picks a
-  username and creates a passkey: the account has no password and can't remove its last passkey. `DECISIONS.md` has
+  an admin creates a single-use link with a role (`/api/invites`, shown once, seven days), and whoever opens it
+  (`/invito/<token>`, public; a used or expired link is the generic 404) picks a username and creates a passkey: the
+  account has no password and can't remove its last passkey. `DECISIONS.md` has
   the details.
 * **Model input and output**: uploaded content (including file and folder names) is wrapped in per-request random
   fences and prompts instruct models to treat it as data; model LaTeX is sanitised (no `\input`, `\write18`, preamble

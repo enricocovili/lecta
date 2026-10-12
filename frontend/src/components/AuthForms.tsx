@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { post } from "../lib/api";
-import { passkeyError, passkeysSupported, signInWithPasskey } from "../lib/passkey";
+import { ApiError, post } from "../lib/api";
+import { acceptInvite, passkeyError, passkeysSupported, signInWithPasskey } from "../lib/passkey";
+import { ROLE_HINT, ROLE_LABEL, type Role } from "../lib/roles";
 import { Icon } from "./icons";
 
 function FormError({ error }: { error: string | null }) {
@@ -231,5 +232,92 @@ export function SetupWizard() {
         </form>
       )}
     </div>
+  );
+}
+
+export interface InviteInfo {
+  role: Role;
+  note: string | null;
+  expires_at: string;
+}
+
+/** The page of an invite link: pick a username, make a passkey, and the account exists (and is signed in). */
+export function InviteForm({ token, invite, signedInAs }: { token: string; invite: InviteInfo; signedInAs?: string }) {
+  const [username, setUsername] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Known only in the browser (the page is rendered on the server first); assume yes until then, so the button doesn't flicker.
+  const [canPasskey, setCanPasskey] = useState(true);
+  useEffect(() => setCanPasskey(passkeysSupported()), []);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await acceptInvite(token, username);
+      location.href = "/admin";
+    } catch (err) {
+      // The link was used, revoked or expired while the page was open.
+      setError(err instanceof ApiError && err.status === 404 ? "Questo invito non è più valido: chiedine uno nuovo a chi te l'ha mandato." : passkeyError(err));
+      setBusy(false);
+    }
+  };
+
+  const expires = new Date(invite.expires_at).toLocaleDateString("it-IT", { day: "numeric", month: "long" });
+  return (
+    <form className="card auth-card" onSubmit={submit} data-testid="invite-form">
+      <h1 className="auth-title">Sei invitato</h1>
+      <p className="auth-sub">
+        Crea il tuo account come <strong data-testid="invite-role">{ROLE_LABEL[invite.role]}</strong>. {ROLE_HINT[invite.role]}
+      </p>
+      {invite.note && (
+        <div className="alert accent" data-testid="invite-note">
+          <Icon name="info" />
+          <span>{invite.note}</span>
+        </div>
+      )}
+      {signedInAs && (
+        <div className="alert warn">
+          <Icon name="alert-circle" />
+          <span>
+            Hai già effettuato l'accesso come <strong>{signedInAs}</strong>: creando l'account entrerai con quello nuovo.
+          </span>
+        </div>
+      )}
+      <FormError error={error} />
+      {canPasskey ? (
+        <>
+          <label className="field">
+            Nome utente <span className="hint">lettere, numeri e . _ @ -</span>
+            <input
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              maxLength={64}
+              pattern="[A-Za-z0-9._@\-]+"
+              autoFocus
+            />
+          </label>
+          <button className="btn primary lg auth-submit" disabled={busy} type="submit" data-testid="invite-accept">
+            <Icon name="key" />
+            {busy ? "Creazione in corso…" : "Crea la passkey"}
+          </button>
+          <p className="auth-foot">
+            Niente password: entrerai con l'impronta, il PIN del dispositivo o il tuo gestore di password. Il link vale fino al {expires} e
+            si usa una volta sola.
+          </p>
+        </>
+      ) : (
+        <div className="alert warn">
+          <Icon name="alert-circle" />
+          <span>Questo browser non supporta le passkey: apri il link con un browser recente (Chrome, Safari, Firefox, Edge).</span>
+        </div>
+      )}
+    </form>
   );
 }

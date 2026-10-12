@@ -9,7 +9,8 @@ type Me = { authenticated: boolean; username?: string; csrf?: string; needs_setu
 export const onRequest = defineMiddleware(async (context, next) => {
   const path = context.url.pathname;
   const needsAuthInfo =
-    path === "/" || path.startsWith("/admin") || path === "/login" || path === "/setup" || path.startsWith("/courses") || path === "/search";
+    path === "/" || path.startsWith("/admin") || path === "/login" || path === "/setup" || path.startsWith("/courses") || path === "/search" ||
+    path.startsWith("/invito/"); // an invite page tells who is signed in already
   let me: Me = { authenticated: false };
   if (needsAuthInfo) {
     const r = await backendGet<Me>(context, "/api/auth/me");

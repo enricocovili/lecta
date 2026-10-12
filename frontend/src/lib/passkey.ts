@@ -33,9 +33,10 @@ export function passkeyError(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-/** Make a passkey (settings); the server remembers it under `name`. */
-export async function registerPasskey(name: string): Promise<void> {
-  const { state, options } = await post<{ state: string; options: Record<string, any> }>("/api/account/passkeys/options");
+type Options = { state: string; options: Record<string, any> };
+
+/** Ask the browser (or the password manager) to make a passkey from the server's options; returns it as the server wants it. */
+async function createCredential(options: Record<string, any>): Promise<Record<string, unknown>> {
   const credential = (await navigator.credentials.create({
     publicKey: {
       ...options,
@@ -46,23 +47,32 @@ export async function registerPasskey(name: string): Promise<void> {
   })) as PublicKeyCredential | null;
   if (!credential) throw new Error("Operazione annullata.");
   const r = credential.response as AuthenticatorAttestationResponse;
-  await post("/api/account/passkeys", {
-    state,
-    name,
-    credential: {
-      id: credential.id,
-      rawId: toBase64Url(credential.rawId),
-      type: credential.type,
-      authenticatorAttachment: credential.authenticatorAttachment,
-      clientExtensionResults: credential.getClientExtensionResults(),
-      response: { clientDataJSON: toBase64Url(r.clientDataJSON), attestationObject: toBase64Url(r.attestationObject), transports: r.getTransports?.() ?? [] },
-    },
-  });
+  return {
+    id: credential.id,
+    rawId: toBase64Url(credential.rawId),
+    type: credential.type,
+    authenticatorAttachment: credential.authenticatorAttachment,
+    clientExtensionResults: credential.getClientExtensionResults(),
+    response: { clientDataJSON: toBase64Url(r.clientDataJSON), attestationObject: toBase64Url(r.attestationObject), transports: r.getTransports?.() ?? [] },
+  };
+}
+
+/** Make a passkey (settings); the server remembers it under `name`. */
+export async function registerPasskey(name: string): Promise<void> {
+  const { state, options } = await post<Options>("/api/account/passkeys/options");
+  await post("/api/account/passkeys", { state, name, credential: await createCredential(options) });
+}
+
+/** Accept an invite: make the account `username` with a passkey; the server signs it in. */
+export async function acceptInvite(token: string, username: string): Promise<void> {
+  const path = `/api/invite/${encodeURIComponent(token)}`;
+  const { state, options } = await post<Options>(`${path}/options`, { username });
+  await post(`${path}/accept`, { state, username, credential: await createCredential(options) });
 }
 
 /** Sign in with a passkey: the browser (or the password manager) offers the ones it holds for this site. */
 export async function signInWithPasskey(): Promise<void> {
-  const { state, options } = await post<{ state: string; options: Record<string, any> }>("/api/auth/passkey/options");
+  const { state, options } = await post<Options>("/api/auth/passkey/options");
   const credential = (await navigator.credentials.get({
     publicKey: {
       ...options,
