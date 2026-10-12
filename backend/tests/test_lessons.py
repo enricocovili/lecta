@@ -98,6 +98,20 @@ def test_typed_text_is_written_in_the_annotated_pdf_where_the_browser_shows_it(t
     assert abs(x0 - 0.1 * W) < 4 and abs(y1 - baseline) < 3 and y0 > 0.3 * W - 2
 
 
+def test_greek_letters_and_maths_symbols_of_a_typed_text_stay_text_in_the_annotated_pdf(tmp_path):
+    doc = fitz.open()
+    doc.new_page(width=842, height=595)
+    pdf = tmp_path / "e.pdf"
+    pdf.write_bytes(doc.tobytes())
+    line = "perché α ω ∑ ≤ € ⇒ x"
+    page = fitz.open(stream=ls.annotated_pdf(pdf, [{"kind": "slide", "slide_page": 1, "ink": [text(line, x=0.1, y=0.5)]}]), filetype="pdf")[0]
+    assert page.get_text().split() == line.split()
+    # The runs of the Symbol font (⇒) follow on the same baseline, after what comes before them.
+    spans = [sp for b in page.get_text("dict")["blocks"] for ln in b.get("lines", []) for sp in ln["spans"]]
+    assert len({round(sp["origin"][1]) for sp in spans}) == 1
+    assert [sp["origin"][0] for sp in spans] == sorted(sp["origin"][0] for sp in spans)
+
+
 def test_a_stretched_or_turned_text_keeps_its_matrix_and_is_drawn_that_way(tmp_path):
     ok = ls.clean_ink([{**text(), "m": [0.70711, 0.70711, -0.70711, 0.70711]}])
     assert ok[0]["m"] == [0.7071, 0.7071, -0.7071, 0.7071]

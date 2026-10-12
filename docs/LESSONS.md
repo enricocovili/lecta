@@ -95,7 +95,7 @@ fits, and the server can draw the same thing on the PDF):
 
 `w` is the font size, `p` the text's top-left corner, `s` what it says (up to 5000 characters). Lines are 1.25 font sizes
 apart and the first baseline is 0.97 font sizes below the top (where a text field of that line height puts it with
-Helvetica or Arial, the font of the browser and of the PDF). A text stretched or turned by the select tool also has
+Helvetica or Arial, the font of the browser and of the PDF). The PDF embeds MuPDF's Helvetica (Nimbus Sans, same metrics) as a Unicode font, so Greek letters and maths symbols stay text; the few it lacks (⇒, ⇔…) come from its Symbol font. A text stretched or turned by the select tool also has
 `m`: `[a, b, c, d]`, the canvas matrix (area 1) of its lines around its top-left corner. The server validates everything (`services/lessons.clean_ink`): at most 4000 strokes and 250 000
 points per page, sane coordinates, colour and width.
 

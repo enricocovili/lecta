@@ -133,6 +133,34 @@ def _rgb(hex_color: str) -> tuple[float, float, float]:
 
 _FLIP = fitz.Matrix(1, 0, 0, -1, 0, 0)
 
+# Typed text is written with MuPDF's own Helvetica (Nimbus Sans: the browser's metrics) embedded as a Unicode font, so Greek
+# letters and most maths symbols stay text (the base14 `helv` only knows Latin-1); what it lacks (⇒, ⇔…) comes from its
+# Symbol font. Their names on the page: "LectaSans", "LectaSym".
+_FONTS = {"LectaSans": fitz.Font(fontbuffer=fitz.Font("helv").buffer), "LectaSym": fitz.Font(fontbuffer=fitz.Font("symbol").buffer)}
+
+
+def _font_for(ch: str) -> str:
+    if ch.isspace() or _FONTS["LectaSans"].has_glyph(ord(ch)) or not _FONTS["LectaSym"].has_glyph(ord(ch)):
+        return "LectaSans"
+    return "LectaSym"
+
+
+def _runs(line: str) -> list[tuple[str, str]]:
+    """The line cut where the font changes: [(font name, text)]."""
+    out: list[tuple[str, str]] = []
+    for ch in line:
+        f = _font_for(ch)
+        if out and out[-1][0] == f:
+            out[-1] = (f, out[-1][1] + ch)
+        else:
+            out.append((f, ch))
+    return out
+
+
+def _font_on(page: fitz.Page, name: str) -> None:
+    if not any(f[4] == name for f in page.get_fonts()):
+        page.insert_font(fontname=name, fontbuffer=_FONTS[name].buffer)
+
 
 def draw_strokes(page: fitz.Page, strokes: list[dict[str, Any]]) -> None:
     """Draw the strokes on a page (highlighters first, so pens stay readable above them, and typed text on top)."""
@@ -158,9 +186,13 @@ def draw_strokes(page: fitz.Page, strokes: list[dict[str, Any]]) -> None:
                 for i, line in enumerate(s.get("s", "").split("\n")):
                     if not line.strip():
                         continue
-                    at = (corner + fitz.Point(0, (TEXT_ASCENT + i * TEXT_LINE_HEIGHT) * size) * m) * derot
-                    shape.insert_text(at, line, fontsize=size, fontname="helv", color=_rgb(s["c"]), rotate=page.rotation,
-                                      morph=(at, morph) if s.get("m") else None)
+                    dx = 0.0
+                    for font, run in _runs(line):
+                        at = (corner + fitz.Point(dx, (TEXT_ASCENT + i * TEXT_LINE_HEIGHT) * size) * m) * derot
+                        _font_on(page, font)
+                        shape.insert_text(at, run, fontsize=size, fontname=font, color=_rgb(s["c"]), rotate=page.rotation,
+                                          morph=(at, morph) if s.get("m") else None)
+                        dx += _FONTS[font].text_length(run, fontsize=size)
                 continue
             n = len(pts) // 3
             if n == 0:
