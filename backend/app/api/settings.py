@@ -10,12 +10,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..security.auth import require_admin
+from ..security.auth import require_admin, require_editor
 from ..services import embeddings, semantic, templates
 from ..services import jobs as jobs_svc
 from ..services import settings as settings_svc
 
 router = APIRouter(dependencies=[Depends(require_admin)])
+# The global LaTeX template, read by whoever overrides it in a course's settings.
+template_router = APIRouter(dependencies=[Depends(require_editor)])
 
 # Sections written by the server itself, or edited through dedicated endpoints.
 READONLY_FIELDS = {"embeddings": {"benchmark"}}
@@ -28,7 +30,7 @@ async def all_settings(db: AsyncSession = Depends(get_db)) -> dict:
     return out
 
 
-@router.get("/settings/template/effective")
+@template_router.get("/settings/template/effective")
 async def effective_template(db: AsyncSession = Depends(get_db)) -> dict:
     tpl = await settings_svc.get_section(db, "template")
     return {"preamble": tpl.preamble or templates.DEFAULT_PREAMBLE, "is_default": tpl.preamble is None}

@@ -16,9 +16,9 @@ from ..db import get_db
 from ..egress import gate
 from ..models import Chapter, ChatMessage, ChatSession, Course, Lab, LabFile, Lesson, LessonPage
 from ..pipeline import agent, lab_agent, lesson_agent
-from ..security.auth import require_admin
+from ..security.auth import require_content
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_content)])
 
 message_out = agent.message_out
 

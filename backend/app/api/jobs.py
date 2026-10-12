@@ -15,10 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import SessionLocal, get_db
 from ..models import AuditLog, IngestFigure, IngestItem, Job, JobLog
-from ..security.auth import require_admin
+from ..security.auth import require_content
 from ..services import jobs as jobs_svc
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_content)])
 
 
 def job_out(j: Job) -> dict[str, Any]:

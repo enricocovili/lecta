@@ -16,12 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import config
 from ..db import get_db
 from ..models import Build, Course
-from ..security.auth import require_admin
+from ..security.auth import require_content
 from ..services import blobs, compile as compile_svc, latex, projects
 from ..services.sniff import sniff_bytes
 from .courses import load_course
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_content)])
 
 MAX_IMAGE_UPLOAD = 50 * 1024 * 1024
 IMAGE_TYPES = {"png": ".png", "jpeg": ".jpg", "pdf": ".pdf"}

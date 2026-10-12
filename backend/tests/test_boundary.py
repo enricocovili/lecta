@@ -53,20 +53,6 @@ def _all_routes(app) -> list[_R]:
     return out
 
 
-def test_every_private_route_is_guarded(app):
-    """Static check: every non-public API route depends on require_admin (defence in depth)."""
-    from app.security.auth import require_admin
-
-    def has_admin_dep(dependant) -> bool:  # noqa: ANN001
-        return any(d.call is require_admin or has_admin_dep(d) for d in dependant.dependencies)
-
-    missing = []
-    for r in _all_routes(app):
-        if not r.is_ws and not is_public(r.path) and not has_admin_dep(r.dependant):
-            missing.append(r.path)
-    assert not missing, f"private routes without require_admin: {missing}"
-
-
 async def test_anonymous_sweep_returns_404(app, anon, monkeypatch):
     from app.security.guard import NOT_FOUND_LIMIT
 

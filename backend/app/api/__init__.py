@@ -11,5 +11,5 @@ def extra_routers() -> list[APIRouter]:
     return [
         editor.router, publish.router, settings.router, providers.router, costs.router,
         uploads.router, chat.router, search.router,
-        concepts.router, preview.router, lessons.router, labs.router, shared.router, passkeys.router,
+        concepts.router, preview.router, lessons.router, labs.router, shared.router, passkeys.router, settings.template_router,
     ]

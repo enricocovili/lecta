@@ -12,12 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..models import Chapter, Course
-from ..security.auth import require_admin
+from ..security.auth import require_content
 from ..services import draft, latex, projects
 from ..services.source_export import build_source_zip, project_files, zip_name
 from .courses import chapter_out, load_chapter, load_course
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_content)])
 
 
 # --------------------------------------------------------------------------- draft typeset by LaTeX

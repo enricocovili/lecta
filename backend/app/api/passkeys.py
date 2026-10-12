@@ -42,7 +42,7 @@ from webauthn.helpers.structs import (
 from ..db import get_db
 from ..models import Passkey, User
 from ..security import auth
-from ..security.auth import AuthContext, require_admin
+from ..security.auth import AuthContext, require_user
 
 router = APIRouter()
 
@@ -98,13 +98,13 @@ class PasskeyAdd(BaseModel):
 
 
 @router.get("/account/passkeys")
-async def list_passkeys(ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> list[dict]:
+async def list_passkeys(ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)) -> list[dict]:
     rows = (await db.execute(select(Passkey).where(Passkey.user_id == ctx.user.id).order_by(Passkey.created_at))).scalars()
     return [_out(p) for p in rows]
 
 
 @router.post("/account/passkeys/options")
-async def passkey_register_options(request: Request, ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> dict:
+async def passkey_register_options(request: Request, ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)) -> dict:
     rp_id, origin = _relying_party(request)
     existing = (await db.execute(select(Passkey).where(Passkey.user_id == ctx.user.id))).scalars().all()
     options = generate_registration_options(
@@ -120,7 +120,7 @@ async def passkey_register_options(request: Request, ctx: AuthContext = Depends(
 
 
 @router.post("/account/passkeys", status_code=201)
-async def passkey_register(body: PasskeyAdd, ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> dict:
+async def passkey_register(body: PasskeyAdd, ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)) -> dict:
     pending = _take(body.state, "register", ctx.user.id)
     try:
         verified = verify_registration_response(
@@ -149,7 +149,7 @@ class PasskeyRename(BaseModel):
 
 
 @router.patch("/account/passkeys/{passkey_id}")
-async def passkey_rename(passkey_id: int, body: PasskeyRename, ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> dict:
+async def passkey_rename(passkey_id: int, body: PasskeyRename, ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)) -> dict:
     pk = await db.get(Passkey, passkey_id)
     if pk is None or pk.user_id != ctx.user.id:
         raise HTTPException(status_code=404, detail="Not Found")
@@ -159,7 +159,7 @@ async def passkey_rename(passkey_id: int, body: PasskeyRename, ctx: AuthContext 
 
 
 @router.delete("/account/passkeys/{passkey_id}")
-async def passkey_delete(passkey_id: int, ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> dict:
+async def passkey_delete(passkey_id: int, ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)) -> dict:
     pk = await db.get(Passkey, passkey_id)
     if pk is None or pk.user_id != ctx.user.id:
         raise HTTPException(status_code=404, detail="Not Found")

@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..security.auth import require_admin
+from ..security.auth import has_role, require_admin
 from ..services import jobs as jobs_svc
 
 router = APIRouter(prefix="/diag")
@@ -42,6 +42,9 @@ async def upload(request: Request) -> dict:
 @router.websocket("/ws")
 async def ws(websocket: WebSocket) -> None:
     # The ASGI guard already rejected anonymous connections before we get here.
+    if not has_role(websocket.scope["state"]["auth"].user, "admin"):
+        await websocket.close(code=4403)
+        return
     await websocket.accept()
     try:
         while True:

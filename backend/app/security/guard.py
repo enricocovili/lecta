@@ -1,10 +1,11 @@
 """ASGI guard for the public/private boundary.
 
-Every `/api/*` path that is not explicitly public requires a valid admin
-session *before routing*. Anonymous callers get the same 404 as an unknown
-URL, whatever the method, body or content type (so 405/422 can't leak which
-private routes exist). Route-level `require_admin` dependencies are a second,
-independent layer.
+Every `/api/*` path that is not explicitly public requires a valid session
+(of an active user) *before routing*. Anonymous callers get the same 404 as an
+unknown URL, whatever the method, body or content type (so 405/422 can't leak
+which private routes exist). Route-level dependencies (`require_user`,
+`require_content`, `require_editor`, `require_admin`) are a second, independent
+layer, and the one that checks the user's role.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from ..db import SessionLocal
 from .auth import RateLimiter, load_session
 
 # Anonymous traffic (public pages, PDF downloads, probes of private URLs) is rate
-# limited per client IP; the single admin's authenticated requests are not.
+# limited per client IP; signed-in users' requests are not.
 anon_limiter = RateLimiter(limit=300, window_s=60)
 NOT_FOUND_LIMIT = RateLimiter(limit=60, window_s=60)
 

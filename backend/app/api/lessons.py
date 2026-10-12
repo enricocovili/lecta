@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import config
 from ..db import get_db
 from ..models import Chapter, ChatSession, Course, Job, Lab, Lesson, LessonPage, LessonShare, Upload
-from ..security.auth import require_admin
+from ..security.auth import require_admin, require_content
 from ..services import blobs
 from ..services import jobs as jobs_svc
 from ..services import labs as labs_svc
@@ -31,7 +31,7 @@ from ..services.texttools import slugify
 from . import labs
 from .courses import GUIDELINES_MAX
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_content)])
 
 NOTEBOOK_RATIO = 1.4142  # a blank page of a lesson without slides: A4, portrait
 DEFAULT_SLIDE_RATIO = 0.5625
@@ -429,13 +429,13 @@ async def _shares(db: AsyncSession, lesson_id: int) -> list[LessonShare]:
     return list((await db.execute(select(LessonShare).where(LessonShare.lesson_id == lesson_id).order_by(LessonShare.mode))).scalars())
 
 
-@router.get("/lessons/{lesson_id}/shares")
+@router.get("/lessons/{lesson_id}/shares", dependencies=[Depends(require_admin)])
 async def list_shares(lesson_id: int, db: AsyncSession = Depends(get_db)) -> list[dict]:
     await _lesson(db, lesson_id)
     return [share_out(sh) for sh in await _shares(db, lesson_id)]
 
 
-@router.post("/lessons/{lesson_id}/shares", status_code=201)
+@router.post("/lessons/{lesson_id}/shares", status_code=201, dependencies=[Depends(require_admin)])
 async def create_share(lesson_id: int, body: ShareIn, db: AsyncSession = Depends(get_db)) -> dict:
     """The link for this mode: made if there is none (or when asked for a new one), else the one that exists."""
     await _lesson(db, lesson_id)
@@ -451,7 +451,7 @@ async def create_share(lesson_id: int, body: ShareIn, db: AsyncSession = Depends
     return share_out(sh)
 
 
-@router.delete("/lessons/{lesson_id}/shares/{mode}")
+@router.delete("/lessons/{lesson_id}/shares/{mode}", dependencies=[Depends(require_admin)])
 async def delete_share(lesson_id: int, mode: Literal["read", "write"], db: AsyncSession = Depends(get_db)) -> dict:
     await _lesson(db, lesson_id)
     await db.execute(LessonShare.__table__.delete().where(LessonShare.lesson_id == lesson_id, LessonShare.mode == mode))

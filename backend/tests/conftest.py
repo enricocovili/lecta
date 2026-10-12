@@ -137,9 +137,24 @@ async def ensure_admin(app) -> None:  # noqa: ANN001
             await db.commit()
 
 
-async def login(client: Client) -> None:
+async def ensure_user(username: str, role: str) -> None:
+    """A signed-in-able user with this role, whose password is ADMIN_PASSWORD (tests only)."""
+    from app.db import SessionLocal
+    from app.models import User
+    from app.security.auth import hash_password, user_by_username
+
+    async with SessionLocal() as db:
+        user = await user_by_username(db, username)
+        if user is None:
+            db.add(User(username=username, password_hash=hash_password(ADMIN_PASSWORD), role=role))
+        else:
+            user.role, user.disabled_at = role, None
+        await db.commit()
+
+
+async def login(client: Client, username: str = ADMIN_USER) -> None:
     await client.get("/api/auth/csrf")
-    r = await client.post("/api/auth/login", json={"username": ADMIN_USER, "password": ADMIN_PASSWORD})
+    r = await client.post("/api/auth/login", json={"username": username, "password": ADMIN_PASSWORD})
     assert r.status_code == 200, r.text
     me = (await client.get("/api/auth/me")).json()
     client.csrf = me["csrf"]
@@ -154,6 +169,31 @@ async def admin(app):
     await ensure_admin(app)
     async with make_client(app) as c:
         await login(c)
+        yield c
+
+
+async def _signed_in(app, username: str, role: str):  # noqa: ANN001
+    from app.security.auth import login_global_limiter, login_limiter
+
+    login_limiter.hits.clear()
+    login_global_limiter.hits.clear()
+    await ensure_user(username, role)
+    async with make_client(app) as c:
+        await login(c, username)
+        yield c
+
+
+@pytest_asyncio.fixture
+async def editor(app):
+    """A signed-in editor (not the admin)."""
+    async for c in _signed_in(app, "editor", "editor"):
+        yield c
+
+
+@pytest_asyncio.fixture
+async def viewer(app):
+    """A signed-in viewer."""
+    async for c in _signed_in(app, "viewer", "viewer"):
         yield c
 
 

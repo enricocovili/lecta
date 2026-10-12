@@ -15,7 +15,7 @@ from .. import appsecrets
 from ..db import get_db
 from ..models import Session, User
 from ..security import auth
-from ..security.auth import AuthContext, require_admin
+from ..security.auth import AuthContext, require_user
 from ..services import settings as settings_svc
 
 router = APIRouter()
@@ -149,7 +149,7 @@ async def change_password(
     body: PasswordIn,
     request: Request,
     response: Response,
-    ctx: AuthContext = Depends(require_admin),
+    ctx: AuthContext = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     user = await db.get(User, ctx.user.id)
@@ -171,7 +171,7 @@ class TotpEnableIn(BaseModel):
 
 
 @router.post("/account/totp/setup")
-async def totp_setup(ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> dict:
+async def totp_setup(ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)) -> dict:
     user = await db.get(User, ctx.user.id)
     assert user is not None and user.password_hash is not None
     if user.totp_enabled:
@@ -186,7 +186,7 @@ async def totp_setup(ctx: AuthContext = Depends(require_admin), db: AsyncSession
 
 @router.post("/account/totp/enable")
 async def totp_enable(
-    body: TotpEnableIn, ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)
+    body: TotpEnableIn, ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)
 ) -> dict:
     user = await db.get(User, ctx.user.id)
     assert user is not None
@@ -205,7 +205,7 @@ class TotpDisableIn(BaseModel):
 
 @router.post("/account/totp/disable")
 async def totp_disable(
-    body: TotpDisableIn, ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)
+    body: TotpDisableIn, ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)
 ) -> dict:
     user = await db.get(User, ctx.user.id)
     assert user is not None
@@ -219,7 +219,7 @@ async def totp_disable(
 
 
 @router.get("/account/sessions")
-async def list_sessions(ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> list[dict]:
+async def list_sessions(ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)) -> list[dict]:
     from sqlalchemy import select
 
     rows = (await db.execute(select(Session).where(Session.user_id == ctx.user.id).order_by(Session.last_seen_at.desc()))).scalars()

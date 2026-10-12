@@ -596,3 +596,11 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      says the same. Setup is needed until an admin exists, and two setups at once can't both create one. The CLI commands
      act on the only admin, or on `--user NAME`. *Alternatives:* a separate table for invited users (two kinds of account
      for sessions, passkeys and ownership to tell apart); deleting users (their courses would go too, or lose their owner).
+115. **Every private route has an access level, and a table in the tests lists them all (#71).** The guard still only
+     asks for an active session; each route then depends on its level: the user's own account for anyone, content read
+     by everyone and written by editors (one dependency that looks at the method), and admin-only settings, providers,
+     prompts, costs, publishing, lesson share links and diagnostics. The global LaTeX template is readable by editors,
+     who override it per course. Signed in but below the level is 403; anonymous stays 404 (8). `tests/test_access.py`
+     holds the route-by-method table and fails on any route not in it, so a new route's level is always a choice
+     made on purpose. *Alternatives:* a role check inside each endpoint (easy to forget, nothing to test against); a
+     separate router per level (content routers would split in two along the method).

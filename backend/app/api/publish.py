@@ -11,11 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..models import Course, Job, Publication
 from ..pipeline.publish import enqueue_publish
-from ..security.auth import require_admin
+from ..security.auth import require_admin, require_content
 from ..services import jobs as jobs_svc
 from .courses import load_course
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_content)])
 
 
 async def publish_state(db: AsyncSession, c: Course) -> dict[str, Any]:
@@ -52,7 +52,7 @@ async def get_publish(course_id: int, db: AsyncSession = Depends(get_db)) -> dic
     return await publish_state(db, c)
 
 
-@router.post("/courses/{course_id}/publish")
+@router.post("/courses/{course_id}/publish", dependencies=[Depends(require_admin)])
 async def publish(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
     """Switch ON (or retry): the course is public from now on and a build is queued."""
     c = await load_course(db, course_id)
@@ -63,7 +63,7 @@ async def publish(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
     return {**await publish_state(db, c), "job_id": job.id if job else None}
 
 
-@router.post("/courses/{course_id}/unpublish")
+@router.post("/courses/{course_id}/unpublish", dependencies=[Depends(require_admin)])
 async def unpublish(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
     c = await load_course(db, course_id)
     c.published = False

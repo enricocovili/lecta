@@ -12,11 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..models import Chapter, Course, ProjectFile, Publication
-from ..security.auth import require_admin
+from ..security.auth import require_content
 from ..services import overview, projects
 from ..services.texttools import slugify
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_content)])
 
 LANG_PATTERN = r"^[a-z]{2,3}$"
 GUIDELINES_MAX = 8000

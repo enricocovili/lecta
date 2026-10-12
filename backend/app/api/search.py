@@ -16,11 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import config
 from ..db import get_db
 from ..models import Chapter, Course, ProjectFile, Publication, SourceFile
-from ..security.auth import require_admin
+from ..security.auth import require_content
 from ..services import blobs, compile as compile_svc, projects, templates
 from ..services.texttools import keywords_simple
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_content)])
 
 
 def _first_line(src: str, terms: list[str]) -> int | None:

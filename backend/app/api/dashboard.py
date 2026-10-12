@@ -8,13 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..models import Chapter, ChatMessage, ChatSession, Course, Job, ProjectFile
-from ..security.auth import require_admin
+from ..security.auth import require_content
 from ..services import jobs as jobs_svc
 from ..pipeline import agent
 from ..services import overview
 from .jobs import job_out
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_content)])
 
 
 async def _latest_reviews(db: AsyncSession) -> dict[int, dict]:

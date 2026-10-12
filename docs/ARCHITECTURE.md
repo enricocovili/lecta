@@ -45,8 +45,10 @@ reasoning behind every change since.
 
 * **Public/private boundary**: an ASGI guard in front of all routes returns 404 to anonymous callers for every `/api`
   path that isn't explicitly public (`/api/public/*`, health, setup and auth endpoints), before routing. Every private
-  route also depends on `require_admin`. Private admin pages also 404. `tests/test_boundary.py` sweeps every route ×
-  method anonymously.
+  route also depends on an access level: `require_user` (any signed-in user), `require_content` (everyone reads,
+  editors write), `require_editor` or `require_admin`; a signed-in user below it gets 403. Private admin pages also
+  404. `tests/test_boundary.py` sweeps every route × method anonymously; `tests/test_access.py` lists every route's
+  level and fails on a route it doesn't list.
 * **Sessions**: accounts live in `users`, each with a role (`viewer`, `editor`, `admin`) and possibly disabled (a
   disabled user's sessions stop working); argon2id password (optional: invited users have only passkeys), httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe
   methods, login rate limiting, optional TOTP. **Passkeys** (WebAuthn, Settings → Account): add one with the

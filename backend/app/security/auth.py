@@ -1,9 +1,11 @@
 """Authentication: argon2 passwords, DB-backed sessions, CSRF, rate limits, TOTP.
 
-Access rule: every private endpoint depends on `require_admin`, which raises
-404 (not 401) for anonymous callers, so private resources are indistinguishable
-from unknown ones. Unsafe methods additionally require the session's CSRF token
-in the `X-CSRF-Token` header.
+Access rule: every private endpoint depends on one of `require_user`,
+`require_content`, `require_editor` or `require_admin`. All of them raise 404
+(not 401) for anonymous callers, so private resources are indistinguishable
+from unknown ones, and 403 for a signed-in user whose role is too low. Unsafe
+methods additionally require the session's CSRF token in the `X-CSRF-Token`
+header.
 """
 
 from __future__ import annotations
@@ -231,11 +233,20 @@ async def load_session(request: Request, db: AsyncSession) -> AuthContext | None
     return AuthContext(user=user, session=sess)
 
 
-async def optional_admin(request: Request, db: AsyncSession = Depends(get_db)) -> AuthContext | None:
-    return await load_session(request, db)
+LEVELS = {"viewer": 0, "editor": 1, "admin": 2}
 
 
-async def require_admin(request: Request, db: AsyncSession = Depends(get_db)) -> AuthContext:
+def has_role(user: User, role: str) -> bool:
+    """Whether the user's role includes `role` (an admin can do what an editor can, an editor what a viewer can)."""
+    return LEVELS[user.role] >= LEVELS[role]
+
+
+def forbidden() -> HTTPException:
+    return HTTPException(status_code=403, detail="Non hai i permessi per farlo")
+
+
+async def require_user(request: Request, db: AsyncSession = Depends(get_db)) -> AuthContext:
+    """Any signed-in user: the account's own pages (passkeys, sessions, password)."""
     ctx = getattr(request.state, "auth", None) or await load_session(request, db)
     if ctx is None:
         raise not_found()
@@ -244,6 +255,26 @@ async def require_admin(request: Request, db: AsyncSession = Depends(get_db)) ->
         if not hmac.compare_digest(header, ctx.session.csrf_token) or not _same_origin(request):
             raise HTTPException(status_code=403, detail="CSRF check failed")
     request.state.auth = ctx
+    return ctx
+
+
+async def require_content(request: Request, ctx: AuthContext = Depends(require_user)) -> AuthContext:
+    """Content routes: every user reads, editors and admins write (unsafe methods)."""
+    if request.method in UNSAFE and not has_role(ctx.user, "editor"):
+        raise forbidden()
+    return ctx
+
+
+async def require_editor(ctx: AuthContext = Depends(require_user)) -> AuthContext:
+    if not has_role(ctx.user, "editor"):
+        raise forbidden()
+    return ctx
+
+
+async def require_admin(ctx: AuthContext = Depends(require_user)) -> AuthContext:
+    """Settings, providers, prompts, costs, publishing and share links, users."""
+    if not has_role(ctx.user, "admin"):
+        raise forbidden()
     return ctx
 
 

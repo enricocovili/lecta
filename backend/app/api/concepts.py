@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..security.auth import require_admin
+from ..security.auth import require_content
 from ..services import concepts
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_content)])
 
 
 @router.get("/concepts")
