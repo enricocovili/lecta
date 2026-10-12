@@ -418,38 +418,55 @@ test.describe.serial("Lezioni", () => {
     con.assertClean(EXPECTED);
   });
 
-  test("«Chiedi» on a page asks the assistant about it, with the pages around it and the whole lesson", async ({ page }) => {
+  test("the assistant's button on a slide asks about it in a popup, with the pages around it and the whole lesson", async ({ page }) => {
     test.setTimeout(180_000);
     const con = watchConsole(page);
     await login(page);
     await page.goto(`/admin/courses/${courseId}/lessons/1`);
     const lesson = await stored(page);
-    await page.getByTestId("lesson-page").nth(1).getByTestId("ask-page").click();
-    const panel = page.getByTestId("lesson-ai");
-    await expect(panel).toBeVisible();
-    await expect(panel.locator(".ai-scope-pill")).toContainText("Slide 2");
-    await panel.getByRole("button", { name: "Spiega la slide" }).click();
-    const reply = panel.getByTestId("ai-message").last();
+    // No «Chiedi» in the top bar or over the notes: the slide's corner has the button.
+    await expect(page.locator(".wsb").getByText("Chiedi")).toHaveCount(0);
+    const row = page.getByTestId("lesson-page").nth(1);
+    await expect(row.locator(".les-notes").getByTestId("ask-page")).toHaveCount(0);
+    await row.getByTestId("ask-page").click();
+    const pop = row.getByTestId("slide-ask");
+    await expect(pop).toBeVisible();
+    await expect(pop.locator(".les-ask-head")).toContainText("Slide 2");
+    await expect(pop.getByTestId("slide-ask-input")).toBeFocused();
+    await pop.getByRole("button", { name: "Spiega la slide" }).click();
+    const reply = pop.getByTestId("ai-message");
     await expect(reply).toContainText(`Domanda su [p. 2] Slide 2: ho le immagini di ${lesson.pages.length} pagine ([p. 1] Slide 1`, { timeout: 60_000 });
     await expect(reply).toContainText("con gli appunti");
-    await expect(panel.locator(".ai-scope-chip").last()).toContainText("Slide 2");
-    await expect(panel.getByTestId("ai-change-card")).toHaveCount(0);
+    await expect(pop.getByTestId("ai-change-card")).toHaveCount(0);
     await page.screenshot({ path: "/e2e/.results/lesson-assistant.png" });
 
     // «Aggiungi agli appunti» puts the answer at the end of that page's notes, to edit there; Ctrl+Z takes it out.
-    const notes = page.getByTestId("lesson-page").nth(1).locator(".les-notes-field");
+    const notes = row.locator(".les-notes-field");
     const before = await notes.inputValue();
-    await panel.getByTestId("ai-keep").click();
-    await expect(panel.getByTestId("ai-keep")).toContainText("Aggiunta agli appunti");
+    await pop.getByTestId("ai-keep").click();
+    await expect(pop.getByTestId("ai-keep")).toContainText("Aggiunta agli appunti");
     await expect(notes).toHaveValue(/Il passaggio si spiega così: \$f_s > 2B\$/);
     expect((await notes.inputValue()).startsWith(before.trimEnd())).toBe(true);
     await expect(notes).not.toHaveValue(/suggestions/);
     await page.keyboard.press("Control+z");
     await expect(notes).toHaveValue(before);
 
-    // The top bar's button closes it; the lesson's conversations stay apart from the course text's.
-    await page.getByTestId("lesson-ai-toggle").click();
-    await expect(panel).toBeHidden();
+    // A new question replaces the answer: one at a time.
+    await pop.getByTestId("slide-ask-input").fill("E perché proprio così?");
+    await pop.getByTestId("slide-ask-input").press("Enter");
+    await expect(pop.locator(".les-ask-q")).toHaveText("E perché proprio così?");
+    await expect(reply).toHaveCount(1);
+    await expect(reply).toHaveAttribute("data-status", "done", { timeout: 60_000 });
+    await expect(reply).not.toContainText("Prima di questa domanda");
+
+    // Esc closes it, and so does the button; the lesson's conversations stay apart from the course text's.
+    await pop.getByTestId("slide-ask-input").press("Escape");
+    await expect(pop).toHaveCount(0);
+    await row.getByTestId("ask-page").click();
+    await expect(pop).toBeVisible();
+    await expect(pop.getByTestId("ai-message")).toHaveCount(0);
+    await row.getByTestId("ask-page").click();
+    await expect(pop).toHaveCount(0);
     const course = (await (await page.request.get(`/api/chat/sessions?course_id=${courseId}`)).json()) as { id: number }[];
     const own = (await (await page.request.get(`/api/chat/sessions?course_id=${courseId}&lesson_id=${lesson.id}`)).json()) as { id: number }[];
     expect(own).toHaveLength(1);
@@ -463,14 +480,15 @@ test.describe.serial("Lezioni", () => {
     await login(page);
     await page.goto(`/admin/courses/${courseId}/lessons/1`);
     await page.getByTestId("tool-select").click();
-    const surface = page.getByTestId("ink-surface").nth(2);
+    const row = page.getByTestId("lesson-page").nth(2);
+    const surface = row.getByTestId("ink-surface");
     await surface.scrollIntoViewIfNeeded();
     const box = (await surface.boundingBox())!;
     await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.55);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.85, { steps: 8 });
     await page.mouse.up();
-    // Esc lets it go; drawn again, its «Chiedi» opens the assistant on that area.
+    // Esc lets it go; drawn again, its «Chiedi» opens the assistant's popup on that area.
     await expect(page.getByTestId("ask-area")).toHaveCount(1);
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("ask-area")).toHaveCount(0);
@@ -479,18 +497,18 @@ test.describe.serial("Lezioni", () => {
     await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.85, { steps: 8 });
     await page.mouse.up();
     await page.getByTestId("ask-area-button").click();
-    const label = await page.getByTestId("lesson-page").nth(2).locator(".les-tag").innerText();
-    const panel = page.getByTestId("lesson-ai");
-    await expect(panel.locator(".ai-scope-pill")).toContainText(`${label} · area scelta`);
-    await page.getByTestId("ai-composer").fill("Cosa dice questa parte?");
-    await page.getByTestId("ai-composer").press("Enter");
-    await expect(panel.getByTestId("ai-message").last()).toContainText("e l'area scelta (", { timeout: 60_000 });
-    await expect(panel.locator(".ai-scope-chip").last()).toContainText(`${label} · area scelta`);
+    const label = await row.locator(".les-tag").innerText();
+    const pop = row.getByTestId("slide-ask");
+    await expect(pop.locator(".les-ask-head")).toContainText(label);
+    await expect(pop.getByTestId("slide-ask-area")).toBeVisible();
+    await pop.getByTestId("slide-ask-input").fill("Cosa dice questa parte?");
+    await pop.getByTestId("slide-ask-input").press("Enter");
+    await expect(pop.getByTestId("ai-message")).toContainText("e l'area scelta (", { timeout: 60_000 });
     await page.screenshot({ path: "/e2e/.results/lesson-assistant-area.png" });
     // Another tool lets the area go: the next question is about the page.
     await page.getByTestId("tool-pen").click();
     await expect(page.getByTestId("ask-area")).toHaveCount(0);
-    await expect(panel.locator(".ai-scope-pill")).not.toContainText("area scelta");
+    await expect(pop.getByTestId("slide-ask-area")).toHaveCount(0);
     con.assertClean(EXPECTED);
   });
 

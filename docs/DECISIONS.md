@@ -547,6 +547,13 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 
 ## Assistant
 
+111. **The lesson's assistant is a one-shot popup on the slide, not a conversation beside the pages.** During and after a
+     lecture the question is about one slide: a small popup under a button on the slide's corner keeps the slide in view,
+     costs no room for the notes and leaves the top bar alone, where the side panel took a third of the screen and a scope
+     pill had to say which page it meant. One question, one answer, replaced by the next; so the earlier turns are not
+     sent with a question (each one already carries the pictures and the whole lesson; history only added cost and the
+     wrong slide's context). *Alternatives:* the side panel with the conversation (#64, replaced); a thread per page
+     (more to keep and show, little gain over asking again).
 110. **A question about a slide carries the pictures of the pages around it, and the rest of the lesson as text (#64).**
      A derivation on a slide usually starts a slide or two earlier and its notation is defined further back, and slide text
      extracted from a PDF garbles formulas: so the pages from ten before to ten after the asked one go with every question as

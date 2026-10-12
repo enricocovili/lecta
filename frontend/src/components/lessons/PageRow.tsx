@@ -1,5 +1,5 @@
 // One page of the lesson: the slide with the drawing over it, and the Markdown notes next to it (or below).
-import { memo, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Icon } from "../icons";
 import { Markdown } from "../workspace/Markdown";
 import { bringIntoView, noteMarks, SlideMarks, useRenderedMarks, type PageFind } from "./FindBar";
@@ -32,8 +32,8 @@ export interface Actions {
   addBlankAfter: (pid: number | null) => void;
   removePage: (pid: number) => void;
   visible: (index: number) => void;
-  /** open the assistant on this page (the owner only) */
-  ask?: (pid: number) => void;
+  /** open the assistant's popup on this page, or close it when it is open there and `open` is not set (the owner only) */
+  ask?: (pid: number, open?: boolean) => void;
   /** a rectangle drawn with the select tool on this page is an area to ask about (null: let go); the owner only */
   area?: (pid: number, r: Rect | null) => void;
 }
@@ -59,9 +59,11 @@ interface Props {
   area?: Rect | null;
   /** what the search (Ctrl+F) found on this page (null: nothing here) */
   find?: PageFind | null;
+  /** the assistant's popup, when it is open on this page */
+  popup?: ReactNode;
 }
 
-function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = false, scroller, actions, label, selected, area = null, find = null }: Props) {
+function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = false, scroller, actions, label, selected, area = null, find = null, popup = null }: Props) {
   const row = useRef<HTMLElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const rendered = useRef<HTMLDivElement>(null);
@@ -127,6 +129,7 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
   const isSlide = page.kind === "slide" && doc && page.slide_page;
   return (
     <section ref={row} id={`lesson-page-${page.id}`} className={`les-row ${layout}`} data-testid="lesson-page" data-page-index={index}>
+      <div className="les-slide-wrap">
       <div className="les-slide" ref={box} style={{ aspectRatio: `${1 / page.ratio}` }}>
         {isSlide && <SlideView doc={doc} pageNo={page.slide_page!} width={width} height={height} active={near} />}
         {find && <SlideMarks find={find} ratio={page.ratio} />}
@@ -150,31 +153,40 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
           onMoveStrokes={(moves) => actions.moveStrokes(page.id, moves)}
           area={area}
           onArea={actions.area && ((r) => actions.area!(page.id, r))}
-          onAskArea={actions.ask && (() => actions.ask!(page.id))}
+          onAskArea={actions.ask && (() => actions.ask!(page.id, true))}
         />
         <span className="les-tag">{label}</span>
-        {/* Without the notes column its buttons sit on the slide's corner. */}
-        {layout === "slides" && actions.ask && (
-          <button type="button" className="btn icon les-slide-ask" onClick={() => actions.ask!(page.id)} title="Chiedi all’assistente di questa pagina" aria-label="Chiedi all’assistente di questa pagina" data-testid="ask-page">
-            <Icon name="sparkles" />
-          </button>
-        )}
-        {layout === "slides" && !readOnly && (
-          <button type="button" className="btn icon les-slide-remove" onClick={() => actions.removePage(page.id)} title={page.kind === "slide" ? "Togli questa slide dalla lezione" : "Togli questa pagina"} aria-label="Togli questa pagina" data-testid="remove-page">
-            <Icon name="trash" />
-          </button>
-        )}
+      </div>
+      {/* The slide's own buttons on its top-right corner (outside its box, so the popup is not cut), shown like the tag. */}
+      {(actions.ask || (layout === "slides" && !readOnly)) && (
+        <div className="les-corner">
+          {actions.ask && (
+            <button
+              type="button"
+              className={`btn icon les-corner-ask ${popup ? "on" : ""}`}
+              onClick={() => actions.ask!(page.id)}
+              aria-pressed={!!popup}
+              title="Chiedi all’assistente di questa pagina: vede anche le slide vicine e legge tutta la lezione"
+              aria-label="Chiedi all’assistente di questa pagina"
+              data-testid="ask-page"
+            >
+              <Icon name="sparkles" />
+            </button>
+          )}
+          {/* Without the notes column the remove button sits here too. */}
+          {layout === "slides" && !readOnly && (
+            <button type="button" className="btn icon les-corner-remove" onClick={() => actions.removePage(page.id)} title={page.kind === "slide" ? "Togli questa slide dalla lezione" : "Togli questa pagina"} aria-label="Togli questa pagina" data-testid="remove-page">
+              <Icon name="trash" />
+            </button>
+          )}
+        </div>
+      )}
+      {popup}
       </div>
       {layout !== "slides" && (
         <div className="les-notes">
           <div className="les-notes-head">
             <span className="les-notes-title">Appunti · {label}</span>
-            {actions.ask && (
-              <button type="button" className="btn ghost xs" onClick={() => actions.ask!(page.id)} title="Chiedi all’assistente di questa pagina: vede anche le slide vicine e legge tutta la lezione" data-testid="ask-page">
-                <Icon name="sparkles" />
-                Chiedi
-              </button>
-            )}
             {!readOnly && (
               <button type="button" className="btn ghost xs" onClick={() => actions.removePage(page.id)} title={page.kind === "slide" ? "Togli questa slide dalla lezione" : "Togli questa pagina"} aria-label="Togli questa pagina" data-testid="remove-page">
               <Icon name="trash" />

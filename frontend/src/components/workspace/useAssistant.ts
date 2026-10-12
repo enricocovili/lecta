@@ -41,9 +41,11 @@ interface Opts {
   lessonId?: number;
   /** The AI wrote something (`final`: the turn is over or was undone). Refresh the draft. */
   onChange: (files: ChangedFile[], final: boolean) => void;
+  /** false: the earlier conversations are not loaded, a question goes on in the most recent one (a lesson's one-shot popup) */
+  history?: boolean;
 }
 
-export function useAssistant({ courseId, labId, lessonId, onChange }: Opts) {
+export function useAssistant({ courseId, labId, lessonId, onChange, history = true }: Opts) {
   const where = labId ? { course_id: courseId, lab_id: labId } : lessonId ? { course_id: courseId, lesson_id: lessonId } : { course_id: courseId };
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
@@ -177,8 +179,14 @@ export function useAssistant({ courseId, labId, lessonId, onChange }: Opts) {
         if (stop) return;
         const sorted = [...list].sort((a, b) => b.id - a.id);
         setSessions(sorted);
-        if (sorted[0]) await loadSession(sorted[0].id);
-        else setLoading(false);
+        if (sorted[0] && history) await loadSession(sorted[0].id);
+        else {
+          if (sorted[0]) {
+            sidRef.current = sorted[0].id;
+            setSessionId(sorted[0].id);
+          }
+          setLoading(false);
+        }
       })
       .catch((e) => {
         if (!stop) {
@@ -190,7 +198,7 @@ export function useAssistant({ courseId, labId, lessonId, onChange }: Opts) {
       stop = true;
       detach();
     };
-  }, [courseId, labId, lessonId, loadSession, detach]);
+  }, [courseId, labId, lessonId, history, loadSession, detach]);
 
   const ensureSession = async (): Promise<number> => {
     if (sidRef.current) return sidRef.current;
@@ -201,13 +209,13 @@ export function useAssistant({ courseId, labId, lessonId, onChange }: Opts) {
     return s.id;
   };
 
-  /** Send a message and follow the turn; false when it was not accepted (no model, another turn running…). */
-  const send = async (content: string, scope: Scope = {}): Promise<boolean> => {
+  /** Send a message and follow the turn → the reply's id; null when it was not accepted (no model, another turn running…). */
+  const ask = async (content: string, scope: Scope = {}): Promise<number | null> => {
     const text = content.trim();
-    if (!text) return false;
+    if (!text) return null;
     if (streamingId !== null) {
       toast("L’assistente sta ancora lavorando: attendi o premi Stop.", "error");
-      return false;
+      return null;
     }
     try {
       const sid = await ensureSession();
@@ -215,12 +223,14 @@ export function useAssistant({ courseId, labId, lessonId, onChange }: Opts) {
       const reply = normalize({ ...r.reply, created_at: r.reply.created_at ?? new Date().toISOString() });
       setMessages((ms) => [...ms, normalize(r.message), reply]);
       void attach(reply.id, sid);
-      return true;
+      return reply.id;
     } catch (e) {
       toastError(e);
-      return false;
+      return null;
     }
   };
+  /** Send a message and follow the turn; false when it was not accepted. */
+  const send = async (content: string, scope: Scope = {}): Promise<boolean> => (await ask(content, scope)) !== null;
 
   const cancel = async () => {
     if (streamingId === null) return;
@@ -286,6 +296,7 @@ export function useAssistant({ courseId, labId, lessonId, onChange }: Opts) {
     messages,
     loading,
     busy: streamingId !== null,
+    ask,
     send,
     cancel,
     undo,

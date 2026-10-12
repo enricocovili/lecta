@@ -47,18 +47,22 @@ with the occurrence selected, when the one looked at was in the notes. Ctrl+F wi
 
 ## Asking about a slide
 
-«Chiedi» (owner only) opens the **lesson's assistant** beside the pages (over them under ~860 px): on a page's notes header
-(on the slide's corner with slides only) it asks about that page and keeps it while scrolling; the top bar's «Chiedi» opens and
-closes the panel, asking about the page being looked at. The scope pill names the page; removing it goes back to the page being
-looked at. **An area** of a page is asked about with the select tool: the last rectangle drawn with it stays on the page as a
-dashed box with «Chiedi» on its corner (a click elsewhere, Esc or another tool lets it go), and the questions about that page
-then carry it (`scope.region`: x0, y0, x1, y1 in page widths, as the ink); the model gets it as a sharp cut (from a 2400 px
-picture of the page, 0.01 page widths of room around it) next to the pictures of the pages. Quick actions: explain the slide, the procedure step by step, a numerical example, what to know first.
+The **lesson's assistant** (owner only) is asked in place: the ✦ button on a slide's top-right corner (shown like the tag:
+when the pointer is on the page, always on a touch screen; with slides only the remove button sits beside it) opens a small
+popup under it, on the slide (`components/lessons/SlideAsk.tsx`), and closes it again; Esc closes it too, and closing it stops an
+answer still being written. One popup at a time. It has quick actions (explain the slide, the procedure step by step, a numerical
+example, what to know first) and a field for one's own question (Enter sends); **one question, one answer**: a new question
+replaces the answer shown, and closing forgets it. Fingers scroll the answer inside the popup instead of the pages. **An area**
+of a page is asked about with the select tool: the last rectangle drawn with it stays on the page as a dashed box with
+«Chiedi» on its corner (a click elsewhere, Esc or another tool lets it go), which opens the popup on it («area scelta», with an ×
+to ask about the whole page again); the question then carries it (`scope.region`: x0, y0, x1, y1 in page widths, as the ink) and
+the model gets it as a sharp cut (from a 2400 px picture of the page, 0.01 page widths of room around it) next to the pictures
+of the pages.
 
 Every question is sent with the **whole lesson** in the prompt (every page: the text printed on its slide, the typed notes, whether
 it carries handwriting) and the **pictures of the pages from ten before to ten after** the one asked about, strokes and typed text
 drawn on them (the asked page at 1600 px, the others at 1100 px). Its tools are `view_page` (any other page as a picture) and
-`read_chapter` (the lesson's section of its chapter). It **only explains**: no tool changes anything, and a turn has nothing to undo. Under an answer, **«Aggiungi agli appunti»**
+`read_chapter` (the lesson's section of its chapter). It **only explains**: no tool changes anything, and a turn has nothing to undo. A question stands alone: the earlier ones are not sent with it. Under the answer, **«Aggiungi agli appunti»**
 puts it at the end of the notes of the page asked about (a blank line after what is there), where it is edited like the rest
 and later goes into the text with «Integra appunti»; it is one step of the editor's history, so Ctrl+Z takes it out, and the
 editor scrolls to the page.

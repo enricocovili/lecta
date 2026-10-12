@@ -355,6 +355,8 @@ export function useGestures(scroller: RefObject<HTMLElement | null>, opts: RefOb
         }
       }
       if (e.pointerType !== "touch" && !(o.tool === "hand" && onInk && e.button === 0)) return;
+      // A finger in the assistant's popup scrolls its answer, selects and types: the browser's own.
+      if ((e.target as Element | null)?.closest?.(".les-ask")) return;
       const live = [...ptrs.entries()].filter(([, p]) => p.mode !== "palm");
       // A finger on the selection's handles or buttons, or in a text being typed, works them, also when fingers do not write
       // (a palm is still a palm).

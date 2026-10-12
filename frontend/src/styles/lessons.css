@@ -211,26 +211,6 @@ body.ws-page .les {
   display: flex;
   position: relative;
 }
-/* The assistant: beside the pages, over them on a narrow screen. */
-.les-ai {
-  width: 26rem;
-  min-height: 0;
-  display: flex;
-  background: var(--bg-elev);
-  border-left: 1px solid var(--border);
-}
-.les-ai.off {
-  display: none;
-}
-@media (max-width: 860px) {
-  .les-ai {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    width: auto;
-    border-left: none;
-  }
-}
 .les-scroll {
   flex: 1;
   min-width: 0;
@@ -321,43 +301,121 @@ body.ws-page .les {
 .les-row:focus-within .les-tag {
   opacity: 1;
 }
-/* «Solo slide»: the page's remove button on the slide's top-right corner, shown like the tag (always on a touch screen). */
-.les .les-slide-remove,
-.les .les-slide-ask {
+.les-slide-wrap {
+  position: relative;
+  min-width: 0;
+}
+/* The slide's buttons on its top-right corner: ask the assistant (and, with slides only, remove the page). Shown like the tag
+   (always on a touch screen), and while the popup is open. */
+.les-corner {
   position: absolute;
   right: 6px;
   top: 6px;
-  z-index: 2;
-  width: 34px;
-  height: 34px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+}
+.les .les-corner .btn {
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   border: none;
   background: rgb(28 27 23 / 62%);
   color: #fff;
   line-height: normal;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, background 0.15s;
 }
-.les .les-slide-remove:hover {
-  background: #b3261e;
-}
-.les .les-slide-ask {
-  right: 46px;
-}
-.les .les-slide-ask:hover {
-  background: #2c4fa3;
-}
-.les-row:hover .les-slide-remove,
-.les-slide-remove:focus-visible,
-.les-row:hover .les-slide-ask,
-.les-slide-ask:focus-visible {
+.les-row:hover .les-corner .btn,
+.les .les-corner .btn:focus-visible,
+.les .les-corner .btn.on {
   opacity: 1;
 }
 @media (pointer: coarse) {
-  .les .les-slide-remove,
-  .les .les-slide-ask {
+  .les .les-corner .btn {
     opacity: 0.8;
   }
+}
+.les .les-corner-ask:hover,
+.les .les-corner-ask.on {
+  background: #2c4fa3;
+}
+.les .les-corner-remove:hover {
+  background: #b3261e;
+}
+/* The assistant's popup, under the corner buttons; it may hang below the slide, over the next page. */
+.les-ask {
+  position: absolute;
+  right: 6px;
+  top: 44px;
+  z-index: 20;
+  width: min(26rem, calc(100% - 12px));
+  min-width: min(17rem, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem 0.7rem;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 22%);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+/* Fingers scroll the answer and select its text here, instead of scrolling the pages (gestures.ts leaves them alone). */
+.les-scroll .les-ask,
+.les-scroll .les-ask * {
+  touch-action: pan-y;
+}
+.les-ask-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.les-ask-head > .icon {
+  color: var(--accent);
+}
+.les-ask-area {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px 0 8px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.les-ask-area button {
+  display: inline-flex;
+  border: none;
+  background: none;
+  color: inherit;
+  padding: 2px;
+  cursor: pointer;
+}
+.les-ask-answer {
+  max-height: min(55vh, 28rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.les-ask-q {
+  margin: 0 0 0.4rem;
+  color: var(--fg-muted);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+}
+.les-ask .ai-avatar {
+  display: none;
+}
+.les-ask-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.les-ask-input textarea {
+  font-size: 0.9rem;
 }
 .les-ink {
   position: absolute;

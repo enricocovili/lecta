@@ -8,9 +8,9 @@ import Pop from "../workspace/Pop";
 import { Confirm, Seg, toast, toastError, useLocalStorage } from "../ui";
 import { FindBar, selectedWords, useLessonFind } from "./FindBar";
 import GenerateDialog from "./GenerateDialog";
-import LessonAssistant from "./LessonAssistant";
 import { clampZoom, stepZoom, useGestures, ZOOM_MAX, ZOOM_MIN, type GestureOptions } from "./gestures";
 import ShareDialog from "./ShareDialog";
+import SlideAsk from "./SlideAsk";
 import { COLORS, HL_COLORS, HL_WIDTHS, PEN_WIDTHS, TEXT_SIZES, type Rect, type Stroke, type Tool } from "./ink";
 import LessonStatusPill, { type LessonStatus } from "./LessonStatus";
 import PageRow, { type Actions, type DrawSettings } from "./PageRow";
@@ -118,17 +118,10 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   const [askRemove, setAskRemove] = useState<number | null>(null);
   // What the select tool picked: strokes of one page.
   const [selection, setSelection] = useState<{ pid: number; strokes: Stroke[] } | null>(null);
-  // The assistant (the owner's): open or not, and the page picked with «Chiedi» (none: the page being looked at).
-  const [aiOpen, setAiOpen] = useLocalStorage("lecta:lesson:ai", false);
-  const showAi = owner && aiOpen;
-  const [aiMounted, setAiMounted] = useState(false);
-  const [askPin, setAskPin] = useState<number | null>(null);
+  // The page whose assistant popup is open (the owner's; one at a time).
+  const [askPid, setAskPid] = useState<number | null>(null);
   // The last rectangle drawn with the select tool: an area of a page to ask the assistant about.
   const [area, setArea] = useState<{ pid: number; rect: Rect } | null>(null);
-  const [aiFocus, setAiFocus] = useState(0);
-  useEffect(() => {
-    if (showAi) setAiMounted(true);
-  }, [showAi]);
 
   useEffect(() => {
     if (owner) get<unknown[]>(`/api/lessons/${lesson.id}/shares`).then((l) => setHasShares(l.length > 0)).catch(() => undefined);
@@ -224,13 +217,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
       },
       select: (pid, strokes) => setSelection(strokes.length ? { pid, strokes } : null),
       visible: setCurrent,
-      ask: owner
-        ? (pid) => {
-            setAskPin(pid);
-            setAiOpen(true);
-            setAiFocus((n) => n + 1);
-          }
-        : undefined,
+      ask: owner ? (pid, open) => setAskPid((cur) => (cur === pid && !open ? null : pid)) : undefined,
       area: owner ? (pid, rect) => setArea(rect ? { pid, rect } : null) : undefined,
       addBlankAfter: (pid) => {
         addBlankAfter(pid)
@@ -244,7 +231,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
         else setAskRemove(pid);
       },
     }),
-    [setNotes, addStroke, eraseStrokes, moveStrokes, addBlankAfter, removePage, owner, setAiOpen],
+    [setNotes, addStroke, eraseStrokes, moveStrokes, addBlankAfter, removePage, owner],
   );
 
   // The selection is let go when another tool is picked, and keeps only the strokes that are still there (undo, erasing,
@@ -415,21 +402,17 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
 
   const labels = useMemo(() => pages.map((_, i) => pageLabel(pages, i)), [pages]);
   const findWhere = find.hit ? `${labels[pages.findIndex((p) => p.id === find.hit!.pid)] ?? ""}${find.hit.where === "notes" ? ", appunti" : ""}` : null;
-  const pinnedIndex = askPin === null ? -1 : pages.findIndex((p) => p.id === askPin);
-  const askedIndex = pinnedIndex >= 0 ? pinnedIndex : current;
-  const askedPage = useMemo(() => (pages[askedIndex] ? { id: pages[askedIndex].id, label: labels[askedIndex] } : null), [pages, labels, askedIndex]);
-  const pageName = useCallback((id: number) => labels[pages.findIndex((p) => p.id === id)] ?? null, [pages, labels]);
   // An answer of the assistant goes at the end of the page's notes: one step of the history, so Ctrl+Z takes it out.
   const keepAnswer = useCallback(
-    (pid: number | null, text: string) => {
+    (pid: number, text: string) => {
       const i = pagesRef.current.findIndex((p) => p.id === pid);
       if (i < 0) {
         toastError(new Error("Quella pagina non c’è più nella lezione"));
         return false;
       }
       const notes = pagesRef.current[i].notes.replace(/\s+$/, "");
-      setNotes(pid!, `${notes ? `${notes}\n\n` : ""}${text.trim()}\n`);
-      reveal(pid!, true);
+      setNotes(pid, `${notes ? `${notes}\n\n` : ""}${text.trim()}\n`);
+      reveal(pid, true);
       toast(`Aggiunta agli appunti di «${pageLabel(pagesRef.current, i)}»: Ctrl+Z la toglie`);
       return true;
     },
@@ -485,19 +468,6 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
               Appunti (.md)
             </a>
           </Pop>
-          {owner && (
-            <button
-              type="button"
-              className={`btn ${showAi ? "active" : "ghost"}`}
-              onClick={() => setAiOpen(!aiOpen)}
-              aria-pressed={showAi}
-              data-testid="lesson-ai-toggle"
-              title="Chiedi all’assistente della pagina che stai guardando: vede le slide vicine e legge tutta la lezione"
-            >
-              <Icon name="sparkles" />
-              <span className="wsb-lbl">Chiedi</span>
-            </button>
-          )}
           {(owner || labHref) && (
             <a
               className="btn ghost"
@@ -774,6 +744,20 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
                 selected={selection?.pid === p.id ? selection.strokes : null}
                 area={area?.pid === p.id ? area.rect : null}
                 find={find.byPage.get(p.id) ?? null}
+                popup={
+                  owner && askPid === p.id ? (
+                    <SlideAsk
+                      lessonId={lesson.id}
+                      courseId={lesson.course_id}
+                      pageId={p.id}
+                      label={labels[i]}
+                      area={area?.pid === p.id ? area.rect : null}
+                      onKeep={(text) => keepAnswer(p.id, text)}
+                      onDropArea={() => setArea(null)}
+                      onClose={() => setAskPid(null)}
+                    />
+                  ) : null
+                }
               />
             ))}
             {!readOnly && (
@@ -784,24 +768,6 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
             )}
           </div>
         </div>
-        {owner && aiMounted && (
-          <LessonAssistant
-            lessonId={lesson.id}
-            courseId={lesson.course_id}
-            page={askedPage}
-            pinned={pinnedIndex >= 0}
-            area={area && area.pid === askedPage?.id ? area.rect : null}
-            open={showAi}
-            focusNonce={aiFocus}
-            pageName={pageName}
-            onClose={() => setAiOpen(false)}
-            onUnpin={() => {
-              setAskPin(null);
-              setArea(null);
-            }}
-            onKeep={keepAnswer}
-          />
-        )}
       </div>
       {askRemove !== null && (
         <Confirm
