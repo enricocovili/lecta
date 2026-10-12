@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+import threading
+
 from app.services.blocks import split
-from app.services.draft import _crop, _setters, _with_chapter, heading_of
+from app.services.draft import _crop, _setters, _with_chapter, _write_json, heading_of
 
 
 def _spans(src: str) -> list[tuple[int, int]]:
@@ -131,6 +135,36 @@ async def test_chapter_draft_is_typeset_once_and_then_cached(admin, anon):
     # The whole course in one call.
     whole = (await admin.get(f"/api/courses/{cid}/draft")).json()
     assert [x["chapter"]["id"] for x in whole["chapters"]] == [ch["id"]] and whole["chapters"][0]["typeset"] == 0
+
+
+def test_the_cache_files_of_a_course_survive_writers_in_many_threads_at_once(tmp_path):
+    path = tmp_path / "index.json"
+    errors: list[Exception] = []
+
+    def write(n):
+        try:
+            for i in range(300):
+                _write_json(path, {"n": n, "i": i})
+        except Exception as e:  # noqa: BLE001
+            errors.append(e)
+
+    threads = [threading.Thread(target=write, args=(n,)) for n in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == [] and json.loads(path.read_text())["i"] == 299
+    assert [p.name for p in tmp_path.iterdir()] == ["index.json"]
+
+
+async def test_two_new_chapters_drafted_at_once_both_answer(admin):
+    c = await _course(admin, ("Primo", "Secondo"))
+    cid = c["id"]
+    for ch in c["chapters"]:
+        await _put(admin, cid, ch["path"], CHAPTER.replace("Primo", ch["title"]))
+    rs = await asyncio.gather(*(admin.get(f"/api/courses/{cid}/chapters/{ch['id']}/draft") for ch in c["chapters"]))
+    assert [r.status_code for r in rs] == [200, 200]
+    assert all(b["pages"] and not b["error"] for r in rs for b in r.json()["blocks"])
 
 
 async def test_a_block_with_an_error_says_where_and_the_others_are_shown(admin):

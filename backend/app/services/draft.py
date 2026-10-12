@@ -26,6 +26,7 @@ import json
 import os
 import re
 import shutil
+import threading
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -126,7 +127,8 @@ def _read_json(path: Path, default: Any) -> Any:
 
 def _write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    # One temporary file per writer: two chapters of a course store their pictures at once, in threads of one process.
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     tmp.write_text(json.dumps(data))
     os.replace(tmp, path)
 
@@ -320,7 +322,9 @@ class ChapterRender:
         })
         if res.get("status") == "superseded":
             raise Superseded()
-        return await asyncio.to_thread(self.collect, wd, job, res, cands)
+        # The index, the labels and the meta are the course's: one chapter at a time reads and rewrites them.
+        async with _locks[("cache", self.course.id)]:
+            return await asyncio.to_thread(self.collect, wd, job, res, cands)
 
     def collect(self, wd: Path, job: str, res: dict[str, Any], cands: list[dict[str, Any] | None]) -> tuple[list[dict[str, Any] | None], list[str], int]:
         """The variant of every block after a run (typeset ones are stored), the warnings, how many were typeset."""
