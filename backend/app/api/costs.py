@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..models import AuditLog, Job
+from ..models import AuditLog, Job, User
 from ..security.auth import require_admin
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -33,6 +33,7 @@ def audit_out(r: AuditLog) -> dict[str, Any]:
         "duration_ms": r.duration_ms,
         "job_id": r.job_id,
         "chat_session_id": r.chat_session_id,
+        "user_id": r.user_id,
     }
 
 
@@ -76,7 +77,22 @@ async def costs(db: AsyncSession = Depends(get_db)) -> dict:
             .limit(100)
         )
     ).all()
+    by_user = (
+        await db.execute(
+            select(AuditLog.user_id, User.username, func.sum(AuditLog.tokens_in), func.sum(AuditLog.tokens_out),
+                   func.sum(AuditLog.cost_usd), func.count())
+            .outerjoin(User, User.id == AuditLog.user_id)
+            .where(AuditLog.status == "ok")
+            .group_by(AuditLog.user_id, User.username)
+            .order_by(func.sum(AuditLog.cost_usd).desc())
+        )
+    ).all()
     return {
+        # Who spent what (user None: calls of the server itself, provider tests, or of a deleted user).
+        "users": [
+            {"user_id": u, "username": name, "tokens_in": int(ti or 0), "tokens_out": int(to or 0), "cost_usd": float(c or 0), "requests": n}
+            for u, name, ti, to, c, n in by_user
+        ],
         "months": [
             {"month": m, "provider": p, "tokens_in": int(ti or 0), "tokens_out": int(to or 0), "cost_usd": float(c or 0), "requests": n}
             for m, p, ti, to, c, n in rows

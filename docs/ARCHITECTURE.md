@@ -52,7 +52,8 @@ reasoning behind every change since.
 * **Ownership**: every course has an owner (`security/access.py`). Editors read their own courses and the published
   ones and change only their own; viewers read every course; admins read and change everything. A course the user
   can't read is 404, one they can't change 403. Lessons, labs and import material are private to the owner (and admins,
-  viewers) even when the course is published; a job belongs to whoever started it and to its course's owner. Search,
+  viewers) even when the course is published; a job belongs to whoever started it and to its course's owner;
+  a conversation with the assistant to its author (admins see all), and asking it needs the right to change the course. Search,
   the home page and the assistant's retrieval only look in the courses the user may read. `tests/test_ownership.py` calls every route under a course as another
   editor.
 * **Sessions**: accounts live in `users`, each with a role (`viewer`, `editor`, `admin`) and possibly disabled (a

@@ -2,7 +2,8 @@
 
 The sweeps call every route under a course (its chapters and files, its lessons and labs, what its imports read) as
 another editor: on an unpublished course everything is 404 (an editor can't tell it exists); on a published one the
-text reads and changes are 403, while lessons, labs, import material and jobs stay 404 (they are never published).
+text reads and changes are 403, while lessons, labs, import material, jobs and conversations stay 404 (they are never
+published).
 """
 
 from __future__ import annotations
@@ -10,18 +11,15 @@ from __future__ import annotations
 import uuid
 
 from app.db import SessionLocal
-from app.models import IngestFigure, IngestItem, Job, SourceFile, Upload
+from app.models import ChatMessage, IngestFigure, IngestItem, Job, SourceFile, Upload
 from app.security import access
 
 from .test_access import _calls, _private, _table
 from .test_boundary import PARAM_RE
 
-# Path parameters that lead to a course (filled with the material's ids; any other parameter is 1).
-COURSE_PARAMS = {"course_id", "chapter_id", "lesson_id", "number", "sid", "item_id", "fig_id", "job_id"}
-
-# Routes that get their checks with the assistant, left out of the sweeps until then.
-NOT_YET = {"/api/courses/{course_id}/review/latest"}
-NOT_YET_PREFIXES = ("/api/chat/",)
+# Path parameters that lead to a course (filled with the material's ids; any other parameter is 1). `sid` is a
+# source file, or under /api/chat/ a conversation.
+COURSE_PARAMS = {"course_id", "chapter_id", "lesson_id", "number", "sid", "item_id", "fig_id", "job_id", "rid"}
 
 
 async def _course(client, published: bool = False, admin=None) -> dict:  # noqa: ANN001
@@ -57,6 +55,14 @@ async def _material(client, published: bool = False, admin=None) -> dict:  # noq
         db.add(fig)
         await db.commit()
         ids = {"sid": sf.id, "item_id": item.id, "fig_id": fig.id, "job_id": job.id}
+    r = await client.post("/api/chat/sessions", json={"course_id": course["id"]})
+    assert r.status_code == 201, r.text
+    chat = r.json()
+    async with SessionLocal() as db:
+        reply = ChatMessage(session_id=chat["id"], role="assistant", content="Fatto.", status="done")
+        db.add(reply)
+        await db.commit()
+        ids |= {"chat_sid": chat["id"], "rid": reply.id}
     return {"course": course, "course_id": course["id"], "chapter_id": course["chapters"][0]["id"],
             "lesson_id": lesson["id"], "number": lesson["number"], **ids}
 
@@ -64,16 +70,20 @@ async def _material(client, published: bool = False, admin=None) -> dict:  # noq
 def _course_routes(app):  # noqa: ANN001
     for r, method in _private(app):
         params = {m.group(1) for m in PARAM_RE.finditer(r.path)}
-        if params & COURSE_PARAMS and r.path not in NOT_YET and not r.path.startswith(NOT_YET_PREFIXES):
+        if params & COURSE_PARAMS:
             yield r, method
 
 
 def _is_private(route) -> bool:  # noqa: ANN001
-    """Lessons, labs, import material and jobs: never opened by publishing."""
-    return bool({access.private_access, access.job_access} & set(_calls(route.dependant)))
+    """Lessons, labs, import material, jobs and conversations: never opened by publishing."""
+    calls = set(_calls(route.dependant))
+    return bool({access.private_access, access.job_access} & calls) or (
+        access.chat_access in calls and ("{sid}" in route.path or "{rid}" in route.path))
 
 
 def _url(path: str, ids: dict) -> str:
+    if path.startswith("/api/chat/"):
+        ids = {**ids, "sid": ids["chat_sid"]}
     return PARAM_RE.sub(lambda m: str(ids.get(m.group(1), 1)), path)
 
 
@@ -198,3 +208,38 @@ async def test_a_job_belongs_to_whoever_started_it(editor, admin):
     assert job["user_id"] is not None and job["course_id"] == ids["course_id"]
     # The course's owner sees the job the admin started on it.
     assert (await editor.get(f"/api/jobs/{job['id']}")).status_code == 200
+
+
+async def test_a_conversation_is_its_authors(editor, other_editor, viewer, admin):
+    ids = await _material(editor, published=True, admin=admin)
+    course, sid = ids["course_id"], ids["chat_sid"]
+    mine = (await editor.get(f"/api/chat/sessions?course_id={course}")).json()
+    assert [s["id"] for s in mine] == [sid] and mine[0]["author"] == "editor"
+    assert (await other_editor.get(f"/api/chat/sessions?course_id={course}")).json() == []
+    assert (await other_editor.get(f"/api/chat/sessions/{sid}")).status_code == 404
+    # Admins see everybody's, with the author.
+    assert any(s["id"] == sid and s["author"] == "editor" for s in (await admin.get(f"/api/chat/sessions?course_id={course}")).json())
+    assert (await admin.get(f"/api/chat/sessions/{sid}")).json()["author"] == "editor"
+    # The assistant only works for whoever may change the course.
+    assert (await other_editor.post("/api/chat/sessions", json={"course_id": course})).status_code == 403
+    assert (await viewer.post("/api/chat/sessions", json={"course_id": course})).status_code == 403
+    unpublished = await _course(editor)
+    assert (await other_editor.post("/api/chat/sessions", json={"course_id": unpublished["id"]})).status_code == 404
+
+
+async def test_ai_calls_and_costs_are_split_by_user(editor, admin):
+    from app.egress import gate
+    from app.models import AuditLog
+
+    ids = await _material(editor)
+    async with SessionLocal() as db:
+        user_id = (await editor.get("/api/courses/" + str(ids["course_id"]))).json()["owner_id"]
+        assert await gate._caller(db, gate.GateContext(chat_session_id=ids["chat_sid"])) == user_id
+        job = Job(kind="ingest", title="x", status="succeeded", course_id=ids["course_id"], user_id=user_id)
+        db.add(job)
+        await db.flush()
+        assert await gate._caller(db, gate.GateContext(job_id=job.id)) == user_id
+        db.add(AuditLog(provider_name="p", provider_type="fake", model="m", status="ok", user_id=user_id, cost_usd=0.5, tokens_in=10))
+        await db.commit()
+    users = (await admin.get("/api/costs")).json()["users"]
+    assert any(u["username"] == "editor" and u["cost_usd"] >= 0.5 for u in users)

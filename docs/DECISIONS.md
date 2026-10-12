@@ -629,3 +629,11 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      course" mode: each caller names the courses to look in (the import's course, the assistant's course), so one
      user's notes can't reach another user's import or assistant. *Alternative:* filtering retrieval results after the
      fact (an unfiltered search is one forgotten filter away from a leak).
+119. **A conversation with the assistant is its author's, and every AI call records its user (#75).**
+     `chat_sessions.user_id` (existing ones were the admin's): a user lists and opens only their own conversations, an
+     admin everybody's with the author's name; the latest review and the home page's AI activity follow the same rule.
+     Asking the assistant needs the right to change the course (a viewer or another editor gets 403), so an editor's
+     assistant never works on someone else's text. `audit_log.user_id` is taken, when the call starts, from the
+     conversation or the job the call is for; the costs page adds a «Per utente» split when more than one user spent.
+     «Non capita» marks and the last open page stay shared per lesson for now (#87). *Alternative:* conversations shared
+     by everybody who can read the course (one user's questions are not another's business).

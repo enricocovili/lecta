@@ -9,10 +9,13 @@ open them, since only the course's text is published.
 A job is seen by whoever started it, the owner of its course, admins and viewers; changed (cancelled, retried,
 deleted) by whoever started it, the course's owner and admins.
 
+A conversation with the assistant is its author's (admins see and continue them all); asking the assistant needs the
+right to change the course.
+
 A course that can't be read is answered with 404, like an unknown one (an editor can't probe what others have);
 one that can be read but not changed with 403.
 
-The routers depend on `access`, `private_access` or `job_access`, which check the course (or job) named by the
+The routers depend on `access`, `private_access`, `job_access` or `chat_access`, which check the course (or job) named by the
 route's path before its body is read, so no route under a course can forget it.
 """
 
@@ -25,7 +28,7 @@ from sqlalchemy import ColumnElement, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..models import Course, IngestFigure, IngestItem, Job, Lesson, SourceFile, Upload, User
+from ..models import ChatMessage, ChatSession, Course, IngestFigure, IngestItem, Job, Lesson, SourceFile, Upload, User
 from .auth import UNSAFE, AuthContext, forbidden, has_role, require_content
 
 
@@ -95,6 +98,20 @@ async def check_job(acc: Access, db: AsyncSession, job_id: int) -> Job:
     return job
 
 
+def chats_visible(user: User) -> ColumnElement[bool]:
+    """A filter on `ChatSession` for the conversations the user sees."""
+    return true() if has_role(user, "admin") else ChatSession.user_id == user.id
+
+
+async def check_chat(acc: Access, db: AsyncSession, session: ChatSession | None) -> ChatSession:
+    """The conversation if it is `acc`'s (or `acc` is an admin), else 404; writing to it needs the course too (403)."""
+    if session is None or not (session.user_id == acc.user.id or has_role(acc.user, "admin")):
+        raise _not_found()
+    if acc.write:
+        check(acc, await db.get(Course, session.course_id), write=True, private=session.lab_id is not None or session.lesson_id is not None)
+    return session
+
+
 # --------------------------------------------------------------------------- the routers' dependencies
 
 
@@ -157,4 +174,17 @@ async def private_access(request: Request, ctx: AuthContext = Depends(require_co
                 raise _not_found()
         else:
             check(acc, await db.get(Course, course_id), private=True)
+    return acc
+
+
+async def chat_access(request: Request, ctx: AuthContext = Depends(require_content), db: AsyncSession = Depends(get_db)) -> Access:
+    """The assistant: the path's conversation (`{sid}`) or reply (`{rid}`) must be the user's, a `{course_id}` readable."""
+    acc = _access(request, ctx)
+    if "sid" in request.path_params:
+        await check_chat(acc, db, await db.get(ChatSession, _param(request, "sid")))
+    if "rid" in request.path_params:
+        reply = await db.get(ChatMessage, _param(request, "rid"))
+        await check_chat(acc, db, await db.get(ChatSession, reply.session_id) if reply is not None else None)
+    if "course_id" in request.path_params:
+        check(acc, await db.get(Course, _param(request, "course_id")))
     return acc

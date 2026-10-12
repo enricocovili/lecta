@@ -207,6 +207,7 @@ export default function AiUsage() {
   const log = useApi(() => get<Row[]>("/api/audit?limit=500"));
   const costs = useApi(() =>
     get<{
+      users: { user_id: number | null; username: string | null; tokens_in: number; tokens_out: number; cost_usd: number; requests: number }[];
       months: { month: string; provider: string; tokens_in: number; tokens_out: number; cost_usd: number; requests: number }[];
       jobs: { id: number; title: string; tokens_in: number; tokens_out: number; cost_usd: number; created_at: string }[];
     }>("/api/costs"),
@@ -261,6 +262,24 @@ export default function AiUsage() {
                   </div>
                 )}
               </section>
+              {costs.data.users.length > 1 && (
+                <section>
+                  <div className="section-label">Per utente</div>
+                  <div className="card flush rows">
+                    {costs.data.users.map((u) => (
+                      <div key={u.user_id ?? "server"} className="aud-cost-row">
+                        <span className="grow">
+                          <strong>{u.username ?? (u.user_id === null ? "Server" : "Utente eliminato")}</strong>
+                          <span className="small muted">
+                            {u.requests} {u.requests === 1 ? "richiesta" : "richieste"} · {fmtTok(u.tokens_in + u.tokens_out)} token
+                          </span>
+                        </span>
+                        <span className="mono">{fmtMoney(u.cost_usd)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
               <section>
                 <div className="section-label">Per job</div>
                 {costs.data.jobs.length === 0 ? (

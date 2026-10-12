@@ -440,6 +440,9 @@ class AuditLog(Base):
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
     job_id: Mapped[int | None] = mapped_column(BigInteger)
     chat_session_id: Mapped[int | None] = mapped_column(Integer)
+    # Whose call it was (the conversation's or the job's user; None: the server or a provider test). Not a foreign
+    # key: the log outlives users.
+    user_id: Mapped[int | None] = mapped_column(Integer)
 
 
 # --------------------------------------------------------------------------- uploads & sources
@@ -595,6 +598,8 @@ class ChatSession(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
+    # Who started it: only they (and the admins) see it.
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     chapter_id: Mapped[int | None] = mapped_column(ForeignKey("chapters.id", ondelete="SET NULL"))
     # A conversation of a lesson's lab (its assistant works on the lab's files); None: the course's text.
     lab_id: Mapped[int | None] = mapped_column(ForeignKey("labs.id", ondelete="CASCADE"), index=True)

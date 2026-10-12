@@ -21,11 +21,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import appsecrets
 from ..db import SessionLocal
-from ..models import AuditLog, Job, Provider
+from ..models import AuditLog, ChatSession, Job, Provider
 from ..services import blobs
 from ..services import settings as settings_svc
 from .adapters import ADAPTERS
@@ -269,8 +270,18 @@ def parse_json(text: str) -> Any:
     raise GateSendError("the model did not return valid JSON")
 
 
+async def _caller(db: AsyncSession, ctx: GateContext) -> int | None:
+    """The user a call is made for: the conversation's, else the job's."""
+    if ctx.chat_session_id is not None:
+        return (await db.execute(select(ChatSession.user_id).where(ChatSession.id == ctx.chat_session_id))).scalar_one_or_none()
+    if ctx.job_id is not None:
+        return (await db.execute(select(Job.user_id).where(Job.id == ctx.job_id))).scalar_one_or_none()
+    return None
+
+
 async def _begin_audit(db: AsyncSession, req: EgressRequest, p: Provider, model: str, ctx: GateContext) -> AuditLog:
     row = AuditLog(
+        user_id=await _caller(db, ctx),
         provider_id=p.id,
         provider_name=p.name,
         provider_type=p.type,

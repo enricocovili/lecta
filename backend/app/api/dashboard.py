@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..models import Chapter, ChatMessage, ChatSession, Course, Job, ProjectFile
 from ..pipeline import agent
-from ..security.access import Access, access, jobs_readable, readable
+from ..security.access import Access, access, chats_visible, jobs_readable, readable
 from ..services import jobs as jobs_svc
 from ..services import overview
 from .jobs import job_out
@@ -19,14 +19,13 @@ router = APIRouter(dependencies=[Depends(access)])
 
 
 async def _latest_reviews(db: AsyncSession, acc: Access) -> dict[int, dict]:
-    """The newest document feedback of every course the user owns (or sees, as admin or viewer): {course_id: {score,
-    verdict, at, stale}}."""
+    """The newest document feedback of every course, from the user's conversations (an admin's: anybody's):
+    {course_id: {score, verdict, at, stale}}."""
     rows = (
         await db.execute(
             select(ChatSession.course_id, ChatMessage.review, ChatMessage.created_at, ChatMessage.id)
             .join(ChatMessage, ChatMessage.session_id == ChatSession.id)
-            .join(Course, Course.id == ChatSession.course_id)
-            .where(ChatMessage.review.is_not(None), ChatMessage.status == "done", readable(acc.user, private=True))
+            .where(ChatMessage.review.is_not(None), ChatMessage.status == "done", chats_visible(acc.user))
             .order_by(ChatMessage.id)
         )
     ).all()
@@ -34,13 +33,13 @@ async def _latest_reviews(db: AsyncSession, acc: Access) -> dict[int, dict]:
 
 
 async def _ai_activity(db: AsyncSession, acc: Access, limit: int = 12) -> list[dict]:
-    """What the assistant did lately on the user's courses: one entry per turn that answered or changed something."""
+    """What the assistant did lately in the user's conversations: one entry per turn that answered or changed something."""
     rows = (
         await db.execute(
             select(ChatMessage, ChatSession.course_id, Course.name)
             .join(ChatSession, ChatSession.id == ChatMessage.session_id)
             .join(Course, Course.id == ChatSession.course_id)
-            .where(ChatMessage.role == "assistant", readable(acc.user, private=True))
+            .where(ChatMessage.role == "assistant", chats_visible(acc.user))
             .order_by(ChatMessage.id.desc())
             .limit(limit)
         )

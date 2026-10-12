@@ -14,17 +14,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..egress import gate
-from ..models import Chapter, ChatMessage, ChatSession, Course, Lab, LabFile, Lesson, LessonPage
+from ..models import Chapter, ChatMessage, ChatSession, Course, Lab, LabFile, Lesson, LessonPage, User
 from ..pipeline import agent, lab_agent, lesson_agent
-from ..security.auth import require_content
+from ..security.access import Access, chat_access, chats_visible, check
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(chat_access)])
 
 message_out = agent.message_out
 
 
-def session_out(s: ChatSession) -> dict[str, Any]:
-    return {"id": s.id, "course_id": s.course_id, "chapter_id": s.chapter_id, "lab_id": s.lab_id, "lesson_id": s.lesson_id, "title": s.title, "created_at": s.created_at, "updated_at": s.updated_at}
+def session_out(s: ChatSession, author: str | None = None) -> dict[str, Any]:
+    return {"id": s.id, "course_id": s.course_id, "chapter_id": s.chapter_id, "lab_id": s.lab_id, "lesson_id": s.lesson_id, "title": s.title,
+            "user_id": s.user_id, "author": author, "created_at": s.created_at, "updated_at": s.updated_at}
+
+
+async def _author(db: AsyncSession, s: ChatSession) -> str | None:
+    return (await db.execute(select(User.username).where(User.id == s.user_id))).scalar_one_or_none()
 
 
 def _running(s: ChatSession) -> agent.Turn | None:
@@ -42,14 +47,18 @@ async def _session(db: AsyncSession, sid: int) -> ChatSession:
 
 @router.get("/chat/sessions")
 async def list_sessions(course_id: int, chapter_id: int | None = None, lab_id: int | None = None, lesson_id: int | None = None,
-                        db: AsyncSession = Depends(get_db)) -> list[dict]:
-    """The conversations about the course's text, or (with `lab_id`) those of one of its labs, or (with `lesson_id`) of a lesson."""
-    q = select(ChatSession).where(ChatSession.course_id == course_id).order_by(ChatSession.updated_at.desc())
+                        acc: Access = Depends(chat_access), db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """The user's conversations (an admin's: everybody's, with the author) about the course's text, or (with `lab_id`)
+    those of one of its labs, or (with `lesson_id`) of a lesson."""
+    q = (
+        select(ChatSession, User.username).join(User, User.id == ChatSession.user_id)
+        .where(ChatSession.course_id == course_id, chats_visible(acc.user)).order_by(ChatSession.updated_at.desc())
+    )
     q = q.where(ChatSession.lab_id == lab_id) if lab_id is not None else q.where(ChatSession.lab_id.is_(None))
     q = q.where(ChatSession.lesson_id == lesson_id) if lesson_id is not None else q.where(ChatSession.lesson_id.is_(None))
     if chapter_id is not None:
         q = q.where(ChatSession.chapter_id == chapter_id)
-    return [session_out(s) for s in (await db.execute(q)).scalars()]
+    return [session_out(s, author) for s, author in (await db.execute(q)).all()]
 
 
 class SessionIn(BaseModel):
@@ -61,10 +70,9 @@ class SessionIn(BaseModel):
 
 
 @router.post("/chat/sessions", status_code=201)
-async def create_session(body: SessionIn, db: AsyncSession = Depends(get_db)) -> dict:
-    course = await db.get(Course, body.course_id)
-    if course is None:
-        raise HTTPException(status_code=404, detail="Not Found")
+async def create_session(body: SessionIn, acc: Access = Depends(chat_access), db: AsyncSession = Depends(get_db)) -> dict:
+    # The assistant works only for whoever may change the course (a lesson's or lab's: never published).
+    course = check(acc, await db.get(Course, body.course_id), write=True, private=bool(body.lab_id or body.lesson_id))
     if body.chapter_id:
         ch = await db.get(Chapter, body.chapter_id)
         if ch is None or ch.course_id != course.id:
@@ -78,18 +86,18 @@ async def create_session(body: SessionIn, db: AsyncSession = Depends(get_db)) ->
         lesson = await db.get(Lesson, body.lesson_id)
         if lesson is None or lesson.course_id != course.id or body.lab_id:
             raise HTTPException(status_code=404, detail="Not Found")
-    s = ChatSession(course_id=course.id, chapter_id=None if body.lab_id or body.lesson_id else body.chapter_id, lab_id=body.lab_id,
+    s = ChatSession(course_id=course.id, user_id=acc.user.id, chapter_id=None if body.lab_id or body.lesson_id else body.chapter_id, lab_id=body.lab_id,
                     lesson_id=body.lesson_id, title=body.title or "Nuova conversazione")
     db.add(s)
     await db.commit()
-    return session_out(s)
+    return session_out(s, acc.user.username)
 
 
 @router.get("/chat/sessions/{sid}")
 async def get_session(sid: int, db: AsyncSession = Depends(get_db)) -> dict:
     s = await _session(db, sid)
     msgs = (await db.execute(select(ChatMessage).where(ChatMessage.session_id == sid).order_by(ChatMessage.id))).scalars().all()
-    out = session_out(s)
+    out = session_out(s, await _author(db, s))
     out["messages"] = [message_out(m) for m in msgs]
     return out
 
@@ -236,15 +244,15 @@ async def undo_reply(rid: int, db: AsyncSession = Depends(get_db)) -> dict:
 
 
 @router.get("/courses/{course_id}/review/latest")
-async def latest_review(course_id: int, db: AsyncSession = Depends(get_db)) -> dict:
-    course = await db.get(Course, course_id)
-    if course is None:
-        raise HTTPException(status_code=404, detail="Not Found")
+async def latest_review(course_id: int, acc: Access = Depends(chat_access), db: AsyncSession = Depends(get_db)) -> dict:
+    """The newest review of the course's text among the user's conversations (an admin's: anybody's)."""
+    course = check(acc, await db.get(Course, course_id))
     row = (
         await db.execute(
             select(ChatMessage)
             .join(ChatSession, ChatSession.id == ChatMessage.session_id)
-            .where(ChatSession.course_id == course_id, ChatSession.lab_id.is_(None), ChatMessage.review.is_not(None), ChatMessage.status == "done")
+            .where(ChatSession.course_id == course_id, ChatSession.lab_id.is_(None), ChatMessage.review.is_not(None), ChatMessage.status == "done",
+                   chats_visible(acc.user))
             .order_by(ChatMessage.id.desc())
             .limit(1)
         )
