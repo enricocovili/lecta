@@ -2,8 +2,8 @@
 
 A lesson can have a **laboratory** (`labs`, one per lesson, deleted with it): the files the lecturer explains in the lab
 (sources of any language, notebooks, PDFs, pictures), read in Lecta and commented while the lecture goes on. The lab is a
-section of its lesson, not of the course text: nothing of it goes into the chapters (DECISIONS 103). Its chapter, when one is
-needed, is the lesson's (`lessons.chapter_id`).
+section of its lesson, not of the course text: the files stay out of the chapters (DECISIONS 103); only its **comments** can go in,
+when the lesson is integrated ([Comments in the text](#comments-in-the-text)). Its chapter, when one is needed, is the lesson's (`lessons.chapter_id`).
 
 ## Files
 
@@ -92,6 +92,16 @@ deleted stays on the file as **«Righe rimosse»** (`anchor.gone`, with the text
 marked in the code. When a text file is **uploaded again** under the same name, or later changed by the assistant, the
 server does the same with a line diff (`services/labs.remap_anchors`: the unchanged lines carry the comment; none left →
 `gone`), and the page reads the file and its comments again.
+
+## Comments in the text
+
+«Integra appunti» on the lesson has «Porta i commenti del laboratorio» (shown when the lesson has a lab, on when it has
+comments; `generate` takes `lab_comments`). The comments then go to the import as the last section of the lesson's notes,
+«Commenti del laboratorio» (`services/labs.comments_markdown`, taken with the snapshot): one heading per comment with its file and
+place (lines, cell, page, whole file, removed lines), the code it is about in a fence (the lines, or the notebook cell; at most
+60 lines), then the comment. The writing prompt (`notes.compose`) treats them as class notes: each one goes where its topic is
+discussed, and the code is quoted (a few lines, `verbatim`) only when the comment cannot be understood without it and is
+strictly about those lines; otherwise the point is said in words. The free notes of the lab stay out.
 
 ## Notes
 

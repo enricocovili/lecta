@@ -6,7 +6,8 @@ snapshot of the lesson taken when the button was pressed:
 * the slides PDF, with the slides that carry handwriting replaced by a picture of the slide *with* the strokes
   (so the reading model sees what was underlined, circled or written in the margin);
 * the typed notes as one Markdown file, a section per slide («Slide 5»), which is the backbone of the text;
-* every blank page written on by hand, as a picture (read like a photo of handwritten notes).
+* every blank page written on by hand, as a picture (read like a photo of handwritten notes);
+* when asked, the comments of the lesson's lab, as the last section of the notes («Commenti del laboratorio»).
 
 Nothing else changes: grouping, reading, writing, placement and the compile check are the import's own.
 """
@@ -77,6 +78,10 @@ async def prepare(ctx: JobContext, upload_id: int, snapshot_blob: str) -> dict[s
     pages = numbered
     lesson_meta = {"id": snap.get("lesson_id"), "title": title}
     md = ls.notes_markdown(title, pages)
+    # The comments of the lesson's lab, when asked for: the last section of the notes (the writing prompt says what to do
+    # with them and their code).
+    if snap.get("lab_comments"):
+        md = (md or f"# {title.strip() or 'Lezione'}\n") + "\n" + snap["lab_comments"]
 
     async with SessionLocal() as db:
         await db.execute(delete(SourceFile).where(SourceFile.upload_id == upload_id, SourceFile.meta["generated"].astext == "true"))

@@ -205,3 +205,80 @@ async def follow_comments(db: AsyncSession, f: LabFile, old: str, new: str) -> N
             c.anchor = anchor
             c.version += 1
             c.updated_at = datetime.now(UTC)
+
+
+# --------------------------------------------------------------------------- comments into the lesson's text
+
+# A comment brings at most this many lines of its code into the notes (the writer quotes code only when it must anyway).
+MAX_COMMENT_CODE_LINES = 60
+
+
+def _fence(code: str, language: str | None) -> str:
+    ticks = "```"
+    while ticks in code:
+        ticks += "`"
+    return f"{ticks}{language or ''}\n{code.rstrip()}\n{ticks}"
+
+
+def _cell_source(content: str | None, n: int) -> str:
+    try:
+        cells = json.loads(content or "").get("cells") or []
+        src = cells[n - 1].get("source", "")
+    except (ValueError, AttributeError, IndexError, TypeError):
+        return ""
+    return "".join(src) if isinstance(src, list) else str(src)
+
+
+def _cut(code: str) -> str:
+    lines = code.splitlines()
+    return "\n".join(lines[:MAX_COMMENT_CODE_LINES] + (["…"] if len(lines) > MAX_COMMENT_CODE_LINES else []))
+
+
+def _where(c: LabComment) -> tuple[int, int, str]:
+    a = c.anchor or {}
+    if "from" in a:
+        return (2 if a.get("gone") else 1, a["from"], "")
+    for key in ("cell", "page"):
+        if key in a:
+            return (1, a[key], "")
+    return (0, 0, "")
+
+
+def comments_markdown(files: list[LabFile], comments: list[LabComment]) -> str | None:
+    """The lab's comments as a section of the lesson's notes («Commenti del laboratorio»): one heading per comment with its file
+    and place, the code it is about (the lines, the notebook cell), then what the student wrote. None without comments."""
+    by_id = {f.id: f for f in files}
+    out: list[str] = []
+    for c in sorted(comments, key=lambda c: (by_id[c.file_id].path if c.file_id in by_id else "", _where(c), c.created_at)):
+        f = by_id.get(c.file_id)
+        body = (c.body or "").strip()
+        if f is None or not body:
+            continue
+        a = c.anchor or {}
+        code = ""
+        if "from" in a:
+            lines = (f.content or "").splitlines()
+            if a.get("gone") or not lines:
+                place, code = "righe rimosse", a.get("text") or ""
+            else:
+                place = f"riga {a['from']}" if a["from"] == a["to"] else f"righe {a['from']}–{a['to']}"
+                code = "\n".join(lines[a["from"] - 1 : a["to"]]) or a.get("text") or ""
+        elif "cell" in a:
+            place, code = f"cella {a['cell']}", _cell_source(f.content, a["cell"])
+        elif "page" in a:
+            place = f"pagina {a['page']}"
+        else:
+            place = "tutto il file"
+        part = f"### {f.path}, {place}\n\n"
+        if code.strip():
+            part += _fence(_cut(code), f.language) + "\n\n"
+        out.append(part + body)
+    if not out:
+        return None
+    return "## Commenti del laboratorio\n\n" + "\n\n".join(out) + "\n"
+
+
+async def lesson_comments_markdown(db: AsyncSession, lab_id: int) -> str | None:
+    files = list((await db.execute(select(LabFile).where(LabFile.lab_id == lab_id))).scalars())
+    comments = list((await db.execute(select(LabComment).where(LabComment.lab_id == lab_id))).scalars())
+    return comments_markdown(files, comments)

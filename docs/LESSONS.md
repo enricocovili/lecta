@@ -125,7 +125,7 @@ points per page, sane coordinates, colour and width.
 | `GET /api/lessons/{id}/pdf` | the slides |
 | `GET /api/lessons/{id}/annotated.pdf` | slides and added pages in order with the strokes and the typed text drawn on them |
 | `GET /api/lessons/{id}/notes.md` | the typed notes as the import receives them |
-| `POST /api/lessons/{id}/generate` `{guidelines?, save_guidelines, chapter_id?, placement?, mark_completed=true}` | starts the import → `{job_id}`; `placement`: `update` (default when the lesson has a chapter), `new_chapter` (default otherwise), `auto` |
+| `POST /api/lessons/{id}/generate` `{guidelines?, save_guidelines, chapter_id?, placement?, mark_completed=true, lab_comments=false}` | starts the import → `{job_id}`; `placement`: `update` (default when the lesson has a chapter), `new_chapter` (default otherwise), `auto` |
 
 ## Sharing a lesson
 
@@ -155,6 +155,7 @@ The owner manages the links in «Condividi»: create, copy, replace (the old lin
 | the slides PDF | the PDF file; slides that carry ink are replaced by a **picture of the slide with the strokes drawn on it** and routed to the vision step (`why: handwriting of the student`), so the model sees what was underlined, circled or written in the margin |
 | the typed notes | one Markdown file `# Title` + a `## Slide N` section per slide (`## Pagina aggiunta dopo la slide N` for added pages): the **backbone** of the text, in the order of the lecture |
 | a blank page with ink | a picture read like a photo of handwritten notes |
+| the lab's comments (with «Porta i commenti del laboratorio») | the last section of the notes, «Commenti del laboratorio» ([LABS.md](LABS.md#comments-in-the-text)) |
 
 Then the usual pipeline runs: everything of one lesson is **one group** (one chapter), reading, writing, placement (**the first time a new chapter: one lesson, one chapter**;
 `chapter_id` puts the text in that chapter, `placement: "auto"` lets the usual placement compare with the existing chapters), compile check. The bond between notes and slides is kept end to end: the reading step marks every

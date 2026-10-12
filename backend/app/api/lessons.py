@@ -24,6 +24,7 @@ from ..models import Chapter, ChatSession, Course, Job, Lab, Lesson, LessonPage,
 from ..security.auth import require_admin
 from ..services import blobs
 from ..services import jobs as jobs_svc
+from ..services import labs as labs_svc
 from ..services import lessons as ls
 from ..services import settings as settings_svc
 from ..services.texttools import slugify
@@ -498,6 +499,8 @@ class GenerateIn(BaseModel):
     placement: Literal["update", "new_chapter", "auto"] | None = None
     # Set the lesson «Completata» once its text is written into a chapter (the dialog's tick, on by default).
     mark_completed: bool = True
+    # Bring the comments of the lesson's lab into the text (the dialog's tick, on when the lab has comments).
+    lab_comments: bool = False
 
 
 @router.post("/lessons/{lesson_id}/generate")
@@ -537,6 +540,10 @@ async def generate(lesson_id: int, body: GenerateIn, db: AsyncSession = Depends(
         "lesson_id": lesson.id, "title": lesson.title, "pdf_blob": lesson.pdf_blob, "pdf_name": lesson.pdf_name, "pdf_pages": lesson.pdf_pages,
         "pages": [{"position": p.position, "kind": p.kind, "slide_page": p.slide_page, "ratio": p.ratio, "notes": p.notes, "ink": p.ink} for p in pages],
     }
+    if body.lab_comments:
+        lab_id = (await db.execute(select(Lab.id).where(Lab.lesson_id == lesson.id))).scalar_one_or_none()
+        if lab_id is not None:
+            snapshot["lab_comments"] = await labs_svc.lesson_comments_markdown(db, lab_id)
     snap_blob = blobs.put_bytes(json.dumps(snapshot, ensure_ascii=False).encode())
     up = Upload(status="queued", target_course_id=course.id, target_chapter_id=chapter_id, note=f"Lezione: {lesson.title}"[:2000], via="lesson")
     db.add(up)

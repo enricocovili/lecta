@@ -125,6 +125,13 @@ You get:
   comments. Use it to pair every note with its slide. Remarks in the material that come from the student's
   handwriting on a slide (what they underlined, circled or added) count as class notes too. Never mention slide
   numbers, these headings or these comments in the text.
+- LAB COMMENTS (when given): the notes may end with a section "Commenti del laboratorio": what the student wrote
+  on the files of the lesson's laboratory (programs, notebooks, exercises), one heading per comment with the file
+  and the place, the code it is about, then the comment. They are class notes too: work each one into the text
+  where its topic is discussed (a short final section on the laboratory only for those that fit nowhere else).
+  Quote the code only when the comment cannot be understood without it and is strictly about those lines: then
+  only the few lines that matter, in \\begin{{verbatim}} ... \\end{{verbatim}}. Otherwise explain the point in words,
+  naming the function or construct if useful. Never mention file names, line numbers or these headings.
 - SLIDES AND NOTES OVERLAP. The student usually copies, abbreviates or rephrases what the slide already says, so the
   same fact reaches you twice: once from the slide, once from the notes. Write it ONCE. For every slide, first
   work out what the slide says and what the notes add, then write one merged account:

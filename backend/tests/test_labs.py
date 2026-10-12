@@ -7,8 +7,12 @@ import uuid
 
 import pytest
 
+from app.models import LabComment, LabFile
+from app.pipeline import compose
 from app.services import labs as lb
 
+from .conftest import wait_job
+from .test_ingest_e2e import setup_fake
 from .test_lessons import new_lesson, slides_pdf
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
@@ -300,3 +304,62 @@ async def test_the_lab_is_shared_with_the_lesson_links(admin, anon):
     # A revoked link sees nothing.
     await admin.delete(f"/api/lessons/{lid}/shares/write")
     assert (await anon.get(f"/api/public/lesson/{write}/lab")).status_code == 404
+
+
+# --------------------------------------------------------------------------- comments into the lesson's text
+
+
+def test_the_comments_become_a_section_of_the_notes_with_the_code_they_are_about():
+    code = "\n".join(f"riga {i}" for i in range(1, 101))
+    files = [LabFile(id=1, path="src/main.c", language="c", content=code), LabFile(id=2, path="es.ipynb", language="python", content=NOTEBOOK),
+             LabFile(id=3, path="testo.pdf", language=None, content=None)]
+    at = lambda n: __import__("datetime").datetime(2026, 10, 1, 10, n)  # noqa: E731
+    comments = [
+        LabComment(id="a", file_id=1, anchor={"from": 3, "to": 4, "text": "riga 3\nriga 4"}, body="Qui si **inizializza** il buffer", created_at=at(2)),
+        LabComment(id="b", file_id=1, anchor={}, body="Il programma dell'esercizio 1", created_at=at(5)),
+        LabComment(id="c", file_id=1, anchor={"from": 1, "to": 100, "text": ""}, body="Tutto il ciclo", created_at=at(1)),
+        LabComment(id="d", file_id=1, anchor={"from": 7, "to": 7, "text": "vecchia riga", "gone": True}, body="Tolta poi", created_at=at(0)),
+        LabComment(id="e", file_id=2, anchor={"cell": 1}, body="Stampa uno", created_at=at(3)),
+        LabComment(id="f", file_id=3, anchor={"page": 2}, body="La consegna", created_at=at(4)),
+        LabComment(id="g", file_id=3, anchor={}, body="   ", created_at=at(6)),
+    ]
+    md = lb.comments_markdown(files, comments)
+    heads = [ln for ln in md.splitlines() if ln.startswith("#")]
+    assert heads == ["## Commenti del laboratorio", "### es.ipynb, cella 1", "### src/main.c, tutto il file", "### src/main.c, righe 1–100",
+                     "### src/main.c, righe 3–4", "### src/main.c, righe rimosse", "### testo.pdf, pagina 2"]
+    assert "```c\nriga 3\nriga 4\n```\n\nQui si **inizializza** il buffer" in md
+    assert "```python\nprint(1)\n```\n\nStampa uno" in md and "```c\nvecchia riga\n```" in md
+    # A long stretch of code is cut; a page of a PDF and a whole file carry no code.
+    assert "riga 60\n…\n```" in md and "riga 61" not in md
+    assert "### testo.pdf, pagina 2\n\nLa consegna" in md and "### src/main.c, tutto il file\n\nIl programma" in md
+    assert lb.comments_markdown(files, []) is None and lb.comments_markdown(files, [comments[-1]]) is None
+
+
+async def test_integrating_a_lesson_can_bring_its_lab_comments_into_the_text(admin, worker, monkeypatch):
+    await setup_fake(admin)
+    seen: list[str] = []
+    real_ai = compose.ai
+
+    async def spy(ctx, req, **kw):  # noqa: ANN001
+        if req.task == "notes.compose":
+            seen.append(req.system + "\n".join(p.text or "" for m in req.messages for p in m.parts if p.type == "text"))
+        return await real_ai(ctx, req, **kw)
+
+    monkeypatch.setattr(compose, "ai", spy)
+    _, lesson = await new_lesson(admin, n=1)
+    lid = lesson["id"]
+    await admin.put(f"/api/lessons/{lid}/pages/{lesson['pages'][0]['id']}", json={"notes": "- il campionamento"})
+    assert (await admin.post(f"/api/lessons/{lid}/lab")).status_code == 201
+    f = (await upload(admin, lid, "camp.py", "fs = 8000\nx = campiona(segnale, fs)\n")).json()
+    await admin.put(f"/api/lessons/{lid}/lab/comments/{uuid.uuid4()}",
+                    json={"file_id": f["id"], "anchor": {"from": 2, "to": 2, "text": "x = campiona(segnale, fs)"}, "body": "campiona a 8 kHz"})
+    assert (await admin.get(f"/api/lessons/{lid}")).json()["lab"] == {"files": 1, "comments": 1}
+
+    r = await admin.post(f"/api/lessons/{lid}/generate", json={"lab_comments": True})
+    assert r.status_code == 200, r.text
+    j = await wait_job(admin, r.json()["job_id"], timeout=300)
+    assert j["status"] == "succeeded", j["error"]
+    notes = [it for it in (await admin.get(f"/api/jobs/{j['id']}/ingest")).json()["items"] if it["kind"] == "markdown"][0]["text"]
+    assert "Slide 1" in notes and "Commenti del laboratorio" in notes and "camp.py, riga 2" in notes
+    assert "x = campiona(segnale, fs)" in notes and "campiona a 8 kHz" in notes
+    assert len(seen) == 1 and "campiona a 8 kHz" in seen[0] and "Quote the code only when the comment cannot be understood" in seen[0]

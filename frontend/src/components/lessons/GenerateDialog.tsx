@@ -17,6 +17,8 @@ export interface LessonSummary {
   slides: number;
   notes_pages: number;
   ink_pages: number;
+  /** comments on the files of the lesson's lab (null: the lesson has no lab) */
+  lab_comments: number | null;
 }
 
 const pages = (n: number) => (n === 1 ? "1 pagina" : `${n} pagine`);
@@ -25,6 +27,7 @@ export default function GenerateDialog({ lesson, beforeSend, onClose }: { lesson
   const [guidelines, setGuidelines] = useState(lesson.course_guidelines);
   const [save, setSave] = useState(true);
   const [complete, setComplete] = useState(true);
+  const [labComments, setLabComments] = useState((lesson.lab_comments ?? 0) > 0);
   // "update" = the chapter the lesson already lives in, integrated with what is there; "new" = a chapter of its own (one lesson,
   // one chapter); "auto" = Lecta compares with the chapters of the subject; else a chapter id.
   const [where, setWhere] = useState(lesson.chapter_id ? "update" : "new");
@@ -43,6 +46,7 @@ export default function GenerateDialog({ lesson, beforeSend, onClose }: { lesson
         guidelines: guidelines.trim(),
         save_guidelines: save,
         mark_completed: complete,
+        lab_comments: labComments,
         chapter_id: /^\d+$/.test(where) ? Number(where) : null,
         placement: where === "auto" ? "auto" : where === "update" ? "update" : "new_chapter",
       });
@@ -98,6 +102,13 @@ export default function GenerateDialog({ lesson, beforeSend, onClose }: { lesson
           <input type="checkbox" checked={complete} onChange={(e) => setComplete(e.target.checked)} data-testid="generate-complete" />
           Segna la lezione come completata
         </label>
+        {lesson.lab_comments !== null && (
+          <label className="check small">
+            <input type="checkbox" checked={labComments} onChange={(e) => setLabComments(e.target.checked)} data-testid="generate-lab-comments" />
+            Porta i commenti del laboratorio ({lesson.lab_comments === 1 ? "1 commento" : `${lesson.lab_comments} commenti`}): entrano nel testo, con il
+            codice solo dove serve per capirli
+          </label>
+        )}
         <label className="field">
           Dove
           <select value={where} onChange={(e) => setWhere(e.target.value)} data-testid="generate-where">

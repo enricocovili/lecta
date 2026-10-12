@@ -547,6 +547,12 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 
 ## Assistant
 
+112. **A lab's comments reach the text as class notes, the code only when a comment needs it (#60).** The lab stays apart from
+     the theory (103), but what the student wrote on its files is often the explanation the lecturer gave aloud. So, when asked
+     in «Integra appunti», every comment travels as the last section of the lesson's notes, with the code it sits on so the
+     model can understand it, and the writing prompt places each one by topic and quotes code only when the comment is
+     strictly about it and meaningless without it. *Alternatives:* choosing comments one by one in the lab (more clicks for
+     a rare need); always quoting the code (pages of listings in a study text).
 111. **The lesson's assistant is a one-shot popup on the slide, not a conversation beside the pages.** During and after a
      lecture the question is about one slide: a small popup under a button on the slide's corner keeps the slide in view,
      costs no room for the notes and leaves the top bar alone, where the side panel took a third of the screen and a scope

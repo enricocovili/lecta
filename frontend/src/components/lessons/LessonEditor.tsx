@@ -32,7 +32,7 @@ export interface LessonData {
   last_page_id: number | null;
   last_result: { chapters?: { chapter_id: number | null; title: string | null }[] } | null;
   /** the lesson's laboratory, if it has one */
-  lab?: { files: number } | null;
+  lab?: { files: number; comments: number } | null;
   pages: PageState[];
 }
 
@@ -397,6 +397,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
       slides: pages.filter((p) => p.kind === "slide").length,
       notes_pages: pages.filter((p) => p.notes.trim()).length,
       ink_pages: pages.filter((p) => p.ink.length).length,
+      lab_comments: lesson.lab ? lesson.lab.comments : null,
     }),
     [lesson, pages],
   );
