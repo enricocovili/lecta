@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { get, post } from "../lib/api";
 import { canCreate, otherOwner, type Role } from "../lib/roles";
 import { Icon } from "./icons";
-import { COURSE_TONE, CoursePill, courseStateText, fmtUpdated, PublishedFlag, useCourseStates, type CourseState } from "./pagekit";
+import { COURSE_TONE, CoursePill, courseStateText, fmtUpdated, OpenNotes, openNotesText, PublishedFlag, useCourseStates, type CourseState } from "./pagekit";
 import type { Course } from "./types";
 import { Dot, Empty, ErrorBox, Loading, Modal, Seg, toastError, useApi, useLocalStorage } from "./ui";
 
@@ -137,6 +137,7 @@ function CourseCard({ c, st, owner }: { c: Course; st: CourseState | undefined; 
           metaLine(c, st)
         )}
       </div>
+      <OpenNotes course={c} />
       {c.tags.length > 0 && (
         <div className="row pg-course-tags">
           {c.tags.map((t) => (
@@ -233,6 +234,7 @@ export default function CoursesBrowser({ role, userId }: { role?: Role; userId?:
                       {metaLine(c, st)}
                     </div>
                   </div>
+                  {!!c.open_notes && <span className="pill sm warn">{openNotesText(c.open_notes)}</span>}
                   <span className="pg-row-flag hide-mobile">
                     <PublishedFlag published={c.published} />
                   </span>

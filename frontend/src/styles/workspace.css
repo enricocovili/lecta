@@ -672,6 +672,29 @@ body.ws-page {
   gap: 0.3rem;
   margin-top: 0.35rem;
 }
+/* The author's side (decision 130): a suggestion as a diff, and the line that opens the chapter's open notes. */
+.doc-note-diff del {
+  background: var(--danger-soft);
+  color: var(--danger-fg);
+}
+.doc-note-diff ins {
+  background: var(--ok-soft);
+  color: var(--ok-fg);
+  text-decoration: none;
+}
+.doc-ch-notes {
+  margin: 0 0 0.6rem;
+  font-family: var(--font);
+}
+.doc-ch-notes > .btn {
+  color: var(--warn-fg);
+}
+.doc-ch-notes > .btn[aria-expanded="true"] .icon:last-child {
+  transform: rotate(90deg);
+}
+.doc-ch-notes .doc-notes {
+  margin-top: 0.3rem;
+}
 /* The pictures are black ink on nothing: the dark theme inverts them, except those holding a photo. */
 :root[data-mode="dark"] .doc-block img:not(.raster) {
   filter: invert(0.88) hue-rotate(180deg);

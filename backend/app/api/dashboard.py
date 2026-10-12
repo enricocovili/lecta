@@ -13,7 +13,7 @@ from ..pipeline import agent
 from ..security.access import Access, access, can_write, chats_visible, jobs_readable, readable
 from ..services import jobs as jobs_svc
 from ..services import overview
-from .courses import usernames
+from .courses import open_notes, usernames
 from .jobs import job_out
 
 router = APIRouter(dependencies=[Depends(access)])
@@ -65,6 +65,7 @@ async def _courses(db: AsyncSession, acc: Access) -> list[dict]:
     counts = dict((await db.execute(select(Chapter.course_id, func.count()).group_by(Chapter.course_id))).all())
     courses = (await db.execute(select(Course).where(readable(acc.user)).order_by(Course.name))).scalars().all()
     names = await usernames(db)
+    notes = await open_notes(db, acc, courses)
     return [
         {
             "id": c.id,
@@ -76,6 +77,7 @@ async def _courses(db: AsyncSession, acc: Access) -> list[dict]:
             "can_write": can_write(acc.user, c),
             "updated_at": c.updated_at,
             "chapter_count": counts.get(c.id, 0),
+            "open_notes": notes.get(c.id, 0),  # readers' notes waiting for the owner (0 on courses the user can't change)
             "review": ({**reviews[c.id], "stale": c.updated_at > reviews[c.id]["at"]} if c.id in reviews else None),
             "ai_running": (agent.running_turn(c.id) is not None),
             **{k: v for k, v in states.get(c.id, {}).items() if k != "updated_at"},

@@ -185,3 +185,27 @@ async def test_notes_follow_their_block_and_say_when_its_text_changed(editor, vi
     # Refused, it stays open and nothing was written.
     assert [n["status"] for n in (await editor.get(c["url"])).json() if n["id"] == later.json()["id"]] == ["open"]
     assert "Un paragrafo con $y$." not in await _source(editor, c)
+    # A note on changed text is still rejected or resolved.
+    assert (await editor.post(f"/api/notes/{later.json()['id']}/reject")).json()["status"] == "rejected"
+    assert (await editor.post(f"/api/notes/{comment['id']}/resolve")).json()["status"] == "resolved"
+
+
+async def test_the_courses_say_how_many_notes_are_open_to_whoever_may_change_them(editor, other_editor, viewer, admin):
+    c = await _course(editor, admin)
+    quiet = await _course(editor, admin)
+    first = await _note(viewer, c)
+    await _note(other_editor, c, on="Un altro")
+    await _note(viewer, c, "suggestion", on="\\begin{theorem}", proposed="Un teorema.")
+    assert (await editor.post(f"/api/notes/{first['id']}/resolve")).status_code == 200
+
+    def counts(res) -> dict[int, int]:  # noqa: ANN001
+        assert res.status_code == 200, res.text
+        courses = res.json()["courses"] if isinstance(res.json(), dict) else res.json()
+        return {x["id"]: x["open_notes"] for x in courses if x["id"] in (c["id"], quiet["id"])}
+
+    for client in (editor, admin):  # the owner and admins: the open ones, closed ones left out
+        assert counts(await client.get("/api/dashboard")) == {c["id"]: 2, quiet["id"]: 0}
+        assert counts(await client.get("/api/courses")) == {c["id"]: 2, quiet["id"]: 0}
+    for client in (viewer, other_editor):  # readers don't count the others' notes
+        assert counts(await client.get("/api/dashboard")) == {c["id"]: 0, quiet["id"]: 0}
+        assert counts(await client.get("/api/courses")) == {c["id"]: 0, quiet["id"]: 0}

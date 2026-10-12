@@ -782,3 +782,22 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      *Alternatives:* a side panel of notes (the draft is already between the outline and the assistant, and the note
      belongs next to its words); several blocks per note (the backend anchors one); the suggestion's box replacing the
      block (the reader would lose the text they are proposing to change).
+130. **Whoever writes a course finds the readers' open notes on its draft, and accepts, rejects or resolves them there;
+     the courses say how many wait (#86).** The owner's draft (and an admin's, who sees everyone's notes) asks for the
+     course's notes like a reader's and shows the **open** ones only: a closed note is done for the writer, and stays
+     with its state for its author, who looks back on it (129). A block with open notes has the reader's marker, with the
+     count; it opens them under the block with who wrote each, the comment or the reason, and a suggestion as a
+     **word-by-word diff** of the block's text (`notes.ts` `wordDiff`, struck out what goes, underlined what comes: the
+     change is often a word or two in a long paragraph, and side by side would make one read both). «Accetta» writes the
+     suggestion (128) and typesets the chapter again, «Rifiuta» closes it, a comment has «Risolvi». Every chapter with
+     open notes has a line, «N note aperte» (and how many «su testo cambiato»), that opens the **chapter's list**: every
+     open note with the block it was written on; for the writer this list replaces the reader's end-of-chapter one, since
+     a note on changed text is one more to deal with. Such a note can be rejected or resolved but not accepted (the
+     button says why); a 409 on closing (the text changed under the writer, someone else closed it) says so, and the
+     notes and the chapter are fetched again. The notes are fetched again whenever the draft is (after writing in
+     place, the assistant, an accepted suggestion), since an open note's place follows the text. The course list
+     (`/api/courses`) and the home's courses (`/api/dashboard`) carry `open_notes`, counted in one grouped query for the
+     courses the user may change (0 on the others: a reader doesn't count other readers' notes); the home's course card
+     and the courses page show it, «N note aperte», as a link to the draft. *Alternatives:* showing closed notes folded
+     under the open ones (the history is the author's; the writer would scroll past what is done); a notes panel beside
+     the draft (the same reason as 129); a notification when a note arrives (an idea on the board, with replies).

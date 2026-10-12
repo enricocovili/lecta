@@ -1,15 +1,18 @@
-// A reader's notes on the draft (decision 129): the box where a comment or a suggested change to a block is written,
-// and the notes themselves, under their block or, when its text changed, at the end of the chapter.
-import { useCallback, useEffect, useState } from "react";
-import { del, get, patch } from "../../lib/api";
+// Notes on the draft. A reader's (decision 129): the box where a comment or a suggested change to a block is written,
+// and their notes, under their block or, when its text changed, at the end of the chapter. The author's (decision 130):
+// the readers' open notes, under their block or in the chapter's list, to accept, reject or resolve.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ApiError, del, get, patch, post } from "../../lib/api";
 import { Icon } from "../icons";
-import { Confirm, fmtWhen } from "../ui";
+import { Confirm, fmtWhen, toast, toastError } from "../ui";
 import { EditBar, EditBox } from "./EditBox";
-import { NOTE_KIND, NOTE_STATUS, noteProblem, type DraftNote, type NoteKind } from "./notes";
+import { NOTE_KIND, NOTE_STATUS, noteProblem, wordDiff, type DraftNote, type NoteKind } from "./notes";
 
-/** The notes on the course the user may see (a reader: their own), kept up to date by what they write here. */
-export function useDraftNotes(courseId: number, enabled: boolean) {
+/** The notes on the course the user may see (a reader: their own; its writers: everyone's), kept up to date by what is
+ *  done here and fetched again with each new `revision` of the text (an open note follows its block). */
+export function useDraftNotes(courseId: number, enabled: boolean, revision = 0) {
   const [notes, setNotes] = useState<DraftNote[]>([]);
+  const [asked, setAsked] = useState(0);
   useEffect(() => {
     if (!enabled) return;
     let live = true;
@@ -19,10 +22,11 @@ export function useDraftNotes(courseId: number, enabled: boolean) {
     return () => {
       live = false;
     };
-  }, [courseId, enabled]);
+  }, [courseId, enabled, revision, asked]);
   const saved = useCallback((n: DraftNote) => setNotes((ns) => (ns.some((x) => x.id === n.id) ? ns.map((x) => (x.id === n.id ? n : x)) : [...ns, n])), []);
   const removed = useCallback((id: number) => setNotes((ns) => ns.filter((x) => x.id !== id)), []);
-  return { notes, saved, removed };
+  const reload = useCallback(() => setAsked((a) => a + 1), []);
+  return { notes, saved, removed, reload };
 }
 
 /** A comment (words) or a suggestion (the block's LaTeX, changed, and why): Ctrl+Enter sends it, Esc leaves it. */
@@ -88,13 +92,45 @@ export function NoteComposer({
   );
 }
 
-function NoteCard({ note, withSrc, onEdit, onDelete }: { note: DraftNote; withSrc: boolean; onEdit: () => void; onDelete: () => void }) {
+/** A suggestion's change to its block, word by word: what goes out struck through, what comes in underlined. */
+function NoteDiff({ from, to }: { from: string; to: string }) {
+  const parts = useMemo(() => wordDiff(from, to), [from, to]);
+  return (
+    <pre className="doc-note-proposed doc-note-diff" aria-label="Modifica proposta" data-testid="note-diff">
+      {parts.map((p, i) => (p.op === "same" ? <span key={i}>{p.text}</span> : p.op === "del" ? <del key={i}>{p.text}</del> : <ins key={i}>{p.text}</ins>))}
+    </pre>
+  );
+}
+
+type Closing = "accept" | "reject" | "resolve";
+const CLOSED: Record<Closing, string> = { accept: "Suggerimento accettato: il blocco è cambiato", reject: "Suggerimento rifiutato", resolve: "Commento risolto" };
+
+function NoteCard({
+  note,
+  withSrc,
+  writer,
+  busy,
+  onEdit,
+  onDelete,
+  onClose,
+}: {
+  note: DraftNote;
+  withSrc: boolean;
+  /** Seen by whoever may change the course: who wrote it, the change as a diff, and the buttons that close it. */
+  writer: boolean;
+  busy: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onClose: (how: Closing) => void;
+}) {
   const tone = note.status === "open" ? "" : note.status === "accepted" ? "ok" : note.status === "rejected" ? "danger" : "accent";
+  const open = note.status === "open";
   return (
     <div className="doc-note" data-testid="draft-note" data-status={note.status}>
       <div className="doc-note-head">
         <Icon name={note.kind === "suggestion" ? "pencil" : "message"} />
         <strong>{NOTE_KIND[note.kind]}</strong>
+        {writer && note.author && <span className="small">di {note.author}</span>}
         <span className={`pill sm ${tone}`} data-testid="note-status">
           {NOTE_STATUS[note.status]}
           {note.resolved_by ? ` da ${note.resolved_by}` : ""}
@@ -102,18 +138,45 @@ function NoteCard({ note, withSrc, onEdit, onDelete }: { note: DraftNote; withSr
         {note.changed && <span className="pill sm warn">testo cambiato</span>}
         <span className="muted tiny">{fmtWhen(note.updated_at)}</span>
       </div>
-      {withSrc && (
-        <pre className="doc-note-src" title="Il blocco com'era quando hai scritto la nota">
+      {withSrc && !(writer && note.proposed !== null) && (
+        <pre className="doc-note-src" title={writer ? "Il blocco com'era quando è stata scritta la nota" : "Il blocco com'era quando hai scritto la nota"}>
           {note.src}
         </pre>
       )}
       {note.body && <p className="doc-note-body">{note.body}</p>}
-      {note.proposed !== null && (
-        <pre className="doc-note-proposed" aria-label="Testo proposto">
-          {note.proposed}
-        </pre>
+      {note.proposed !== null &&
+        (writer ? (
+          <NoteDiff from={note.src} to={note.proposed} />
+        ) : (
+          <pre className="doc-note-proposed" aria-label="Testo proposto">
+            {note.proposed}
+          </pre>
+        ))}
+      {writer && open && (
+        <div className="doc-note-actions">
+          {note.kind === "suggestion" ? (
+            <>
+              <button
+                type="button"
+                className="btn primary sm"
+                disabled={busy || note.changed}
+                title={note.changed ? "Il blocco è cambiato da quando è stato suggerito: si può solo rifiutare, o riscrivere a mano" : "Il testo proposto prende il posto del blocco"}
+                onClick={() => onClose("accept")}
+              >
+                <Icon name="check" /> Accetta
+              </button>
+              <button type="button" className="btn ghost sm" disabled={busy} onClick={() => onClose("reject")}>
+                <Icon name="x" /> Rifiuta
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn ghost sm" disabled={busy} onClick={() => onClose("resolve")}>
+              <Icon name="check" /> Risolvi
+            </button>
+          )}
+        </div>
       )}
-      {note.mine && note.status === "open" && (
+      {!writer && note.mine && open && (
         <div className="doc-note-actions">
           <button type="button" className="btn ghost sm" onClick={onEdit}>
             <Icon name="pencil" /> Modifica
@@ -127,27 +190,56 @@ function NoteCard({ note, withSrc, onEdit, onDelete }: { note: DraftNote; withSr
   );
 }
 
-/** Notes, under their block or at the end of the chapter: each one changed in place, or deleted, while open. */
+/** Notes, under their block or at the end of the chapter: a reader changes or deletes theirs while open; whoever may
+ *  change the course accepts or rejects a suggestion (accepted, its text replaces the block) and resolves a comment. */
 export function NoteList({
   notes,
   title,
   withSrc = false,
+  writer = false,
+  testId = "block-notes",
   onSaved,
   onRemoved,
+  onAccepted,
+  onStale,
   onClose,
 }: {
   notes: DraftNote[];
   title: string;
-  /** Show the block each note was written on (it is no longer in the draft). */
+  /** Show the block each note was written on (it is no longer in the draft, or the list isn't next to it). */
   withSrc?: boolean;
+  /** The course's writer's list: the readers' notes to close. */
+  writer?: boolean;
+  testId?: string;
   onSaved: (n: DraftNote) => void;
   onRemoved: (id: number) => void;
+  /** A suggestion went into the text: its chapter is typeset again. */
+  onAccepted?: (n: DraftNote) => Promise<void>;
+  /** The note couldn't be closed as shown (its block changed, someone else closed it): the notes and the text again. */
+  onStale?: (n: DraftNote) => void;
   onClose?: () => void;
 }) {
   const [editing, setEditing] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<DraftNote | null>(null);
+  const [busy, setBusy] = useState<number | null>(null);
+
+  const close = async (n: DraftNote, how: Closing) => {
+    setBusy(n.id);
+    try {
+      const done = await post<DraftNote>(`/api/notes/${n.id}/${how}`);
+      if (how === "accept") await onAccepted?.(done).catch(() => undefined); // written: the draft catches up anyway
+      onSaved(done);
+      toast(CLOSED[how]);
+    } catch (e) {
+      toastError(e);
+      if (e instanceof ApiError && e.status === 409) onStale?.(n);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
-    <div className="doc-notes" data-testid="block-notes" role="region" aria-label={title}>
+    <div className="doc-notes" data-testid={testId} role="region" aria-label={title}>
       <div className="doc-notes-head small">
         <span>{title}</span>
         {onClose && (
@@ -170,7 +262,16 @@ export function NoteList({
             }}
           />
         ) : (
-          <NoteCard key={n.id} note={n} withSrc={withSrc} onEdit={() => setEditing(n.id)} onDelete={() => setDeleting(n)} />
+          <NoteCard
+            key={n.id}
+            note={n}
+            withSrc={withSrc}
+            writer={writer}
+            busy={busy === n.id}
+            onEdit={() => setEditing(n.id)}
+            onDelete={() => setDeleting(n)}
+            onClose={(how) => void close(n, how)}
+          />
         ),
       )}
       {deleting && (

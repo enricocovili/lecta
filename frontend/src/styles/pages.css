@@ -118,6 +118,25 @@ a.pg-row-title:hover {
 .pg-pubflag.on .icon {
   color: var(--ok-dot);
 }
+/* The readers' open notes on a course (decision 130), a link to its draft. */
+.pg-open-notes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.45rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--warn-soft);
+  color: var(--warn-fg);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  width: fit-content;
+}
+.pg-open-notes:hover {
+  background: var(--warn);
+  color: var(--bg-elev);
+}
 
 /* ------------------------------------------------------------------ courses */
 

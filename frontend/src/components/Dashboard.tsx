@@ -3,7 +3,7 @@ import { ApiError, get, post } from "../lib/api";
 import { Icon } from "./icons";
 import { resultText, type ImportResult } from "./IngestManifest";
 import { jobStage, translateJobTitle, translateProgress } from "./jobtext";
-import { COURSE_LABEL, COURSE_TONE, PublishedFlag } from "./pagekit";
+import { COURSE_LABEL, COURSE_TONE, OpenNotes, openNotesText, PublishedFlag } from "./pagekit";
 import { Confirm, ErrorBox, fmtWhen, Loading, Progress, StatusPill, Switch, toast, toastError, useApi, usePoll, type Tone } from "./ui";
 import { courseText } from "../lib/links";
 import { canCreate, isAdmin, otherOwner, type Role } from "../lib/roles";
@@ -26,6 +26,8 @@ interface CourseState {
   can_write?: boolean;
   updated_at: string;
   chapter_count: number;
+  /** The readers' notes waiting for the user (0 on courses they can't change). */
+  open_notes?: number;
   status: "ok" | "working" | "error";
   reason: "compile" | "job" | null;
   active_job: { id: number; kind: string; title: string; status: string; progress: number; progress_text: string } | null;
@@ -446,6 +448,7 @@ export default function Dashboard({ role, userId }: { role?: Role; userId?: numb
                   {otherOwner(c, userId) && <>di {otherOwner(c, userId)} · </>}
                   {courseMeta(c, conceptCount.get(c.id))}
                 </p>
+                <OpenNotes course={c} />
                 <ReviewLine c={c} />
                 <div className="row">
                   <a className="btn primary" href={`/admin/courses/${c.id}`}>
@@ -473,6 +476,7 @@ export default function Dashboard({ role, userId }: { role?: Role; userId?: numb
                     </span>
                   )}
                 </span>
+                {!!c.open_notes && <span className="pill sm warn">{openNotesText(c.open_notes)}</span>}
                 <span className="muted small">{c.published ? "Pubblica" : "Privata"}</span>
                 <Icon name="chevron-right" />
               </a>

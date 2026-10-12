@@ -34,6 +34,11 @@ the top left goes back to the course page.
   of the draft for «Commenta» or «Suggerisci modifica» (the block's LaTeX in the same box as writing by hand, and why).
   Their notes show up as a marker on the block, with their state; they change or delete them while open. A note whose
   block's text changed is listed at the end of the chapter, «testo cambiato».
+* **Notes on your text**: whoever writes the course (and admins) sees the readers' open notes on the draft: a marker
+  with the count on the block, who wrote each note, a suggestion as the block's text with what goes struck out and what
+  comes underlined. «Accetta» puts the suggestion in the text, «Rifiuta» drops it, «Risolvi» closes a comment. «N note
+  aperte» at the top of a chapter lists them all, those on text changed since included (rejected or resolved, not
+  accepted). The home and the courses page say how many notes wait on each course.
 * There is no revision history: edits and imports write straight into the files; the only safety net is **Annulla** on
   the assistant's last answers.
 

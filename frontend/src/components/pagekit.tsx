@@ -1,6 +1,7 @@
 // Small helpers shared by the workspace pages (courses, jobs, lessons).
 import { useEffect, useRef, type ReactNode } from "react";
 import { get } from "../lib/api";
+import { courseText } from "../lib/links";
 import { Icon } from "./icons";
 import { jobStage, translateProgress } from "./jobtext";
 import { StatusPill, useApi, type Tone } from "./ui";
@@ -40,6 +41,20 @@ export function PublishedFlag({ published }: { published: boolean }) {
       <Icon name={published ? "globe" : "lock"} />
       {published ? "Pubblicata" : "Privata"}
     </span>
+  );
+}
+
+/** "2 note aperte": the readers' notes waiting for whoever writes the course (decision 130). */
+export const openNotesText = (n: number) => (n === 1 ? "1 nota aperta" : `${n} note aperte`);
+
+/** The readers' open notes on a course, as a link to its draft where they are; nothing when there are none. */
+export function OpenNotes({ course }: { course: { id: number; open_notes?: number } }) {
+  if (!course.open_notes) return null;
+  return (
+    <a className="pg-open-notes" href={courseText(course.id)} data-testid="course-open-notes" title="Commenti e suggerimenti dei lettori, da accettare, rifiutare o risolvere nella bozza">
+      <Icon name="message" />
+      {openNotesText(course.open_notes)}
+    </a>
   );
 }
 

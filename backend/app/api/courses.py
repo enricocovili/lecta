@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..models import Chapter, Course, ProjectFile, Publication, User
+from ..models import Chapter, Course, DraftNote, ProjectFile, Publication, User
 from ..security.access import Access, access, can_write, check, readable
 from ..services import overview, projects
 from ..services.texttools import slugify
@@ -110,6 +110,15 @@ async def usernames(db: AsyncSession) -> dict[int, str]:
     return dict((await db.execute(select(User.id, User.username))).all())
 
 
+async def open_notes(db: AsyncSession, acc: Access, courses: list[Course]) -> dict[int, int]:
+    """How many readers' notes are open on each of `courses` the user may change (the only ones whose notes they all see)."""
+    ids = [c.id for c in courses if can_write(acc.user, c)]
+    if not ids:
+        return {}
+    q = select(DraftNote.course_id, func.count()).where(DraftNote.status == "open", DraftNote.course_id.in_(ids))
+    return dict((await db.execute(q.group_by(DraftNote.course_id))).all())
+
+
 async def load_chapter(db: AsyncSession, course: Course, chapter_id: int) -> Chapter:
     ch = await db.get(Chapter, chapter_id)
     if ch is None or ch.course_id != course.id:
@@ -124,10 +133,12 @@ async def list_courses(acc: Access = Depends(access), db: AsyncSession = Depends
         (await db.execute(select(Chapter.course_id, func.count()).group_by(Chapter.course_id))).all()
     )
     names = await usernames(db)
+    notes = await open_notes(db, acc, courses)
     out = []
     for c in courses:
         d = course_out(c, acc, names.get(c.owner_id))
         d["chapter_count"] = counts.get(c.id, 0)
+        d["open_notes"] = notes.get(c.id, 0)
         out.append(d)
     return out
 

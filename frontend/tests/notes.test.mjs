@@ -1,7 +1,7 @@
 // A reader's notes on the draft, placed on its blocks: run with `npm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { noteProblem, placeNotes } from "../src/components/workspace/notes.ts";
+import { noteProblem, placeNotes, wordDiff } from "../src/components/workspace/notes.ts";
 
 const block = (start, end, src) => ({ start, end, src, pages: [], error: null });
 const note = (id, start, src, extra = {}) => ({ id, chapter_id: 1, kind: "comment", status: "open", src, start, end: start, changed: false, body: "x", proposed: null, mine: true, ...extra });
@@ -39,4 +39,27 @@ test("a comment needs words, a suggestion a change to the block", () => {
   assert.equal(noteProblem("suggestion", "", "nuovo", "src"), null);
   assert.equal(noteProblem("suggestion", "", "", "src"), null); // empty: take the block out
   assert.equal(noteProblem("suggestion", "", "src"), null); // a note being changed: its text may stay
+});
+
+test("a suggestion's change is shown word by word, the rest of the block as it was", () => {
+  assert.deepEqual(wordDiff("Un vettore è un elemento.", "Un vettore è un elemento di uno spazio."), [
+    { op: "same", text: "Un vettore è un " },
+    { op: "del", text: "elemento." },
+    { op: "add", text: "elemento di uno spazio." },
+  ]);
+  assert.deepEqual(wordDiff("a b c", "a x c"), [
+    { op: "same", text: "a " },
+    { op: "del", text: "b" },
+    { op: "add", text: "x" },
+    { op: "same", text: " c" },
+  ]);
+  assert.deepEqual(wordDiff("uguale", "uguale"), [{ op: "same", text: "uguale" }]);
+  assert.deepEqual(wordDiff("", "nuovo"), [{ op: "add", text: "nuovo" }]);
+  // Too long to compare: what differs goes out and comes in whole.
+  assert.deepEqual(wordDiff("a b c d", "a x y d", 1), [
+    { op: "same", text: "a " },
+    { op: "del", text: "b c" },
+    { op: "add", text: "x y" },
+    { op: "same", text: " d" },
+  ]);
 });

@@ -2,7 +2,7 @@
 // assistant on the right. /admin/courses/{id}/testo?chapter={id} scrolls to a chapter, ?chat=1 opens the
 // assistant, ?ask=… prefills its message box. Whoever may not change the course (`can_write`: a viewer, an editor on
 // someone else's published course) reads it: no assistant, no writing in place, no structure or settings, no compile;
-// on a published course they comment on a block or suggest a change to it.
+// on a published course they comment on a block or suggest a change to it, and whoever writes it closes those notes.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { get } from "../../lib/api";
 import { isAdmin, otherOwner, type Role } from "../../lib/roles";
@@ -484,8 +484,9 @@ export default function CourseWorkspace({ courseId, role, userId }: { courseId: 
               onSelectionAction={askSelection}
               onBlockWritten={blockWritten}
               readOnly={!canWrite}
-              notes={!canWrite}
+              notes
               canNote={!canWrite && course.published}
+              revision={revision}
             />
           </div>
           {pdfSeen && (

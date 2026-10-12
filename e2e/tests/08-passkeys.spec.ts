@@ -352,6 +352,99 @@ test.describe("Passkey", () => {
     await rc.close();
   });
 
+  test("the admin sees the readers' notes on their course, accepts a suggestion into the text and resolves a comment", async ({ page, browser, baseURL }) => {
+    test.setTimeout(240_000);
+    await login(page);
+    const openNotes = async () =>
+      page.evaluate(async () => {
+        const courses = (await (await fetch("/api/courses")).json()) as { name: string; open_notes: number }[];
+        return courses.find((c) => c.name.includes("Algebra Lineare"))!.open_notes;
+      });
+    const before = await openNotes(); // the earlier reader's notes, if that test ran
+    const noted = (n: number) => (n === 1 ? "1 nota aperta" : `${n} note aperte`);
+    // A paragraph of its own at the end of «Matrici», away from the block the earlier reader wrote on.
+    await page.evaluate(async () => {
+      const csrf = document.cookie.match(/lecta_csrf=([^;]+)/)?.[1] ?? "";
+      const course = ((await (await fetch("/api/courses")).json()) as { id: number; name: string }[]).find((c) => c.name.includes("Algebra Lineare"))!;
+      const { chapters } = (await (await fetch(`/api/courses/${course.id}`)).json()) as { chapters: { title: string; path: string }[] };
+      const path = chapters.find((c) => c.title === "Matrici")!.path;
+      const url = `/api/courses/${course.id}/files/content`;
+      const { content } = (await (await fetch(`${url}?path=${encodeURIComponent(path)}`)).json()) as { content: string };
+      const text = `${content.trimEnd()}\n\nUna matrice è una tabella di numeri.\n`;
+      const res = await fetch(url, { method: "PUT", headers: { "content-type": "application/json", "x-csrf-token": csrf }, body: JSON.stringify({ path, content: text }) });
+      if (!res.ok) throw new Error(await res.text());
+    });
+
+    // A reader comments on the paragraph and suggests a change to it.
+    const { context: rc, p: reader } = await invited(page, browser, baseURL!, "viewer", "revisore");
+    await openCourse(reader, /Algebra Lineare/);
+    const rdoc = reader.getByTestId("doc-preview");
+    const para = rdoc.locator(".doc-block").filter({ has: reader.locator('img[alt^="Una matrice è una tabella"]') }).first();
+    await expect(para).toBeVisible({ timeout: 60_000 });
+    const line = await para.getAttribute("data-line");
+    const rblock = para;
+    const composer = reader.getByTestId("note-editor");
+    await rblock.scrollIntoViewIfNeeded();
+    await rblock.click();
+    await reader.getByTestId("selection-toolbar").getByRole("button", { name: "Commenta" }).click();
+    await composer.getByLabel("Commento").fill("Qui serve un esempio.");
+    await composer.getByLabel("Commento").press("Control+Enter");
+    await expect(composer).toHaveCount(0);
+    await rblock.click();
+    await reader.getByTestId("selection-toolbar").getByRole("button", { name: "Suggerisci modifica" }).click();
+    const latex = composer.getByLabel("Testo proposto");
+    const src = await latex.inputValue();
+    await latex.fill(`In breve: ${src}`);
+    await composer.getByLabel("Motivo").fill("Un attacco più diretto.");
+    await latex.press("Control+Enter");
+    await expect(composer).toHaveCount(0);
+    await expect(rblock.getByTestId("note-mark")).toHaveText("2");
+
+    // The admin's home says how many notes wait on the course, and leads to its draft.
+    const con = watchConsole(page);
+    await page.goto("/admin");
+    const card = page.locator(".home-course", { hasText: "Algebra Lineare" });
+    await expect(card.getByTestId("course-open-notes")).toHaveText(noted(before + 2));
+    await card.getByTestId("course-open-notes").click();
+    await page.waitForURL(/\/admin\/courses\/\d+\/testo$/);
+    const doc = page.getByTestId("doc-preview");
+    const chapter = doc.locator(".doc-ch", { has: page.getByRole("heading", { name: "Matrici" }) });
+    const block = chapter.locator(`.doc-block[data-line="${line}"]`);
+
+    // The marker on the block shows both notes, with who wrote them; the suggestion as a diff of the block.
+    await expect(block.getByTestId("note-mark")).toHaveText("2", { timeout: 60_000 });
+    await block.getByTestId("note-mark").click();
+    const notes = page.getByTestId("block-notes").getByTestId("draft-note");
+    await expect(notes).toHaveCount(2);
+    await expect(notes.nth(0)).toContainText("di revisore");
+    await expect(notes.nth(0)).toContainText("Qui serve un esempio.");
+    await expect(notes.nth(0).getByRole("button", { name: "Accetta" })).toHaveCount(0);
+    await expect(notes.nth(1).getByTestId("note-diff").locator("ins")).toHaveText("In breve: ");
+    await expect(notes.nth(1)).toContainText("Un attacco più diretto.");
+
+    // Accepted, the suggestion is the block's text; the comment was on the text as it was: «testo cambiato».
+    await notes.nth(1).getByRole("button", { name: "Accetta" }).click();
+    await expect(block.locator("img").first()).toHaveAttribute("alt", /^In breve: /, { timeout: 60_000 });
+    await expect(block.getByTestId("note-mark")).toHaveCount(0);
+    const bar = chapter.getByTestId("chapter-notes");
+    await expect(bar).toContainText("1 su testo cambiato");
+    await bar.click();
+    const changed = chapter.getByTestId("chapter-note-list").getByTestId("draft-note").filter({ hasText: "Qui serve un esempio." });
+    await expect(changed).toContainText("testo cambiato");
+    await changed.getByRole("button", { name: "Risolvi" }).click();
+    await expect(changed).toHaveCount(0);
+    con.assertClean();
+
+    // Back home the count is what it was; the reader finds their notes closed by the admin.
+    await page.goto("/admin");
+    if (before) await expect(card.getByTestId("course-open-notes")).toHaveText(noted(before));
+    else await expect(card.getByTestId("course-open-notes")).toHaveCount(0);
+    await reader.reload();
+    const theirs = reader.getByTestId("block-notes").getByTestId("note-status");
+    await expect(theirs).toHaveText([`Risolta da ${USER}`, `Accettata da ${USER}`], { timeout: 60_000 });
+    await rc.close();
+  });
+
   test("a reader opens a lesson of the admin's course read-only: no tools, nothing sent", async ({ page, browser, baseURL }) => {
     test.setTimeout(120_000);
     await login(page);

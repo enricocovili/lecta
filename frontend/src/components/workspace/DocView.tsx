@@ -2,9 +2,10 @@
 // as SVG pictures), in one continuous scroll. A click picks a block (Shift+click extends the pick) and opens the
 // toolbar to ask the AI about it; a double click (or F2) opens the block's text in place, to write anything there.
 // Blocks are flashed where the AI just worked. Someone reading another's published course picks a block to comment
-// on it or suggest a change (decision 129); a marker on a block shows the notes they left there.
+// on it or suggest a change (decision 129); a marker on a block shows the notes they left there. Whoever may change the
+// course finds the readers' open notes the same way, and in a list per chapter, to accept, reject or resolve (130).
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { post, put } from "../../lib/api";
+import { get, post, put } from "../../lib/api";
 import { Icon } from "../icons";
 import { toast } from "../ui";
 import { NoteComposer, NoteList, useDraftNotes } from "./DraftNotes";
@@ -39,15 +40,18 @@ const Block = memo(function Block({
   still,
   notes = 0,
   notesOpen = false,
+  theirs = false,
 }: {
   b: DraftBlock;
   index: number;
   width: number;
   picked: boolean;
   still: boolean;
-  /** How many of the reader's notes are on it: a marker that shows them. */
+  /** How many notes are on it (a reader's own, or the readers' open ones): a marker that shows them. */
   notes?: number;
   notesOpen?: boolean;
+  /** The notes are the readers', shown to whoever writes the course. */
+  theirs?: boolean;
 }) {
   const failed = !!b.error;
   return (
@@ -85,8 +89,8 @@ const Block = memo(function Block({
           className="doc-note-mark"
           data-testid="note-mark"
           aria-expanded={notesOpen}
-          aria-label={notes === 1 ? "Una tua nota su questo blocco" : `${notes} tue note su questo blocco`}
-          title="Le tue note su questo blocco"
+          aria-label={theirs ? (notes === 1 ? "Una nota aperta su questo blocco" : `${notes} note aperte su questo blocco`) : notes === 1 ? "Una tua nota su questo blocco" : `${notes} tue note su questo blocco`}
+          title={theirs ? "Le note dei lettori su questo blocco" : "Le tue note su questo blocco"}
         >
           <Icon name="message" />
           {notes > 1 && <span>{notes}</span>}
@@ -170,6 +174,7 @@ export default function DocView({
   readOnly = false,
   notes: showNotes = false,
   canNote = false,
+  revision = 0,
 }: {
   courseId: number;
   chapters: DraftChapter[] | null;
@@ -184,10 +189,12 @@ export default function DocView({
   onBlockWritten: (d: DraftChapter) => void;
   /** Only to read: blocks are neither picked (the assistant's actions) nor written in place. */
   readOnly?: boolean;
-  /** Show the user's own notes on the blocks (a reader's). */
+  /** Show the notes on the blocks: a reader's own, or (not read-only) the readers' open ones to close. */
   notes?: boolean;
   /** Read-only, and a click picks a block to comment on or suggest a change to (a published course). */
   canNote?: boolean;
+  /** Bumped when the text was fetched again: the notes are placed anew. */
+  revision?: number;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const article = useRef<HTMLElement>(null);
@@ -196,9 +203,13 @@ export default function DocView({
   const [editing, setEditing] = useState<Editing | null>(null);
   const [composing, setComposing] = useState<(Editing & { kind: NoteKind }) | null>(null);
   const [shown, setShown] = useState<{ chapterId: number; index: number } | null>(null);
+  const [listed, setListed] = useState<number | null>(null);
   const noting = readOnly && canNote;
   const still = readOnly && !noting;
-  const { notes, saved, removed } = useDraftNotes(courseId, showNotes);
+  const writer = !readOnly;
+  const { notes: all, saved, removed, reload } = useDraftNotes(courseId, showNotes, revision);
+  // whoever writes the course deals with the open notes; the closed ones are their authors' to look back on
+  const notes = useMemo(() => (writer ? all.filter((n) => n.status === "open") : all), [all, writer]);
   const activeRef = useRef<number | null>(null);
 
   // -- which chapter is being read
@@ -333,7 +344,7 @@ export default function DocView({
     return scope ? { chapterId: pick.chapterId, selection: scope, rect } : null;
   }, [pick, rect, chapters]);
 
-  // -- the reader's notes, on their blocks
+  // -- the notes, on their blocks
   const placed = useMemo(() => {
     const m = new Map<number, ReturnType<typeof placeNotes>>();
     for (const c of chapters ?? []) {
@@ -370,10 +381,50 @@ export default function DocView({
     toast(kind === "suggestion" ? "Suggerimento inviato a chi scrive la materia" : "Commento inviato a chi scrive la materia");
   };
 
+  // An accepted suggestion changed its chapter: typeset again. A note that couldn't be closed as shown: both again.
+  const retypeset = async (chapterId: number) => onBlockWritten(await get<DraftChapter>(`/api/courses/${courseId}/chapters/${chapterId}/draft`));
+  const accepted = (n: DraftNote) => retypeset(n.chapter_id);
+  const stale = (n: DraftNote) => {
+    reload();
+    void retypeset(n.chapter_id).catch(() => undefined);
+  };
+
   const act = (a: SelectionAction) => {
     if (!sel) return;
     setPick(null);
     onSelectionAction(a, sel);
+  };
+
+  // The chapter's open notes for whoever writes it, those on text that changed included: a line that opens the list.
+  const chapterNotes = (chapterId: number) => {
+    const here = notes.filter((n) => n.chapter_id === chapterId);
+    if (!here.length) return null;
+    const changed = placed.get(chapterId)?.apart.length ?? 0;
+    const open = listed === chapterId;
+    return (
+      <div className="doc-ch-notes">
+        <button type="button" className="btn ghost sm" data-testid="chapter-notes" aria-expanded={open} onClick={() => setListed(open ? null : chapterId)}>
+          <Icon name="message" />
+          {here.length === 1 ? "1 nota aperta" : `${here.length} note aperte`}
+          {changed > 0 && <span className="pill sm warn">{changed} su testo cambiato</span>}
+          <Icon name="chevron-right" />
+        </button>
+        {open && (
+          <NoteList
+            notes={here}
+            title="Note aperte su questo capitolo"
+            testId="chapter-note-list"
+            withSrc
+            writer
+            onSaved={saved}
+            onRemoved={removed}
+            onAccepted={accepted}
+            onStale={stale}
+            onClose={() => setListed(null)}
+          />
+        )}
+      </div>
+    );
   };
 
   return (
@@ -385,11 +436,11 @@ export default function DocView({
         aria-label="Bozza del documento"
         aria-busy={loading}
         onClick={(e) => {
-          if (!(e.target instanceof Element) || e.target.closest(".doc-edit, .doc-notes")) return;
+          if (!(e.target instanceof Element) || e.target.closest(".doc-edit, .doc-notes, .doc-ch-notes")) return;
           if (e.target.closest(".doc-note-mark")) return markAt(e.target);
           if (!still) pickAt(e.target, e.shiftKey && !readOnly);
         }}
-        onDoubleClick={(e) => !readOnly && editAt(e.target)}
+        onDoubleClick={(e) => !readOnly && !(e.target instanceof Element && e.target.closest(".doc-note-mark, .doc-notes")) && editAt(e.target)}
         onKeyDown={(e) => {
           if (still) return;
           if (!(e.target instanceof HTMLElement && e.target.classList.contains("doc-block"))) return;
@@ -431,6 +482,7 @@ export default function DocView({
                 <span>{c.error}</span>
               </div>
             )}
+            {writer && c.blocks?.[0]?.heading !== "chapter" && chapterNotes(c.chapter.id)}
             {c.blocks === null ? (
               <div className="doc-loading muted" role="status">
                 <Icon name="loader" className="spin" />
@@ -444,18 +496,28 @@ export default function DocView({
                 const open = !!here && shown?.chapterId === c.chapter.id && shown.index === k;
                 return (
                   <Fragment key={`${b.start}:${b.pages[0]?.url ?? b.error ?? ""}`}>
-                    <Block b={b} index={k} width={c.width} picked={(!!pick && pick.chapterId === c.chapter.id && k >= pick.from && k <= pick.to) || composing?.chapterId === c.chapter.id && composing.index === k} still={still} notes={here?.length} notesOpen={open} />
+                    <Block b={b} index={k} width={c.width} picked={(!!pick && pick.chapterId === c.chapter.id && k >= pick.from && k <= pick.to) || composing?.chapterId === c.chapter.id && composing.index === k} still={still} notes={here?.length} notesOpen={open} theirs={writer} />
+                    {writer && k === 0 && b.heading === "chapter" && chapterNotes(c.chapter.id)}
                     {composing && composing.chapterId === c.chapter.id && composing.index === k && composing.block.start === b.start && (
                       <NoteComposer kind={composing.kind} src={b.src ?? ""} onSend={sendNote} onCancel={() => setComposing(null)} />
                     )}
                     {open && here && (
-                      <NoteList notes={here} title="Le tue note su questo blocco" onSaved={saved} onRemoved={removed} onClose={() => setShown(null)} />
+                      <NoteList
+                        notes={here}
+                        title={writer ? "Note dei lettori su questo blocco" : "Le tue note su questo blocco"}
+                        writer={writer}
+                        onSaved={saved}
+                        onRemoved={removed}
+                        onAccepted={accepted}
+                        onStale={stale}
+                        onClose={() => setShown(null)}
+                      />
                     )}
                   </Fragment>
                 );
               })
             )}
-            {!!placed.get(c.chapter.id)?.apart.length && (
+            {!writer && !!placed.get(c.chapter.id)?.apart.length && (
               <NoteList notes={placed.get(c.chapter.id)!.apart} title="Le tue note su testo cambiato" withSrc onSaved={saved} onRemoved={removed} />
             )}
             {isHollow(c) && <p className="doc-ch-empty muted">{readOnly ? "Questo capitolo è ancora vuoto." : "Questo capitolo è ancora vuoto. Chiedi all’assistente di scriverlo."}</p>}

@@ -130,6 +130,21 @@ The app was called Appunti until 2026-10-02 (DECISIONS 91–92). What changed an
 * **Course page** (DECISIONS 98): a course opens on its lessons and chapters; the text is at `/admin/courses/{id}/testo`.
   The **Laboratori** section lists the labs of the course's lessons (#24, `docs/LABS.md`).
 
+## Più utenti (#69)
+
+Done in 17 steps (#70–#86, DECISIONS 114–130); the plan that guided them is in the git history (`docs/MULTI-USER.md`,
+deleted with the last step).
+
+* **Accounts**: `users` with a role (Lettore, Autore, Amministratore) and a disabled flag; no sign-ups: an admin makes
+  invite links (passkey only, seven days, once) and recovery links in Settings → Utenti.
+* **Content per owner**: every course has an owner; editors see their own and everyone's published courses, viewers
+  and admins everything; others' lessons and labs are never an editor's. Jobs, conversations, search, the assistant's
+  retrieval and the costs follow the user. Whoever may not change something reads it, with no tools.
+* **Notes on published courses**: a reader comments on or suggests a change to a block of the draft; the course's
+  writer accepts, rejects or resolves them on their draft, and the courses say how many are open.
+* **Tests**: `tests/test_access.py` (every route's level), `tests/test_ownership.py` (cross-user sweep), browser spec
+  `e2e/tests/08-passkeys.spec.ts`. Ideas left out of the plan are on the board (💡 Idea, P2).
+
 ## Definition of done: how each point is verified
 
 | Requirement | Evidence |

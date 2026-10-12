@@ -10,8 +10,11 @@ Self-hosted platform for university notes, worked on with an AI assistant.
   answer); a double click on a passage lets you write it yourself, in place. The LaTeX project can be downloaded
   whenever you want.
 * **Public site**: only the courses you switch ON, always in their latest version (PDF and LaTeX source).
+* **People**: no sign-ups. An admin invites others with a link and they sign in with a passkey, as readers (everything,
+  read-only) or authors (their own courses, and the published ones of others). Reading someone else's published course,
+  you comment on a passage or suggest a change; its author accepts it into the text with one click.
 
-One admin, everything in Docker, every setting in the web UI.
+Everything in Docker, every setting in the web UI.
 
 ## Quick start
 

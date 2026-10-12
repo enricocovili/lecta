@@ -29,6 +29,8 @@ export interface Course {
   /** The user may change it: otherwise the course and its draft are read-only. */
   can_write?: boolean;
   chapter_count?: number;
+  /** The readers' notes waiting for whoever writes it (0 on someone else's course). */
+  open_notes?: number;
   chapters?: Chapter[];
   publication?: { id: number; created_at: string; pdf_size: number };
 }
