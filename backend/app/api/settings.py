@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..security.auth import require_admin, require_editor
+from ..security.auth import AuthContext, require_admin, require_editor
 from ..services import embeddings, semantic, templates
 from ..services import jobs as jobs_svc
 from ..services import settings as settings_svc
@@ -91,8 +91,8 @@ async def _touch_published(db: AsyncSession, section: str, before: dict[str, Any
 
 
 @router.post("/settings/embeddings/benchmark")
-async def run_benchmark(db: AsyncSession = Depends(get_db)) -> dict:
-    job = await jobs_svc.enqueue(db, "embeddings.benchmark", {}, title="Benchmark embeddings", priority="interactive")
+async def run_benchmark(ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> dict:
+    job = await jobs_svc.enqueue(db, "embeddings.benchmark", {}, title="Benchmark embeddings", priority="interactive", user_id=ctx.user.id)
     return {"job_id": job.id}
 
 
@@ -116,6 +116,6 @@ async def index_status(db: AsyncSession = Depends(get_db)) -> dict:
 
 
 @router.post("/index/rebuild")
-async def rebuild_index(db: AsyncSession = Depends(get_db)) -> dict:
-    job = await jobs_svc.enqueue(db, "index.rebuild", {}, title="Ricostruzione dell'indice di ricerca", priority="index")
+async def rebuild_index(ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> dict:
+    job = await jobs_svc.enqueue(db, "index.rebuild", {}, title="Ricostruzione dell'indice di ricerca", priority="index", user_id=ctx.user.id)
     return {"job_id": job.id}

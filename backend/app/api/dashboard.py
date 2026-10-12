@@ -1,4 +1,5 @@
-"""Admin homepage data."""
+"""Home page data: what the user may see (their courses and the published ones, their jobs; everything for admins
+and viewers)."""
 
 from __future__ import annotations
 
@@ -8,36 +9,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..models import Chapter, ChatMessage, ChatSession, Course, Job, ProjectFile
-from ..security.auth import require_content
-from ..services import jobs as jobs_svc
 from ..pipeline import agent
+from ..security.access import Access, access, jobs_readable, readable
+from ..services import jobs as jobs_svc
 from ..services import overview
 from .jobs import job_out
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(access)])
 
 
-async def _latest_reviews(db: AsyncSession) -> dict[int, dict]:
-    """The newest document feedback of every course: {course_id: {score, verdict, at, stale}}."""
+async def _latest_reviews(db: AsyncSession, acc: Access) -> dict[int, dict]:
+    """The newest document feedback of every course the user owns (or sees, as admin or viewer): {course_id: {score,
+    verdict, at, stale}}."""
     rows = (
         await db.execute(
             select(ChatSession.course_id, ChatMessage.review, ChatMessage.created_at, ChatMessage.id)
             .join(ChatMessage, ChatMessage.session_id == ChatSession.id)
-            .where(ChatMessage.review.is_not(None), ChatMessage.status == "done")
+            .join(Course, Course.id == ChatSession.course_id)
+            .where(ChatMessage.review.is_not(None), ChatMessage.status == "done", readable(acc.user, private=True))
             .order_by(ChatMessage.id)
         )
     ).all()
     return {cid: {"score": r.get("score"), "verdict": r.get("verdict"), "at": at, "message_id": mid} for cid, r, at, mid in rows}
 
 
-async def _ai_activity(db: AsyncSession, limit: int = 12) -> list[dict]:
-    """What the assistant did lately: one entry per turn that answered or changed something."""
+async def _ai_activity(db: AsyncSession, acc: Access, limit: int = 12) -> list[dict]:
+    """What the assistant did lately on the user's courses: one entry per turn that answered or changed something."""
     rows = (
         await db.execute(
             select(ChatMessage, ChatSession.course_id, Course.name)
             .join(ChatSession, ChatSession.id == ChatMessage.session_id)
             .join(Course, Course.id == ChatSession.course_id)
-            .where(ChatMessage.role == "assistant")
+            .where(ChatMessage.role == "assistant", readable(acc.user, private=True))
             .order_by(ChatMessage.id.desc())
             .limit(limit)
         )
@@ -56,11 +59,11 @@ async def _ai_activity(db: AsyncSession, limit: int = 12) -> list[dict]:
     return out
 
 
-async def _courses(db: AsyncSession) -> list[dict]:
-    reviews = await _latest_reviews(db)
+async def _courses(db: AsyncSession, acc: Access) -> list[dict]:
+    reviews = await _latest_reviews(db, acc)
     states = await overview.course_states(db)
     counts = dict((await db.execute(select(Chapter.course_id, func.count()).group_by(Chapter.course_id))).all())
-    courses = (await db.execute(select(Course).order_by(Course.name))).scalars().all()
+    courses = (await db.execute(select(Course).where(readable(acc.user)).order_by(Course.name))).scalars().all()
     return [
         {
             "id": c.id,
@@ -78,20 +81,20 @@ async def _courses(db: AsyncSession) -> list[dict]:
 
 
 @router.get("/dashboard")
-async def dashboard(db: AsyncSession = Depends(get_db)) -> dict:
+async def dashboard(acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
     recent_docs = (
         await db.execute(
             select(ProjectFile.path, ProjectFile.updated_at, Course.id, Course.name, Chapter.id, Chapter.title)
             .join(Course, Course.id == ProjectFile.course_id)
             .outerjoin(Chapter, (Chapter.course_id == ProjectFile.course_id) & (Chapter.path == ProjectFile.path))
-            .where(ProjectFile.path.like("%.tex"))
+            .where(ProjectFile.path.like("%.tex"), readable(acc.user))
             .order_by(ProjectFile.updated_at.desc())
             .limit(10)
         )
     ).all()
-    recent_courses = (await db.execute(select(Course).order_by(Course.updated_at.desc()).limit(8))).scalars().all()
+    recent_courses = (await db.execute(select(Course).where(readable(acc.user)).order_by(Course.updated_at.desc()).limit(8))).scalars().all()
     running = (
-        await db.execute(select(Job).where(Job.status.in_(jobs_svc.ACTIVE)).order_by(Job.id.desc()).limit(20))
+        await db.execute(select(Job).where(Job.status.in_(jobs_svc.ACTIVE), jobs_readable(acc.user)).order_by(Job.id.desc()).limit(20))
     ).scalars().all()
     return {
         "recent_documents": [
@@ -110,15 +113,14 @@ async def dashboard(db: AsyncSession = Depends(get_db)) -> dict:
             for c in recent_courses
         ],
         "jobs": [job_out(j) for j in running],
-        "activity": await overview.activity(db),
-        "ai_activity": await _ai_activity(db),
-        "courses": await _courses(db),
+        "activity": await overview.activity(db, jobs_readable(acc.user)),
+        "ai_activity": await _ai_activity(db, acc),
+        "courses": await _courses(db, acc),
     }
 
 
 @router.get("/dashboard/counts")
-async def dashboard_counts(db: AsyncSession = Depends(get_db)) -> dict:
+async def dashboard_counts(acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
     """The small numbers next to the navigation entries (polled by every workspace page)."""
-    return {
-        "jobs_active": (await db.execute(select(func.count()).select_from(Job).where(Job.status.in_(jobs_svc.ACTIVE)))).scalar_one(),
-    }
+    active = select(func.count()).select_from(Job).where(Job.status.in_(jobs_svc.ACTIVE), jobs_readable(acc.user))
+    return {"jobs_active": (await db.execute(active)).scalar_one()}

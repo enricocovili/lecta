@@ -129,8 +129,8 @@ async def publish_job(ctx: JobContext) -> dict[str, Any]:
     return {"publication_id": pub.id, "chapters": len(parts)}
 
 
-async def enqueue_publish(db: AsyncSession, course: Course, *, auto: bool) -> Job | None:
-    """Queue a publish build unless one is already queued/running for the course."""
+async def enqueue_publish(db: AsyncSession, course: Course, *, auto: bool, user_id: int | None = None) -> Job | None:
+    """Queue a publish build unless one is already queued/running for the course (`user_id`: who asked, if anyone)."""
     active = (
         await db.execute(select(Job.id).where(Job.kind == "publish", Job.course_id == course.id, Job.status.in_(jobs_svc.ACTIVE)).limit(1))
     ).first()
@@ -138,6 +138,7 @@ async def enqueue_publish(db: AsyncSession, course: Course, *, auto: bool) -> Jo
         return None
     return await jobs_svc.enqueue(
         db, "publish", {"course_id": course.id, "auto": auto}, title=f"Pubblicazione di “{course.name}”", priority="publish", course_id=course.id,
+        user_id=user_id,
     )
 
 

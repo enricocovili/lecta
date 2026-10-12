@@ -1,4 +1,4 @@
-"""Admin full-text search over LaTeX sources, and "Export all"."""
+"""Full-text search over the LaTeX sources of the courses the user may read, and "Export all" of them."""
 
 from __future__ import annotations
 
@@ -15,12 +15,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import config
 from ..db import get_db
-from ..models import Chapter, Course, ProjectFile, Publication, SourceFile
-from ..security.auth import require_content
+from ..models import Chapter, Course, ProjectFile, Publication, SourceFile, Upload
+from ..security.access import Access, access, readable
 from ..services import blobs, compile as compile_svc, projects, templates
 from ..services.texttools import keywords_simple
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(access)])
+
+
+def _own_sources(acc: Access):  # noqa: ANN202
+    """Source files of the courses whose private content the user reads (sources are never published)."""
+    return select(SourceFile).join(Upload, Upload.id == SourceFile.upload_id).join(Course, Course.id == Upload.target_course_id).where(
+        readable(acc.user, private=True)
+    )
 
 
 def _first_line(src: str, terms: list[str]) -> int | None:
@@ -34,11 +41,11 @@ def _first_line(src: str, terms: list[str]) -> int | None:
 
 
 @router.get("/search")
-async def search(q: str = Query(min_length=1, max_length=200), db: AsyncSession = Depends(get_db)) -> dict:
+async def search(q: str = Query(min_length=1, max_length=200), acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> dict:
     terms = keywords_simple(q)
     results = []
-    courses = {c.id: c for c in (await db.execute(select(Course))).scalars()}
-    chapters = {(ch.course_id, ch.path): ch for ch in (await db.execute(select(Chapter))).scalars()}
+    courses = {c.id: c for c in (await db.execute(select(Course).where(readable(acc.user)))).scalars()}
+    chapters = {(ch.course_id, ch.path): ch for ch in (await db.execute(select(Chapter).where(Chapter.course_id.in_(list(courses))))).scalars()}
     by_cfg: dict[str, list[int]] = {}
     for c in courses.values():
         by_cfg.setdefault(templates.ts_config(c.language), []).append(c.id)
@@ -62,7 +69,10 @@ async def search(q: str = Query(min_length=1, max_length=200), db: AsyncSession 
     if not results or re.search(r"[\\{}$]", q):
         rows = await db.execute(
             select(ProjectFile.course_id, ProjectFile.path, ProjectFile.text_content)
-            .where(ProjectFile.is_text.is_(True), ProjectFile.text_content.ilike(f"%{q.replace('%', '').replace('_', '')}%"))
+            .where(
+                ProjectFile.course_id.in_(list(courses)), ProjectFile.is_text.is_(True),
+                ProjectFile.text_content.ilike(f"%{q.replace('%', '').replace('_', '')}%"),
+            )
             .limit(50)
         )
         seen = {(r["course_id"], r["path"]) for r in results}
@@ -92,13 +102,11 @@ async def search(q: str = Query(min_length=1, max_length=200), db: AsyncSession 
         for ch in chapters.values()
         if q.lower() in ch.title.lower()
     ]
-    sources = (
-        await db.execute(select(SourceFile.id, SourceFile.name, SourceFile.kind).where(SourceFile.name.ilike(f"%{q}%")).limit(20))
-    ).all()
+    sources = (await db.execute(_own_sources(acc).where(SourceFile.name.ilike(f"%{q}%")).limit(20))).scalars().all()
     return {
         "files": out[:100],
         "titles": title_hits[:50],
-        "sources": [{"id": i, "name": n, "kind": k} for i, n, k in sources],
+        "sources": [{"id": s.id, "name": s.name, "kind": s.kind} for s in sources],
     }
 
 
@@ -144,11 +152,11 @@ def _zip_stream(entries: list[tuple[str, str | bytes | None, str | None]]) -> It
 
 
 @router.get("/export")
-async def export_all(include_sources: bool = False, db: AsyncSession = Depends(get_db)) -> StreamingResponse:
-    """Zip of every course's LaTeX sources, its latest draft PDF and published PDFs
-    (optionally the uploaded originals too)."""
+async def export_all(include_sources: bool = False, acc: Access = Depends(access), db: AsyncSession = Depends(get_db)) -> StreamingResponse:
+    """Zip of every readable course's LaTeX sources, its latest draft PDF and published PDFs
+    (optionally the uploaded originals of the user's own courses too)."""
     entries: list[tuple[str, str | bytes | None, str | None]] = []
-    courses = (await db.execute(select(Course).order_by(Course.slug))).scalars().all()
+    courses = (await db.execute(select(Course).where(readable(acc.user)).order_by(Course.slug))).scalars().all()
     readme = ["Lecta export " + datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"), ""]
     for c in courses:
         base = f"{c.slug}/"
@@ -164,7 +172,7 @@ async def export_all(include_sources: bool = False, db: AsyncSession = Depends(g
                 entries.append((base + "published.pdf", None, pub.pdf_blob))
         readme.append(f"{c.slug}: {c.name} ({c.academic_year or ''}, {c.language})")
     if include_sources:
-        for sf in (await db.execute(select(SourceFile).where(SourceFile.blob.is_not(None)))).scalars():
+        for sf in (await db.execute(_own_sources(acc).where(SourceFile.blob.is_not(None)))).scalars():
             safe = re.sub(r"[^\w.\- ]", "_", sf.name)[:120]
             entries.append((f"_sources/{sf.upload_id}/{sf.id}-{safe}", None, sf.blob))
     entries.insert(0, ("README.txt", "\n".join(readme) + "\n", None))

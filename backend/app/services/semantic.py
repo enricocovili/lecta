@@ -7,6 +7,7 @@ indexed; callers then fall back to lexical-only retrieval.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from typing import Any
 
 from sqlalchemy import text
@@ -46,7 +47,9 @@ def normalise(sim: float) -> float:
     return max(0.0, min(1.0, (sim - 0.2) / 0.6))
 
 
-async def search(db: AsyncSession, query: str, *, course_id: int | None = None, limit: int = 20) -> list[dict[str, Any]] | None:
+async def search(db: AsyncSession, query: str, *, course_ids: Collection[int], limit: int = 20) -> list[dict[str, Any]] | None:
+    """The chapters of `course_ids` closest to the query (always a given set: one user's courses never leak into
+    another's assistant)."""
     st = await status(db)
     if not st["enabled"] or not (ALLOW_LOAD or embeddings.is_loaded()):
         return None
@@ -65,7 +68,7 @@ async def search(db: AsyncSession, query: str, *, course_id: int | None = None, 
             FROM (
                 SELECT chapter_id, course_id, 1 - (embedding <=> CAST(:q AS vector)) AS sim
                 FROM index_chunks
-                WHERE embedding IS NOT NULL AND model = :m AND (CAST(:cid AS integer) IS NULL OR course_id = :cid)
+                WHERE embedding IS NOT NULL AND model = :m AND course_id = ANY(:cids)
                 ORDER BY embedding <=> CAST(:q AS vector)
                 LIMIT 300
             ) n JOIN chapters ch ON ch.id = n.chapter_id
@@ -74,7 +77,7 @@ async def search(db: AsyncSession, query: str, *, course_id: int | None = None, 
             LIMIT :limit
             """
         ),
-        {"q": to_pg(vec), "m": st["model"], "cid": course_id, "limit": limit},
+        {"q": to_pg(vec), "m": st["model"], "cids": list(course_ids), "limit": limit},
     )
     return [
         {"chapter_id": cid, "course_id": course, "chapter_title": title, "semantic": round(normalise(float(sim)), 4), "cosine": round(float(sim), 4)}

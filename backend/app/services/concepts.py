@@ -321,20 +321,25 @@ async def _compute(db: AsyncSession, st: dict[str, Any]) -> tuple[str, list[Conc
     return mode, cluster(units, pairs)
 
 
-async def concept_map(db: AsyncSession) -> dict[str, Any]:
+async def concept_map(db: AsyncSession, visible: set[int]) -> dict[str, Any]:
+    """The map over the courses in `visible` (those the user may read): a concept counts when it is in two of them."""
     st = await semantic.status(db)
     fp = (await _fingerprint(db), st.get("model"), st["enabled"])
     if _cache.get("fp") != fp:
         _cache["fp"], _cache["value"] = fp, await _compute(db, st)
     mode, concepts = _cache["value"]
+    concepts = [c for c in concepts if len(set(c.course_ids) & visible) >= 2]
 
-    courses = (await db.execute(select(Course.id, Course.name, Course.slug, Course.published).order_by(Course.name))).all()
+    courses = (
+        await db.execute(select(Course.id, Course.name, Course.slug, Course.published).where(Course.id.in_(visible)).order_by(Course.name))
+    ).all()
     names = {cid: name for cid, name, _, _ in courses}
     states = await overview.course_states(db)
     counts: dict[int, int] = {}
     for c in concepts:
         for cid in c.course_ids:
-            counts[cid] = counts.get(cid, 0) + 1
+            if cid in visible:
+                counts[cid] = counts.get(cid, 0) + 1
     return {
         "mode": mode,
         "courses": [
@@ -353,7 +358,7 @@ async def concept_map(db: AsyncSession) -> dict[str, Any]:
                 "id": c.id,
                 "label": c.label,
                 "score": c.score,
-                "course_ids": c.course_ids,
+                "course_ids": [cid for cid in c.course_ids if cid in visible],
                 "occurrences": [
                     {
                         "course_id": u.course_id,

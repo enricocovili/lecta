@@ -2,7 +2,7 @@
 
 The sweeps call every route under a course (its chapters and files, its lessons and labs, what its imports read) as
 another editor: on an unpublished course everything is 404 (an editor can't tell it exists); on a published one the
-text reads and changes are 403, while lessons, labs and import material stay 404 (they are never published).
+text reads and changes are 403, while lessons, labs, import material and jobs stay 404 (they are never published).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from .test_boundary import PARAM_RE
 # Path parameters that lead to a course (filled with the material's ids; any other parameter is 1).
 COURSE_PARAMS = {"course_id", "chapter_id", "lesson_id", "number", "sid", "item_id", "fig_id", "job_id"}
 
-# Routes that get their checks with the jobs and the assistant, left out of the sweeps until then.
+# Routes that get their checks with the assistant, left out of the sweeps until then.
 NOT_YET = {"/api/courses/{course_id}/review/latest"}
 NOT_YET_PREFIXES = ("/api/chat/",)
 
@@ -64,13 +64,13 @@ async def _material(client, published: bool = False, admin=None) -> dict:  # noq
 def _course_routes(app):  # noqa: ANN001
     for r, method in _private(app):
         params = {m.group(1) for m in PARAM_RE.finditer(r.path)}
-        is_job = r.path.startswith("/api/jobs/") and r.path != "/api/jobs/{job_id}/ingest"
-        if params & COURSE_PARAMS and r.path not in NOT_YET and not r.path.startswith(NOT_YET_PREFIXES) and not is_job:
+        if params & COURSE_PARAMS and r.path not in NOT_YET and not r.path.startswith(NOT_YET_PREFIXES):
             yield r, method
 
 
 def _is_private(route) -> bool:  # noqa: ANN001
-    return access.private_access in set(_calls(route.dependant))
+    """Lessons, labs, import material and jobs: never opened by publishing."""
+    return bool({access.private_access, access.job_access} & set(_calls(route.dependant)))
 
 
 def _url(path: str, ids: dict) -> str:
@@ -153,3 +153,48 @@ async def test_lessons_and_labs_are_their_course_owners(editor, other_editor, vi
     theirs = await _material(other_editor)
     r = await other_editor.patch(f"/api/lessons/{theirs['lesson_id']}", json={"course_id": course_id})
     assert r.status_code == 404
+
+
+async def _write(client, course: dict, text: str) -> None:  # noqa: ANN001
+    path = course["chapters"][0]["path"]
+    r = await client.put(f"/api/courses/{course['id']}/files/content", json={"path": path, "content": text})
+    assert r.status_code == 200, r.text
+
+
+async def test_lists_search_and_export_show_only_what_one_may_read(editor, other_editor, viewer, admin):
+    word = "zx" + uuid.uuid4().hex[:8]
+    ids = await _material(editor)
+    course = ids["course"]
+    await _write(editor, course, f"\\section{{Prova}}\n{word} compare solo qui.\n")
+    slug = course["slug"]
+
+    def found(res) -> bool:  # noqa: ANN001
+        return any(f["course_id"] == course["id"] for f in res.json()["files"])
+
+    for client, sees in ((editor, True), (viewer, True), (admin, True), (other_editor, False)):
+        assert found(await client.get(f"/api/search?q={word}")) is sees
+        assert any(j["id"] == ids["job_id"] for j in (await client.get("/api/jobs")).json()) is sees
+        home = (await client.get("/api/dashboard")).json()
+        assert any(c["id"] == course["id"] for c in home["courses"]) is sees
+        assert any(d["course_id"] == course["id"] for d in home["recent_documents"]) is sees
+        export = await client.get("/api/export")
+        assert (f"{slug}/".encode() in export.content) is sees
+    # Bulk deleting the finished jobs deletes only one's own.
+    r = await other_editor.post("/api/jobs/delete", json={"status": "succeeded"})
+    assert ids["job_id"] not in r.json()["deleted"]
+    assert (await editor.get(f"/api/jobs/{ids['job_id']}")).status_code == 200
+    # Published, the text is found by everybody; the job stays the owner's.
+    assert (await admin.post(f"/api/courses/{course['id']}/publish")).status_code == 200
+    assert found(await other_editor.get(f"/api/search?q={word}"))
+    assert all(j["id"] != ids["job_id"] for j in (await other_editor.get("/api/jobs")).json())
+
+
+async def test_a_job_belongs_to_whoever_started_it(editor, admin):
+    ids = await _material(editor)
+    r = await editor.post(f"/api/courses/{ids['course_id']}/publish")
+    assert r.status_code == 403  # publishing is the admins'
+    r = await admin.post(f"/api/courses/{ids['course_id']}/publish")
+    job = (await admin.get(f"/api/jobs/{r.json()['job_id']}")).json()
+    assert job["user_id"] is not None and job["course_id"] == ids["course_id"]
+    # The course's owner sees the job the admin started on it.
+    assert (await editor.get(f"/api/jobs/{job['id']}")).status_code == 200

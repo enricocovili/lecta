@@ -31,12 +31,14 @@ async def enqueue(
     title: str = "",
     priority: int | str = "ingest",
     course_id: int | None = None,
+    user_id: int | None = None,
     parent_id: int | None = None,
     commit: bool = True,
 ) -> Job:
     prio = PRIORITY.get(priority, 5) if isinstance(priority, str) else priority
     job = Job(
-        kind=kind, title=title or kind, payload=payload or {}, priority=prio, course_id=course_id, parent_id=parent_id
+        kind=kind, title=title or kind, payload=payload or {}, priority=prio, course_id=course_id, user_id=user_id,
+        parent_id=parent_id,
     )
     db.add(job)
     await db.flush()

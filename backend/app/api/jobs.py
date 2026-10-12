@@ -15,10 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import SessionLocal, get_db
 from ..models import AuditLog, IngestFigure, IngestItem, Job, JobLog
-from ..security.auth import require_content
+from ..security.access import Access, job_access, jobs_readable
 from ..services import jobs as jobs_svc
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(job_access)])
 
 
 def job_out(j: Job) -> dict[str, Any]:
@@ -34,6 +34,7 @@ def job_out(j: Job) -> dict[str, Any]:
         "result": j.result,
         "attempts": j.attempts,
         "course_id": j.course_id,
+        "user_id": j.user_id,
         "parent_id": j.parent_id,
         "cost_usd": j.cost_usd,
         "tokens_in": j.tokens_in,
@@ -61,9 +62,10 @@ async def _job(db: AsyncSession, job_id: int) -> Job:
 async def list_jobs(
     status: str | None = Query(None, max_length=40),
     limit: int = Query(50, ge=1, le=500),
+    acc: Access = Depends(job_access),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict]:
-    q = select(Job).order_by(Job.id.desc()).limit(limit)
+    q = select(Job).where(jobs_readable(acc.user)).order_by(Job.id.desc()).limit(limit)
     if status == "active":
         q = q.where(Job.status.in_(jobs_svc.ACTIVE))
     elif status:
@@ -293,9 +295,9 @@ class BulkDeleteIn(BaseModel):
 
 
 @router.post("/jobs/delete")
-async def delete_jobs(body: BulkDeleteIn, db: AsyncSession = Depends(get_db)) -> dict:
-    """Delete every job with the given finished status."""
-    rows = list((await db.execute(select(Job).where(Job.status == body.status).order_by(Job.id))).scalars())
+async def delete_jobs(body: BulkDeleteIn, acc: Access = Depends(job_access), db: AsyncSession = Depends(get_db)) -> dict:
+    """Delete every job with the given finished status (of those the user may delete: theirs, or all for an admin)."""
+    rows = list((await db.execute(select(Job).where(Job.status == body.status, jobs_readable(acc.user)).order_by(Job.id))).scalars())
     ids = [j.id for j in rows]
     totals = {"uploads": 0}
     for j in rows:

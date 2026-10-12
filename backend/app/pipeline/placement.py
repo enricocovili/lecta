@@ -37,7 +37,7 @@ async def decide(
         if not await projects.chapters_of(db, target_course_id):
             return {**new_chapter, "rationale": "the course has no chapters yet"}
         cands, mode = await retrieval.candidates(
-            db, bundle["body"], title=bundle["title"], course_id=target_course_id, top_k=cat.top_k
+            db, bundle["body"], title=bundle["title"], course_ids=[target_course_id], top_k=cat.top_k
         )
     await ctx.log(f"placement candidates for “{bundle['title']}” ({mode}): " + ", ".join(
         f"{c['course_name']}/{c.get('chapter_title') or '—'} {c['score']:.2f}" for c in cands[:5]) or "none")

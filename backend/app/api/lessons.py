@@ -556,7 +556,7 @@ async def generate(lesson_id: int, body: GenerateIn, acc: Access = Depends(priva
     job = await jobs_svc.enqueue(
         db, "ingest", {"upload_id": up.id, "lesson_id": lesson.id, "lesson_snapshot": snap_blob, "guidelines": text,
          "mark_completed": body.mark_completed, **({"placement": placement} if chapter_id is None else {})},
-        title=f"Lezione: {lesson.title}"[:200], priority="ingest", course_id=course.id, commit=False,
+        title=f"Lezione: {lesson.title}"[:200], priority="ingest", course_id=course.id, user_id=acc.user.id, commit=False,
     )
     up.job_id = job.id
     await db.commit()

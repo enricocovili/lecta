@@ -621,3 +621,11 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      source file, an import's page or figure, or an import leads to its course and is checked before the route runs;
      material whose course was deleted is left to admins and viewers. Lesson share links stay with the admins (115).
      *Alternative:* opening lessons with the published course (a classmate's notes and slides would be readable).
+118. **Jobs, search, the home page and the assistant's retrieval see only what the user may (#74).** A job records who
+     started it (`jobs.user_id`; existing jobs were the admin's, automatic republishing has none): it is seen by them, by
+     its course's owner, and by admins and viewers, and cancelled, retried or deleted by them and the admins; bulk
+     deleting removes only those. `/dashboard`, `/search`, `/concepts` and `/export` are limited to the readable
+     courses (sources only of one's own). Retrieval (`services/retrieval.py`, `semantic.py`) no longer has an "every
+     course" mode: each caller names the courses to look in (the import's course, the assistant's course), so one
+     user's notes can't reach another user's import or assistant. *Alternative:* filtering retrieval results after the
+     fact (an unfiltered search is one forgotten filter away from a leak).

@@ -357,7 +357,7 @@ async def grep(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:
 async def find_related(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:
     q = _str(args, "query")
     async with SessionLocal() as db:
-        ranked, mode = await retrieval.candidates(db, q, course_id=ctx.course_id, top_k=6)
+        ranked, mode = await retrieval.candidates(db, q, course_ids=[ctx.course_id], top_k=6)
     lines = [f"[id {r['chapter_id']}] «{r['chapter_title']}» — punteggio {r['score']}" for r in ranked if r.get("chapter_id")]
     return ToolResult("\n".join(lines) or "nessun capitolo collegato", summary=f"{len(lines)} capitoli ({mode})")
 

@@ -302,6 +302,8 @@ class Job(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id", ondelete="SET NULL"))
+    # Who started it (None: the server itself, e.g. an automatic republish); they and the course's owner see it.
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     parent_id: Mapped[int | None] = mapped_column(BigInteger)
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     tokens_in: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")

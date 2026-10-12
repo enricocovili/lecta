@@ -61,6 +61,12 @@ async def _ctx() -> JobContext:
     return JobContext(j)
 
 
+async def _all_courses(db) -> list[int]:  # noqa: ANN001
+    from app.models import Course
+
+    return list((await db.execute(select(Course.id))).scalars())
+
+
 def _bundle(title: str, body: str, key: str) -> dict:
     return {"title": title, "body": body, "outline": [], "group_key": key, "sources": ["source:1"], "keys": []}
 
@@ -92,7 +98,7 @@ async def test_placement_in_both_modes(admin, embeddings_mode):
         assert st["enabled"] is embeddings_mode, st
         embedded = (await db.execute(select(IndexChunk).where(IndexChunk.embedding.is_not(None)))).scalars().all()
         assert bool(embedded) is embeddings_mode
-        cands, mode = await retrieval.candidates(db, Q_CONV, title="Convoluzione")
+        cands, mode = await retrieval.candidates(db, Q_CONV, title="Convoluzione", course_ids=await _all_courses(db))
         assert mode == ("hybrid" if embeddings_mode else "lexical")
         assert cands[0]["chapter_id"] == ids["Sistemi LTI"], cands[:3]
 
@@ -114,7 +120,7 @@ async def test_semantic_retrieval_is_cross_lingual_and_incremental(admin, embedd
     ids = await _library(admin)
     await indexer.index_pending(limit=100)
     async with SessionLocal() as db:
-        cands, mode = await retrieval.candidates(db, Q_EN, title="Impulse response")
+        cands, mode = await retrieval.candidates(db, Q_EN, title="Impulse response", course_ids=await _all_courses(db))
         assert mode == "hybrid"
         assert cands[0]["chapter_id"] == ids["Sistemi LTI"], cands[:3]  # English query, Italian notes
         before = dict((await db.execute(select(IndexChunk.id, IndexChunk.content_hash).where(IndexChunk.chapter_id == ids["Sistemi LTI"]))).all())
@@ -136,7 +142,7 @@ async def test_slow_embeddings_fall_back_to_lexical(admin, embeddings_mode):
         await settings_svc.set_section(db, "embeddings", {"min_chunks_per_s": 1e9})
         st = await semantic.status(db)
         assert not st["enabled"] and "too slow" in st["reason"]
-        _, mode = await retrieval.candidates(db, Q_CONV)
+        _, mode = await retrieval.candidates(db, Q_CONV, course_ids=await _all_courses(db))
         assert mode == "lexical"
     r = await admin.get("/api/index/status")
     assert r.json()["mode"] == "lexical"

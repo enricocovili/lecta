@@ -4,12 +4,16 @@ Lexical retrieval uses PostgreSQL full-text search with each course's
 text-search configuration (italian / english / simple …). The semantic part
 (local embeddings + pgvector) is added by services/semantic.py when enabled;
 `candidates()` combines both, or falls back to lexical-only.
+
+Every search names the courses it looks in (`course_ids`): there is no "all courses", so one user's notes can't reach
+another user's import or assistant.
 """
 
 from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Collection
 from typing import Any
 
 from sqlalchemy import select, text
@@ -46,11 +50,11 @@ async def outlines(db: AsyncSession, chapter_ids: list[int]) -> dict[int, list[s
     return out
 
 
-async def lexical(db: AsyncSession, query_text: str, *, course_id: int | None = None, limit: int = 20) -> list[dict[str, Any]]:
+async def lexical(db: AsyncSession, query_text: str, *, course_ids: Collection[int], limit: int = 20) -> list[dict[str, Any]]:
     kws = keywords(query_text)
-    if not kws:
+    if not kws or not course_ids:
         return []
-    courses = (await db.execute(select(Course) if course_id is None else select(Course).where(Course.id == course_id))).scalars().all()
+    courses = (await db.execute(select(Course).where(Course.id.in_(list(course_ids))))).scalars().all()
     by_lang: dict[str, list[int]] = {}
     for c in courses:
         by_lang.setdefault(templates.ts_config(c.language), []).append(c.id)
@@ -85,16 +89,16 @@ async def lexical(db: AsyncSession, query_text: str, *, course_id: int | None = 
 
 
 async def candidates(
-    db: AsyncSession, query_text: str, *, title: str = "", course_id: int | None = None, top_k: int = 8
+    db: AsyncSession, query_text: str, *, course_ids: Collection[int], title: str = "", top_k: int = 8
 ) -> tuple[list[dict[str, Any]], str]:
     """Top-k candidate chapters (+ courses without chapters). Returns (candidates, mode)."""
     from . import semantic
 
     q = f"{title}\n{latex_to_text(query_text)}"
-    lex = await lexical(db, q, course_id=course_id, limit=max(top_k * 3, 20))
+    lex = await lexical(db, q, course_ids=course_ids, limit=max(top_k * 3, 20))
     mode = "lexical"
     scores: dict[int, dict[str, Any]] = {r["chapter_id"]: dict(r, semantic=None) for r in lex}
-    sem = await semantic.search(db, q, course_id=course_id, limit=max(top_k * 3, 20))
+    sem = await semantic.search(db, q, course_ids=course_ids, limit=max(top_k * 3, 20)) if course_ids else None
     if sem is not None:
         mode = "hybrid"
         for r in sem:
@@ -107,7 +111,7 @@ async def candidates(
             d["score"] = round(d.get("lexical", 0.0), 4)
     ranked = sorted(scores.values(), key=lambda d: d["score"], reverse=True)[:top_k]
     # Fill in names and outlines.
-    course_rows = {c.id: c for c in (await db.execute(select(Course))).scalars()}
+    course_rows = {c.id: c for c in (await db.execute(select(Course).where(Course.id.in_(list(course_ids))))).scalars()}
     outs = await outlines(db, [d["chapter_id"] for d in ranked])
     for d in ranked:
         c = course_rows.get(d["course_id"])
@@ -116,7 +120,7 @@ async def candidates(
     # Courses without any chapter are candidates for a new chapter.
     with_chapters = {cid for (cid,) in (await db.execute(select(Chapter.course_id).distinct())).all()}
     for c in course_rows.values():
-        if (course_id is None or c.id == course_id) and c.id not in with_chapters:
+        if c.id not in with_chapters:
             overlap = len(set(keywords(c.name + " " + " ".join(c.tags or []), 10)) & set(keywords(q, 30)))
             ranked.append(
                 {"course_id": c.id, "course_name": c.name, "chapter_id": None, "chapter_title": None, "outline": [],

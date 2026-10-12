@@ -61,7 +61,7 @@ async def publish(course_id: int, acc: Access = Depends(access), db: AsyncSessio
     c = await load_course(db, course_id, acc)
     c.published = True
     await db.commit()
-    job = await enqueue_publish(db, c, auto=False)
+    job = await enqueue_publish(db, c, auto=False, user_id=acc.user.id)
     await db.commit()
     return {**await publish_state(db, c), "job_id": job.id if job else None}
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Build, Chapter, Course, Job, SourceFile, SourceLink, Upload
@@ -108,13 +108,13 @@ async def course_states(db: AsyncSession) -> dict[int, dict[str, Any]]:
     return out
 
 
-async def activity(db: AsyncSession, limit: int = 30) -> list[dict[str, Any]]:
-    """Recent top-level jobs with what the Home needs to render them."""
+async def activity(db: AsyncSession, visible: ColumnElement[bool], limit: int = 30) -> list[dict[str, Any]]:
+    """Recent top-level jobs (of those `visible` selects) with what the Home needs to render them."""
     rows = (
         await db.execute(
             select(Job, Course.name)
             .outerjoin(Course, Course.id == Job.course_id)
-            .where(Job.parent_id.is_(None), Job.kind.not_in(HIDDEN_KINDS))
+            .where(Job.parent_id.is_(None), Job.kind.not_in(HIDDEN_KINDS), visible)
             .order_by(Job.id.desc())
             .limit(limit)
         )

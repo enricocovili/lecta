@@ -6,8 +6,14 @@
 Lessons, labs and what the imports read (sources, their pages and figures) are *private*: being published doesn't
 open them, since only the course's text is published.
 
+A job is seen by whoever started it, the owner of its course, admins and viewers; changed (cancelled, retried,
+deleted) by whoever started it, the course's owner and admins.
+
 A course that can't be read is answered with 404, like an unknown one (an editor can't probe what others have);
 one that can be read but not changed with 403.
+
+The routers depend on `access`, `private_access` or `job_access`, which check the course (or job) named by the
+route's path before its body is read, so no route under a course can forget it.
 """
 
 from __future__ import annotations
@@ -19,7 +25,6 @@ from sqlalchemy import ColumnElement, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-
 from ..models import Course, IngestFigure, IngestItem, Job, Lesson, SourceFile, Upload, User
 from .auth import UNSAFE, AuthContext, forbidden, has_role, require_content
 
@@ -32,56 +37,11 @@ class Access:
     write: bool
 
 
-async def access(request: Request, ctx: AuthContext = Depends(require_content), db: AsyncSession = Depends(get_db)) -> Access:
-    """The routers of a course's content depend on this: a route with `{course_id}` in its path is checked here,
-    before its body is read, so no route under a course can forget it (the endpoint gets the course again with
-    `load_course`)."""
-    acc = Access(user=ctx.user, write=request.method in UNSAFE)
-    if "course_id" in request.path_params:
-        try:
-            course_id = int(request.path_params["course_id"])
-        except ValueError:
-            raise HTTPException(status_code=404, detail="Not Found") from None
-        check(acc, await db.get(Course, course_id))
-    return acc
+def _not_found() -> HTTPException:
+    return HTTPException(status_code=404, detail="Not Found")
 
 
-# Path parameters of the private routes, and how each one leads to its course.
-_COURSE_OF = {
-    "course_id": None,
-    "lesson_id": lambda v: select(Lesson.course_id).where(Lesson.id == v),
-    "sid": lambda v: select(Upload.target_course_id).join(SourceFile, SourceFile.upload_id == Upload.id).where(SourceFile.id == v),
-    "item_id": lambda v: select(Upload.target_course_id).join(IngestItem, IngestItem.upload_id == Upload.id).where(IngestItem.id == v),
-    "fig_id": lambda v: select(Job.course_id).join(IngestFigure, IngestFigure.job_id == Job.id).where(IngestFigure.id == v),
-    "job_id": lambda v: select(Job.course_id).where(Job.id == v),
-}
-
-
-async def private_access(request: Request, ctx: AuthContext = Depends(require_content), db: AsyncSession = Depends(get_db)) -> Access:
-    """`access` for the private routers (lessons, labs, import material): the course behind the path's lesson, lab,
-    source, item, figure or import is checked with `private=True`. Material whose course was deleted is left to
-    admins and viewers."""
-    acc = Access(user=ctx.user, write=request.method in UNSAFE)
-    for name, query in _COURSE_OF.items():
-        if name not in request.path_params:
-            continue
-        try:
-            value = int(request.path_params[name])
-        except ValueError:
-            raise HTTPException(status_code=404, detail="Not Found") from None
-        if query is None:
-            course_id: int | None = value
-        else:
-            row = (await db.execute(query(value))).first()
-            if row is None:
-                raise HTTPException(status_code=404, detail="Not Found")
-            course_id = row[0]
-        if course_id is None:
-            if not sees_everything(acc.user) or (acc.write and not has_role(acc.user, "admin")):
-                raise HTTPException(status_code=404, detail="Not Found")
-        else:
-            check(acc, await db.get(Course, course_id), private=True)
-    return acc
+# --------------------------------------------------------------------------- the rules
 
 
 def sees_everything(user: User) -> bool:
@@ -105,10 +65,96 @@ def readable(user: User, *, private: bool = False) -> ColumnElement[bool]:
     return or_(Course.owner_id == user.id, Course.published.is_(True))
 
 
+def jobs_readable(user: User) -> ColumnElement[bool]:
+    """A filter on `Job` for the jobs the user can see."""
+    if sees_everything(user):
+        return true()
+    return or_(Job.user_id == user.id, Job.course_id.in_(select(Course.id).where(Course.owner_id == user.id)))
+
+
 def check(acc: Access, course: Course | None, *, write: bool | None = None, private: bool = False) -> Course:
     """The course if `acc` may read it (and change it, for an unsafe request or `write=True`), else 404 or 403."""
     if course is None or not can_read(acc.user, course, private=private):
-        raise HTTPException(status_code=404, detail="Not Found")
+        raise _not_found()
     if (acc.write if write is None else write) and not can_write(acc.user, course):
         raise forbidden()
     return course
+
+
+async def check_job(acc: Access, db: AsyncSession, job_id: int) -> Job:
+    """The job if `acc` may see it (and change it, on an unsafe request), else 404 or 403."""
+    job = await db.get(Job, job_id)
+    if job is None:
+        raise _not_found()
+    course = await db.get(Course, job.course_id) if job.course_id is not None else None
+    mine = job.user_id == acc.user.id or (course is not None and course.owner_id == acc.user.id)
+    if not (mine or sees_everything(acc.user)):
+        raise _not_found()
+    if acc.write and not (mine or has_role(acc.user, "admin")):
+        raise forbidden()
+    return job
+
+
+# --------------------------------------------------------------------------- the routers' dependencies
+
+
+def _param(request: Request, name: str) -> int:
+    try:
+        return int(request.path_params[name])
+    except ValueError:
+        raise _not_found() from None
+
+
+def _access(request: Request, ctx: AuthContext) -> Access:
+    return Access(user=ctx.user, write=request.method in UNSAFE)
+
+
+async def access(request: Request, ctx: AuthContext = Depends(require_content), db: AsyncSession = Depends(get_db)) -> Access:
+    """The course's text (chapters, files, draft, publishing): the path's `{course_id}`, published counting."""
+    acc = _access(request, ctx)
+    if "course_id" in request.path_params:
+        check(acc, await db.get(Course, _param(request, "course_id")))
+    return acc
+
+
+async def job_access(request: Request, ctx: AuthContext = Depends(require_content), db: AsyncSession = Depends(get_db)) -> Access:
+    """The jobs: the path's `{job_id}`."""
+    acc = _access(request, ctx)
+    if "job_id" in request.path_params:
+        await check_job(acc, db, _param(request, "job_id"))
+    return acc
+
+
+# Path parameters of the private routes, and how each one leads to its course (None: it is the course).
+_COURSE_OF = {
+    "course_id": None,
+    "lesson_id": lambda v: select(Lesson.course_id).where(Lesson.id == v),
+    "sid": lambda v: select(Upload.target_course_id).join(SourceFile, SourceFile.upload_id == Upload.id).where(SourceFile.id == v),
+    "item_id": lambda v: select(Upload.target_course_id).join(IngestItem, IngestItem.upload_id == Upload.id).where(IngestItem.id == v),
+    "fig_id": lambda v: select(Job.course_id).join(IngestFigure, IngestFigure.job_id == Job.id).where(IngestFigure.id == v),
+}
+
+
+async def private_access(request: Request, ctx: AuthContext = Depends(require_content), db: AsyncSession = Depends(get_db)) -> Access:
+    """Lessons, labs, import material: the course behind the path's lesson, source, item or figure is checked with
+    `private=True`, an import's `{job_id}` as a job. Material whose course was deleted is left to admins and viewers."""
+    acc = _access(request, ctx)
+    if "job_id" in request.path_params:
+        await check_job(acc, db, _param(request, "job_id"))
+    for name, query in _COURSE_OF.items():
+        if name not in request.path_params:
+            continue
+        value = _param(request, name)
+        if query is None:
+            course_id: int | None = value
+        else:
+            row = (await db.execute(query(value))).first()
+            if row is None:
+                raise _not_found()
+            course_id = row[0]
+        if course_id is None:
+            if not sees_everything(acc.user) or (acc.write and not has_role(acc.user, "admin")):
+                raise _not_found()
+        else:
+            check(acc, await db.get(Course, course_id), private=True)
+    return acc
