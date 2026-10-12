@@ -9,5 +9,5 @@ if (!r.data) return Astro.rewrite("/404");
 if (Astro.url.search) return Astro.redirect(`/admin/courses/${id}/testo${Astro.url.search}`);
 ---
 <Admin title={r.data.name} crumbs={[{ label: "Materie", href: "/admin/courses" }, { label: r.data.name }]}>
-  <CourseOverview client:load courseId={id} />
+  <CourseOverview client:load courseId={id} role={Astro.locals.auth.role} userId={Astro.locals.auth.user_id} />
 </Admin>

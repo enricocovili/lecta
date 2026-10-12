@@ -57,7 +57,9 @@ reasoning behind every change since.
   viewers) even when the course is published; a job belongs to whoever started it and to its course's owner;
   a conversation with the assistant to its author (admins see all), and asking it needs the right to change the course. Search,
   the home page and the assistant's retrieval only look in the courses the user may read. `tests/test_ownership.py` calls every route under a course as another
-  editor.
+  editor. The course JSON (`/api/courses`, `/api/tree`, the home page's courses) carries `owner` and `can_write`: the
+  UI shows others' courses as «di <owner>» and, when `can_write` is false, the course page and its text read-only (no
+  assistant, writing in place, structure, settings, compile or new lessons); publishing controls are only for admins.
 * **Sessions**: accounts live in `users`, each with a role (`viewer`, `editor`, `admin`) and possibly disabled (a
   disabled user's sessions stop working); argon2id password (optional: invited users have only passkeys), httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe
   methods, login rate limiting, optional TOTP. **Passkeys** (WebAuthn, Settings → Account): add one with the

@@ -7,5 +7,5 @@ const r = await backendGet<{ name: string }>(Astro, `/api/courses/${id}`);
 if (!r.data) return Astro.rewrite("/404");
 ---
 <Workspace title={r.data.name}>
-  <CourseWorkspace client:only="react" courseId={id} />
+  <CourseWorkspace client:only="react" courseId={id} role={Astro.locals.auth.role} userId={Astro.locals.auth.user_id} />
 </Workspace>

@@ -21,7 +21,7 @@ export interface ScrollRequest {
   sectionId?: string;
 }
 
-const Block = memo(function Block({ b, index, width, picked }: { b: DraftBlock; index: number; width: number; picked: boolean }) {
+const Block = memo(function Block({ b, index, width, picked, still }: { b: DraftBlock; index: number; width: number; picked: boolean; still: boolean }) {
   const failed = !!b.error;
   return (
     <div
@@ -30,7 +30,7 @@ const Block = memo(function Block({ b, index, width, picked }: { b: DraftBlock; 
       data-end={b.end}
       data-index={index}
       id={b.id}
-      tabIndex={b.pages.length || failed ? 0 : -1}
+      tabIndex={still ? undefined : b.pages.length || failed ? 0 : -1}
     >
       {b.pages.map((p) => (
         <img
@@ -165,6 +165,7 @@ export default function DocView({
   onActiveChapter,
   onSelectionAction,
   onBlockWritten,
+  readOnly = false,
 }: {
   courseId: number;
   chapters: DraftChapter[] | null;
@@ -177,6 +178,8 @@ export default function DocView({
   onSelectionAction: (a: SelectionAction, sel: DraftSelection) => void;
   /** A block was written in place: the chapter typeset again. */
   onBlockWritten: (d: DraftChapter) => void;
+  /** Only to read: blocks are neither picked (the assistant's actions) nor written in place. */
+  readOnly?: boolean;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const article = useRef<HTMLElement>(null);
@@ -326,16 +329,18 @@ export default function DocView({
   return (
     <div className="doc-scroll" ref={scroller}>
       <article
-        className="doc"
+        className={`doc${readOnly ? " readonly" : ""}`}
         ref={article}
         data-testid="doc-preview"
         aria-label="Bozza del documento"
         aria-busy={loading}
         onClick={(e) => {
+          if (readOnly) return;
           if (!(e.target instanceof Element && e.target.closest(".doc-edit"))) pickAt(e.target, e.shiftKey);
         }}
-        onDoubleClick={(e) => editAt(e.target)}
+        onDoubleClick={(e) => !readOnly && editAt(e.target)}
         onKeyDown={(e) => {
+          if (readOnly) return;
           if (!(e.target instanceof HTMLElement && e.target.classList.contains("doc-block"))) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -385,11 +390,11 @@ export default function DocView({
                 editing && editing.chapterId === c.chapter.id && editing.index === k ? (
                   <BlockEditor key={`edit:${b.start}`} courseId={courseId} edit={editing} onDone={edited} />
                 ) : (
-                  <Block key={`${b.start}:${b.pages[0]?.url ?? b.error ?? ""}`} b={b} index={k} width={c.width} picked={!!pick && pick.chapterId === c.chapter.id && k >= pick.from && k <= pick.to} />
+                  <Block key={`${b.start}:${b.pages[0]?.url ?? b.error ?? ""}`} b={b} index={k} width={c.width} picked={!!pick && pick.chapterId === c.chapter.id && k >= pick.from && k <= pick.to} still={readOnly} />
                 ),
               )
             )}
-            {isHollow(c) && <p className="doc-ch-empty muted">Questo capitolo è ancora vuoto. Chiedi all’assistente di scriverlo.</p>}
+            {isHollow(c) && <p className="doc-ch-empty muted">{readOnly ? "Questo capitolo è ancora vuoto." : "Questo capitolo è ancora vuoto. Chiedi all’assistente di scriverlo."}</p>}
           </section>
         ))}
       </article>

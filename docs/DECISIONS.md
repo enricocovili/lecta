@@ -699,3 +699,18 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      (#81–#83). Hiding is only courtesy: every call is checked by the backend, which answers 403 anyway. *Alternatives:*
      a page per settings section (`/admin/settings/providers`) so that each could be a server 404 (breaks every link and
      bookmark to the hashes for no gain in safety); greying entries out (shows people what they can't have).
+125. **A course the user may not change opens read-only, and someone else's course says whose it is (#81).** The UI
+     follows the course's `can_write` (from `/api/courses/{id}`, `/api/tree`, the home page), not the role: a viewer,
+     or an editor on another editor's published course, gets the course page and its text to read. Gone are the
+     assistant (button, panel, deep links `?chat`/`?ask`, and its conversations aren't even loaded), picking blocks and
+     writing in place (a click or double click on the draft does nothing), the chapter menu and «Aggiungi capitolo»,
+     the course settings (so the editor-level preamble template is never fetched), «Nuova lezione» and compiling: the
+     PDF tab and «Scarica → PDF» show the latest compiled PDF, else the published one. The top bar says «Sola lettura ·
+     di <owner>». The publishing switch is only for admins (everyone else sees «Pubblicata» or «Privata»), on the
+     course page, in its text and on the home page. An editor reading someone else's course sees no lessons, labs or
+     sources (they stay the owner's, decision 117) and no requests for them are made; viewers still see them. Others'
+     courses show «di <owner>» in the sidebar, the courses page, the home page and the course page (the API adds
+     `owner` to `/api/tree` and `owner`/`can_write` to the home page's courses). Hiding is courtesy, as in decision 124:
+     the API refuses all of these anyway. *Alternatives:* greying controls out (says «you can't» on every button for
+     nothing); compiling for readers too (the compile service is the editors', and a reader has no use for a build
+     newer than the author's last one).

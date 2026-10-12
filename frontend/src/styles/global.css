@@ -556,6 +556,16 @@ details.dropdown > summary::-webkit-details-marker {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* «di <owner>» on a course someone else owns */
+.tree-course > a .owner {
+  flex: none;
+  max-width: 40%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg-faint);
+  font-size: 0.8rem;
+}
 
 /* ------------------------------------------------------------------ bottom nav (phones) */
 

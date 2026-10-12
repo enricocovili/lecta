@@ -57,6 +57,17 @@ body.ws-page {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* «Sola lettura · di <owner>» next to the title */
+.wsb-ro {
+  flex: none;
+  max-width: 18rem;
+}
+.wsb-ro .wsb-lbl {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .wsb-actions {
   display: flex;
   align-items: center;
@@ -494,6 +505,13 @@ body.ws-page {
 .doc-block:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+/* Read-only draft: the blocks are just text (no picking, no writing in place). */
+.doc.readonly .doc-block {
+  cursor: auto;
+}
+.doc.readonly .doc-block:hover {
+  background: none;
 }
 .doc-block.picked {
   background: color-mix(in srgb, var(--accent) 14%, transparent);

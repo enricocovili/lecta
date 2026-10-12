@@ -10,5 +10,5 @@ const role = Astro.locals.auth.role;
     <h1>Home</h1>
     {canCreate(role) && <a class="btn" href="/admin/lessons?new=1"><Icon name="notebook" />Prendi appunti a lezione</a>}
   </div>
-  <Dashboard client:load role={role} />
+  <Dashboard client:load role={role} userId={Astro.locals.auth.user_id} />
 </Admin>

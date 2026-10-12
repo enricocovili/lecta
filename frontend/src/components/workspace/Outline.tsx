@@ -1,5 +1,6 @@
 // The left rail: the outline of the document (chapters and their sections), the structure actions that need
-// no AI (add, rename, reorder, delete), and the sources of the course.
+// no AI (add, rename, reorder, delete), and the sources of the course. Read-only: just the outline (and the sources,
+// for whoever may read them).
 import { useState } from "react";
 import { del, fmtSize, get, patch, post } from "../../lib/api";
 import { Icon } from "../icons";
@@ -26,6 +27,7 @@ function ChapterItem({
   changed,
   sections,
   courseId,
+  readOnly,
   onGoto,
   onToggle,
   onMove,
@@ -41,6 +43,7 @@ function ChapterItem({
   changed: boolean;
   sections: DraftChapter["toc"];
   courseId: number;
+  readOnly: boolean;
   onGoto: (sectionId?: string) => void;
   onToggle: () => void;
   onMove: (dir: -1 | 1) => void;
@@ -84,7 +87,7 @@ function ChapterItem({
             {changed && <span className="rail-ai" title="Modificato di recente dall’assistente" aria-label="Modificato di recente dall’assistente" />}
           </button>
         )}
-        {!editing && (
+        {!editing && !readOnly && (
           <Pop label={`Azioni sul capitolo ${ch.title}`} className="ghost icon xs" menuClass="rail-menu" summary={<Icon name="more" />}>
             <button type="button" onClick={onAsk}>
               <Icon name="sparkles" />
@@ -151,7 +154,7 @@ function ChapterItem({
   );
 }
 
-function Sources({ courseId }: { courseId: number }) {
+function Sources({ courseId, readOnly }: { courseId: number; readOnly: boolean }) {
   const { data } = useApi(() => get<SourceRow[]>(`/api/courses/${courseId}/sources`).catch(() => [] as SourceRow[]), [courseId]);
   const [open, setOpen] = useState(false);
   const rows = data ?? [];
@@ -176,16 +179,20 @@ function Sources({ courseId }: { courseId: number }) {
           ))}
         </ul>
       )}
-      <a className="btn sm rail-import" href={`/admin/lessons?new=1&course=${courseId}`}>
-        <Icon name="plus" />
-        Nuova lezione
-      </a>
+      {!readOnly && (
+        <a className="btn sm rail-import" href={`/admin/lessons?new=1&course=${courseId}`}>
+          <Icon name="plus" />
+          Nuova lezione
+        </a>
+      )}
     </div>
   );
 }
 
 export default function Outline({
   courseId,
+  readOnly,
+  sources,
   chapters,
   preview,
   activeChapterId,
@@ -195,6 +202,10 @@ export default function Outline({
   onStructure,
 }: {
   courseId: number;
+  /** the user may only read the course */
+  readOnly: boolean;
+  /** the user may see the course's sources (they go with the lessons: not an editor on someone else's course) */
+  sources: boolean;
   chapters: CourseChapter[];
   preview: DraftChapter[] | null;
   activeChapterId: number | null;
@@ -243,7 +254,7 @@ export default function Outline({
     <nav className="rail" aria-label="Struttura del documento">
       <div className="rail-scroll">
         <div className="rail-label">Indice</div>
-        {chapters.length === 0 && <p className="rail-none small muted">Nessun capitolo. Aggiungine uno o chiedi all’assistente di iniziare.</p>}
+        {chapters.length === 0 && <p className="rail-none small muted">{readOnly ? "Nessun capitolo." : "Nessun capitolo. Aggiungine uno o chiedi all’assistente di iniziare."}</p>}
         <ol className="rail-list">
           {chapters.map((ch, i) => (
             <ChapterItem
@@ -257,6 +268,7 @@ export default function Outline({
               changed={aiChanged.has(ch.id)}
               sections={toc.get(ch.id) ?? []}
               courseId={courseId}
+              readOnly={readOnly}
               onGoto={(sid) => onGoto(ch.id, sid)}
               onToggle={() => setOpenMap({ ...openMap, [ch.id]: !(openMap[ch.id] ?? ch.id === activeChapterId) })}
               onMove={(d) => move(i, d)}
@@ -265,7 +277,7 @@ export default function Outline({
             />
           ))}
         </ol>
-        {adding ? (
+        {readOnly ? null : adding ? (
           <form className="rail-add" onSubmit={add}>
             <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Titolo del capitolo" aria-label="Titolo del nuovo capitolo" autoFocus onKeyDown={(e) => e.key === "Escape" && setAdding(false)} />
             <button className="btn sm primary" disabled={!newTitle.trim()}>
@@ -278,7 +290,7 @@ export default function Outline({
             Aggiungi capitolo
           </button>
         )}
-        <Sources courseId={courseId} />
+        {sources && <Sources courseId={courseId} readOnly={readOnly} />}
       </div>
     </nav>
   );

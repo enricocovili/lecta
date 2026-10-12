@@ -4,5 +4,5 @@ import CoursesBrowser from "../../../components/CoursesBrowser";
 const role = Astro.locals.auth.role;
 ---
 <Admin title="Materie">
-  <CoursesBrowser client:load role={role} />
+  <CoursesBrowser client:load role={role} userId={Astro.locals.auth.user_id} />
 </Admin>

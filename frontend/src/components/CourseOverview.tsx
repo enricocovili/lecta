@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { fmtDate, get } from "../lib/api";
 import { courseText } from "../lib/links";
+import { isAdmin, otherOwner, type Role } from "../lib/roles";
 import { Icon } from "./icons";
 import LessonStatusPill, { type LessonStatus } from "./lessons/LessonStatus";
-import { CoursePill } from "./pagekit";
+import { CoursePill, PublishedFlag } from "./pagekit";
 import type { Course, TreeCourse } from "./types";
 import { Empty, ErrorBox, Loading, Modal, toast, useApi } from "./ui";
-import { compileFull } from "./workspace/compile";
+import { compileFull, latestPdf } from "./workspace/compile";
 import CourseSettings from "./workspace/CourseSettings";
 import PublishControl from "./workspace/PublishControl";
 
@@ -25,7 +26,9 @@ interface LessonRow {
   lab: { files: number; comments: number } | null;
 }
 
-export default function CourseOverview({ courseId }: { courseId: number }) {
+// Someone who may only read the course (a viewer, an editor on someone else's published course) gets no control that
+// changes it; an editor doesn't see the lessons and labs of others' courses at all (decision 125).
+export default function CourseOverview({ courseId, role, userId }: { courseId: number; role?: Role; userId?: number }) {
   const course = useApi(() => get<Course>(`/api/courses/${courseId}`), [courseId]);
   const status = useApi(() => get<TreeCourse[]>("/api/tree").then((t) => t.find((c) => c.id === courseId)?.status), [courseId]);
   const lessons = useApi(() => get<LessonRow[]>(`/api/lessons?course_id=${courseId}`), [courseId]);
@@ -38,10 +41,23 @@ export default function CourseOverview({ courseId }: { courseId: number }) {
   const chapters = [...(c.chapters ?? [])].sort((a, b) => a.position - b.position);
   const labs = [...(lessons.data ?? [])].filter((l) => l.lab).sort((a, b) => a.number - b.number);
   const newLesson = `/admin/lessons?new=1&course=${courseId}`;
+  const canWrite = !!c.can_write;
+  const owner = otherOwner(c, userId);
+  const showLessons = canWrite || role === "viewer";
 
   const downloadPdf = async () => {
     if (compiling) return;
     const w = window.open("", "_blank"); // opened now, while the click still counts
+    if (!canWrite) {
+      const url = await latestPdf(c);
+      if (url && w) w.location.href = url;
+      else if (url) window.location.href = url;
+      else {
+        w?.close();
+        toast("Il PDF di questa materia non è ancora stato compilato", "error");
+      }
+      return;
+    }
     setCompiling(true);
     try {
       const r = await compileFull(courseId);
@@ -68,11 +84,11 @@ export default function CourseOverview({ courseId }: { courseId: number }) {
           <h1>{c.name}</h1>
           <div className="sub row">
             <CoursePill status={status.data ?? undefined} size="sm" />
-            {[c.academic_year, c.description].filter(Boolean).join(" · ")}
+            {[owner && `di ${owner}`, c.academic_year, c.description].filter(Boolean).join(" · ")}
           </div>
         </div>
         <div className="row co-actions">
-          <PublishControl courseId={c.id} courseName={c.name} onChanged={() => void course.reload()} />
+          {isAdmin(role) ? <PublishControl courseId={c.id} courseName={c.name} onChanged={() => void course.reload()} /> : <PublishedFlag published={c.published} />}
           <button type="button" className="btn" onClick={downloadPdf} disabled={compiling} data-testid="overview-pdf">
             {compiling ? <Icon name="loader" className="spin" /> : <Icon name="download" />}
             PDF
@@ -81,9 +97,11 @@ export default function CourseOverview({ courseId }: { courseId: number }) {
             <Icon name="code" />
             LaTeX
           </a>
-          <button type="button" className="btn ghost icon" onClick={() => setSettings(true)} aria-label="Impostazioni della materia" title="Impostazioni della materia">
-            <Icon name="sliders" />
-          </button>
+          {canWrite && (
+            <button type="button" className="btn ghost icon" onClick={() => setSettings(true)} aria-label="Impostazioni della materia" title="Impostazioni della materia">
+              <Icon name="sliders" />
+            </button>
+          )}
           <a className="btn primary" href={courseText(c.id)}>
             <Icon name="book" />
             Apri il testo
@@ -91,50 +109,60 @@ export default function CourseOverview({ courseId }: { courseId: number }) {
         </div>
       </div>
 
-      <div className="co-grid">
-        <section aria-labelledby="co-lessons">
-          <div className="section-label">
-            <span id="co-lessons">Lezioni</span>
-            <a className="link" href={newLesson}>
-              <Icon name="plus" />
-              Nuova lezione
-            </a>
-          </div>
-          {lessons.data === null ? (
-            <Loading />
-          ) : lessons.data.length === 0 ? (
-            <Empty icon="notebook">
-              Ancora nessuna lezione. <a href={newLesson}>Creane una</a>, prendi appunti sulle slide e poi aggiungili al testo.
-            </Empty>
-          ) : (
-            <div className="card flush rows">
-              {[...lessons.data]
-                .sort((a, b) => a.number - b.number)
-                .map((l) => (
-                  <div key={l.id} className="pg-row co-row" data-testid="overview-lesson">
-                    <span className="status-ico pg-kind-ico">
-                      <Icon name="notebook" />
-                    </span>
-                    <div className="grow">
-                      <a className="pg-row-title" href={`/admin/courses/${courseId}/lessons/${l.number}`}>
-                        {l.title}
-                      </a>
-                      <div className="pg-row-sub">
-                        {l.has_pdf ? `${l.pdf_pages} slide` : `${l.page_count} pagine`}
-                        {l.generated_at ? ` · nel testo dal ${fmtDate(l.generated_at)}` : ` · modificata il ${fmtDate(l.updated_at)}`}
-                      </div>
-                    </div>
-                    <LessonStatusPill
-                      id={l.id}
-                      status={l.status}
-                      editable
-                      onChange={(s) => lessons.setData((all) => all && all.map((x) => (x.id === l.id ? { ...x, status: s } : x)))}
-                    />
-                  </div>
-                ))}
+      <div className={`co-grid${showLessons ? "" : " one"}`}>
+        {showLessons && (
+          <section aria-labelledby="co-lessons">
+            <div className="section-label">
+              <span id="co-lessons">Lezioni</span>
+              {canWrite && (
+                <a className="link" href={newLesson}>
+                  <Icon name="plus" />
+                  Nuova lezione
+                </a>
+              )}
             </div>
-          )}
-        </section>
+            {lessons.data === null ? (
+              <Loading />
+            ) : lessons.data.length === 0 ? (
+              <Empty icon="notebook">
+                {canWrite ? (
+                  <>
+                    Ancora nessuna lezione. <a href={newLesson}>Creane una</a>, prendi appunti sulle slide e poi aggiungili al testo.
+                  </>
+                ) : (
+                  "Ancora nessuna lezione."
+                )}
+              </Empty>
+            ) : (
+              <div className="card flush rows">
+                {[...lessons.data]
+                  .sort((a, b) => a.number - b.number)
+                  .map((l) => (
+                    <div key={l.id} className="pg-row co-row" data-testid="overview-lesson">
+                      <span className="status-ico pg-kind-ico">
+                        <Icon name="notebook" />
+                      </span>
+                      <div className="grow">
+                        <a className="pg-row-title" href={`/admin/courses/${courseId}/lessons/${l.number}`}>
+                          {l.title}
+                        </a>
+                        <div className="pg-row-sub">
+                          {l.has_pdf ? `${l.pdf_pages} slide` : `${l.page_count} pagine`}
+                          {l.generated_at ? ` · nel testo dal ${fmtDate(l.generated_at)}` : ` · modificata il ${fmtDate(l.updated_at)}`}
+                        </div>
+                      </div>
+                      <LessonStatusPill
+                        id={l.id}
+                        status={l.status}
+                        editable={canWrite}
+                        onChange={(s) => lessons.setData((all) => all && all.map((x) => (x.id === l.id ? { ...x, status: s } : x)))}
+                      />
+                    </div>
+                  ))}
+              </div>
+            )}
+          </section>
+        )}
 
         <section aria-labelledby="co-chapters">
           <div className="section-label">
@@ -144,7 +172,7 @@ export default function CourseOverview({ courseId }: { courseId: number }) {
             </a>
           </div>
           {chapters.length === 0 ? (
-            <Empty icon="book">Ancora nessun capitolo: nasce quando integri gli appunti di una lezione.</Empty>
+            <Empty icon="book">{canWrite ? "Ancora nessun capitolo: nasce quando integri gli appunti di una lezione." : "Ancora nessun capitolo."}</Empty>
           ) : (
             <div className="card flush rows">
               {chapters.map((ch, i) => (
@@ -159,41 +187,45 @@ export default function CourseOverview({ courseId }: { courseId: number }) {
         </section>
       </div>
 
-      <section aria-labelledby="co-lab" data-testid="overview-lab">
-        <div className="section-label">
-          <span id="co-lab">Laboratori</span>
-        </div>
-        {lessons.data === null ? (
-          <Loading />
-        ) : labs.length === 0 ? (
-          <Empty icon="flask">
-            Ancora nessun laboratorio. Ogni lezione può averne uno: aprilo con «Laboratorio» dalla lezione, carica i file spiegati in classe e commentali.
-          </Empty>
-        ) : (
-          <div className="card flush rows">
-            {labs.map((l) => (
-              <div key={l.id} className="pg-row co-row" data-testid="overview-lab-row">
-                <span className="status-ico pg-kind-ico">
-                  <Icon name="flask" />
-                </span>
-                <div className="grow">
-                  <a className="pg-row-title" href={`/admin/courses/${courseId}/lessons/${l.number}/lab`}>
-                    Laboratorio · {l.title}
-                  </a>
-                  <div className="pg-row-sub">
-                    {l.lab!.files === 1 ? "1 file" : `${l.lab!.files} file`} · {l.lab!.comments === 1 ? "1 commento" : `${l.lab!.comments} commenti`}
-                  </div>
-                </div>
-                <a className="link small" href={`/admin/courses/${courseId}/lessons/${l.number}`} title="Apri la lezione teorica">
-                  <Icon name="notebook" /> Lezione {l.number}
-                </a>
-              </div>
-            ))}
+      {showLessons && (
+        <section aria-labelledby="co-lab" data-testid="overview-lab">
+          <div className="section-label">
+            <span id="co-lab">Laboratori</span>
           </div>
-        )}
-      </section>
+          {lessons.data === null ? (
+            <Loading />
+          ) : labs.length === 0 ? (
+            <Empty icon="flask">
+              {canWrite
+                ? "Ancora nessun laboratorio. Ogni lezione può averne uno: aprilo con «Laboratorio» dalla lezione, carica i file spiegati in classe e commentali."
+                : "Ancora nessun laboratorio."}
+            </Empty>
+          ) : (
+            <div className="card flush rows">
+              {labs.map((l) => (
+                <div key={l.id} className="pg-row co-row" data-testid="overview-lab-row">
+                  <span className="status-ico pg-kind-ico">
+                    <Icon name="flask" />
+                  </span>
+                  <div className="grow">
+                    <a className="pg-row-title" href={`/admin/courses/${courseId}/lessons/${l.number}/lab`}>
+                      Laboratorio · {l.title}
+                    </a>
+                    <div className="pg-row-sub">
+                      {l.lab!.files === 1 ? "1 file" : `${l.lab!.files} file`} · {l.lab!.comments === 1 ? "1 commento" : `${l.lab!.comments} commenti`}
+                    </div>
+                  </div>
+                  <a className="link small" href={`/admin/courses/${courseId}/lessons/${l.number}`} title="Apri la lezione teorica">
+                    <Icon name="notebook" /> Lezione {l.number}
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
-      {settings && (
+      {settings && canWrite && (
         <Modal title="Impostazioni della materia" wide onClose={() => setSettings(false)}>
           <CourseSettings
             course={c}

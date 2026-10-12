@@ -684,6 +684,9 @@ a.pg-row-title:hover {
   gap: 1.75rem;
   align-items: start;
 }
+.co-grid.one {
+  grid-template-columns: minmax(0, 1fr);
+}
 .co-grid .section-label .link {
   display: inline-flex;
   align-items: center;

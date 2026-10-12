@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { get, post } from "../lib/api";
-import { canCreate, type Role } from "../lib/roles";
+import { canCreate, otherOwner, type Role } from "../lib/roles";
 import { Icon } from "./icons";
 import { COURSE_TONE, CoursePill, courseStateText, fmtUpdated, PublishedFlag, useCourseStates, type CourseState } from "./pagekit";
 import type { Course } from "./types";
@@ -115,7 +115,7 @@ function metaLine(c: Course, st: CourseState | undefined) {
   return `${c.academic_year ? `${c.academic_year} · ` : ""}${chapterCount(c, st)} · aggiornata ${fmtUpdated(c.updated_at)}`;
 }
 
-function CourseCard({ c, st }: { c: Course; st: CourseState | undefined }) {
+function CourseCard({ c, st, owner }: { c: Course; st: CourseState | undefined; owner: string | null }) {
   const state = courseStateText(st);
   return (
     <div className="card pg-course-card">
@@ -127,6 +127,7 @@ function CourseCard({ c, st }: { c: Course; st: CourseState | undefined }) {
         {c.name}
       </a>
       <div className="pg-course-meta">
+        {owner && <span data-testid="course-owner">di {owner} · </span>}
         {state ? (
           <>
             <span className={state.tone === "danger" ? "text-danger" : ""}>{state.text}</span>
@@ -159,7 +160,7 @@ function CourseCard({ c, st }: { c: Course; st: CourseState | undefined }) {
   );
 }
 
-export default function CoursesBrowser({ role }: { role?: Role }) {
+export default function CoursesBrowser({ role, userId }: { role?: Role; userId?: number }) {
   const { data, error, loading } = useApi(() => get<Course[]>("/api/courses"));
   const states = useCourseStates();
   const [view, setView] = useLocalStorage<"grid" | "list">("lecta.courses.view", "grid");
@@ -212,7 +213,7 @@ export default function CoursesBrowser({ role }: { role?: Role }) {
       ) : view === "grid" ? (
         <div className="pg-course-grid">
           {courses.map((c) => (
-            <CourseCard key={c.id} c={c} st={stateOf(c.id)} />
+            <CourseCard key={c.id} c={c} st={stateOf(c.id)} owner={otherOwner(c, userId)} />
           ))}
         </div>
       ) : (
@@ -227,6 +228,7 @@ export default function CoursesBrowser({ role }: { role?: Role }) {
                   <div className="grow">
                     <div className="pg-row-title">{c.name}</div>
                     <div className="pg-row-sub">
+                      {otherOwner(c, userId) && <span data-testid="course-owner">di {otherOwner(c, userId)} · </span>}
                       {state ? <span className={state.tone === "danger" ? "text-danger" : ""}>{state.text} · </span> : null}
                       {metaLine(c, st)}
                     </div>

@@ -109,6 +109,11 @@ async def test_another_editor_reads_a_published_course_but_cannot_change_it(edit
     course = await _course(editor, published=True, admin=admin)
     listed = [c for c in (await other_editor.get("/api/courses")).json() if c["id"] == course["id"]]
     assert listed and not listed[0]["can_write"] and listed[0]["owner"] == "editor"
+    # The sidebar and the home page say whose it is, and that it is read-only.
+    tree = [c for c in (await other_editor.get("/api/tree")).json() if c["id"] == course["id"]]
+    assert tree and not tree[0]["can_write"] and tree[0]["owner"] == "editor"
+    home = [c for c in (await other_editor.get("/api/dashboard")).json()["courses"] if c["id"] == course["id"]]
+    assert home and not home[0]["can_write"] and home[0]["owner"] == "editor"
     assert (await other_editor.get(f"/api/courses/{course['id']}")).status_code == 200
     r = await other_editor.patch(f"/api/courses/{course['id']}", json={"description": "no"})
     assert r.status_code == 403

@@ -1,5 +1,5 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { login, USER, watchConsole } from "./helpers";
+import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { login, openCourse, USER, watchConsole } from "./helpers";
 
 // WebAuthn needs a secure context: plain HTTP is one only on localhost, so the browser reaches the test site as localhost.
 test.use({ baseURL: "http://localhost:4321", launchOptions: { args: ["--host-resolver-rules=MAP localhost lecta-frontend"] } });
@@ -11,6 +11,23 @@ async function virtualAuthenticator(context: BrowserContext, page: Page) {
   await cdp.send("WebAuthn.addVirtualAuthenticator", {
     options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
   });
+}
+
+/** A new account with this role, from an invite the admin (signed in on `admin`) makes, signed in in its own browser. */
+async function invited(admin: Page, browser: Browser, baseURL: string, role: string, username: string) {
+  const path = await admin.evaluate(async (role) => {
+    const csrf = document.cookie.match(/lecta_csrf=([^;]+)/)?.[1] ?? "";
+    const res = await fetch("/api/invites", { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf }, body: JSON.stringify({ role }) });
+    return (await res.json()).path as string;
+  }, role);
+  const context = await browser.newContext({ baseURL });
+  const p = await context.newPage();
+  await virtualAuthenticator(context, p);
+  await p.goto(path);
+  await p.getByLabel("Nome utente").fill(username);
+  await p.getByTestId("invite-accept").click();
+  await p.waitForURL("**/admin", { timeout: 20_000 });
+  return { context, p };
 }
 
 test.describe("Passkey", () => {
@@ -141,22 +158,7 @@ test.describe("Passkey", () => {
   test("a reader sees no admin pages and nothing to create, an author can create", async ({ page, browser, baseURL }) => {
     test.setTimeout(120_000);
     await login(page);
-    /** A new account with this role, from an invite the admin makes, signed in in its own browser. */
-    const join = async (role: string, username: string) => {
-      const path = await page.evaluate(async (role) => {
-        const csrf = document.cookie.match(/lecta_csrf=([^;]+)/)?.[1] ?? "";
-        const res = await fetch("/api/invites", { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf }, body: JSON.stringify({ role }) });
-        return (await res.json()).path as string;
-      }, role);
-      const context = await browser.newContext({ baseURL });
-      const p = await context.newPage();
-      await virtualAuthenticator(context, p);
-      await p.goto(path);
-      await p.getByLabel("Nome utente").fill(username);
-      await p.getByTestId("invite-accept").click();
-      await p.waitForURL("**/admin", { timeout: 20_000 });
-      return { context, p };
-    };
+    const join = (role: string, username: string) => invited(page, browser, baseURL!, role, username);
 
     const { context: rc, p: reader } = await join("viewer", "lettore");
     const con = watchConsole(reader);
@@ -201,6 +203,76 @@ test.describe("Passkey", () => {
     await expect(page.getByRole("tabpanel")).toContainText("Amministratore · accesso con password");
     expect((await page.goto("/admin/audit"))?.status()).toBe(200);
     await expect(page).toHaveURL(/\/admin\/settings#ai/);
+    await rc.close();
+    await ac.close();
+  });
+
+  test("a reader reads a course and its draft without changing anything; an author reads an admin's published course", async ({ page, browser, baseURL }) => {
+    test.setTimeout(180_000);
+    await login(page);
+
+    // The reader («Lettore») opens the admin's course: no settings, publishing, new lessons or assistant anywhere.
+    const { context: rc, p: reader } = await invited(page, browser, baseURL!, "viewer", "studente");
+    const con = watchConsole(reader);
+    await reader.goto("/admin/courses");
+    await expect(reader.getByTestId("course-owner").first()).toContainText(`di ${USER}`);
+    await expect(reader.locator(".tree-course").filter({ hasText: "Algebra Lineare" })).toContainText(`di ${USER}`);
+    await reader.getByRole("link", { name: /Algebra Lineare/ }).first().click();
+    await reader.waitForURL(/\/admin\/courses\/\d+$/);
+    const overview = reader.getByTestId("course-overview");
+    await expect(overview).toContainText(`di ${USER}`);
+    await expect(overview.getByText("Pubblicata")).toBeVisible();
+    await expect(overview.locator(".pub-ctl")).toHaveCount(0);
+    await expect(overview.getByRole("button", { name: "Impostazioni della materia" })).toHaveCount(0);
+    await expect(overview.getByRole("link", { name: "Nuova lezione" })).toHaveCount(0);
+    await overview.getByRole("link", { name: "Apri il testo" }).first().click();
+    await reader.waitForURL(/\/admin\/courses\/\d+\/testo$/);
+    await expect(reader.getByTestId("read-only")).toHaveText(`Sola lettura · di ${USER}`);
+    await expect(reader.getByRole("button", { name: "Assistente AI" })).toHaveCount(0);
+    await expect(reader.locator(".pub-ctl")).toHaveCount(0);
+    const outline = reader.getByRole("navigation", { name: "Struttura del documento" });
+    await expect(outline.getByText("Spazi vettoriali")).toBeVisible();
+    await expect(outline.getByRole("button", { name: "Aggiungi capitolo" })).toHaveCount(0);
+    await expect(outline.getByRole("button", { name: /Azioni sul capitolo/ })).toHaveCount(0);
+    await expect(outline.getByRole("link", { name: "Nuova lezione" })).toHaveCount(0);
+    // The draft is there to read: a click picks nothing, a double click opens nothing.
+    const block = reader.getByTestId("doc-preview").locator(".doc-block:not(.doc-heading):has(img)").first();
+    await expect(block).toBeVisible({ timeout: 60_000 });
+    await block.click();
+    await block.dblclick();
+    await expect(reader.getByTestId("selection-toolbar")).toHaveCount(0);
+    await expect(reader.getByTestId("block-editor")).toHaveCount(0);
+    await reader.getByRole("button", { name: "Altre azioni" }).click();
+    await expect(reader.getByRole("button", { name: "Impostazioni della materia" })).toHaveCount(0);
+    await expect(reader.getByRole("link", { name: "Nuova lezione" })).toHaveCount(0);
+    await expect(reader.getByRole("link", { name: "Lezioni di questa materia" })).toBeVisible();
+    // Only the PDF already compiled: nothing is compiled for a reader.
+    await reader.keyboard.press("Escape");
+    await reader.getByRole("tab", { name: "PDF" }).click();
+    await expect(reader.locator(".pdfpane-err")).toHaveCount(0);
+    con.assertClean();
+
+    // An author («Autore») reads the admin's published course the same way, and doesn't see its lessons.
+    const { context: ac, p: author } = await invited(page, browser, baseURL!, "editor", "collega2");
+    const con2 = watchConsole(author);
+    await author.reload();
+    await expect(author.locator(".tree-course").filter({ hasText: "Algebra Lineare" })).toContainText(`di ${USER}`);
+    await openCourse(author, /Algebra Lineare/);
+    await expect(author.getByTestId("read-only")).toHaveText(`Sola lettura · di ${USER}`);
+    await expect(author.getByRole("button", { name: "Assistente AI" })).toHaveCount(0);
+    await expect(author.getByRole("navigation", { name: "Struttura del documento" }).getByText("Fonti")).toHaveCount(0);
+    const para = author.getByTestId("doc-preview").locator(".doc-block:not(.doc-heading):has(img)").first();
+    await expect(para).toBeVisible({ timeout: 60_000 });
+    await para.dblclick();
+    await expect(author.getByTestId("block-editor")).toHaveCount(0);
+    await author.goBack();
+    await expect(author.getByTestId("course-overview")).toBeVisible();
+    await expect(author.getByTestId("course-overview").getByText("Lezioni", { exact: true })).toHaveCount(0);
+    con2.assertClean();
+    // The admin's own course says nothing of an owner, and keeps every control.
+    await openCourse(page, /Algebra Lineare/);
+    await expect(page.getByTestId("read-only")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Assistente AI" })).toBeVisible();
     await rc.close();
     await ac.close();
   });

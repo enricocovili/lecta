@@ -3,10 +3,10 @@ import { ApiError, get, post } from "../lib/api";
 import { Icon } from "./icons";
 import { resultText, type ImportResult } from "./IngestManifest";
 import { jobStage, translateJobTitle, translateProgress } from "./jobtext";
-import { COURSE_LABEL, COURSE_TONE } from "./pagekit";
+import { COURSE_LABEL, COURSE_TONE, PublishedFlag } from "./pagekit";
 import { Confirm, ErrorBox, fmtWhen, Loading, Progress, StatusPill, Switch, toast, toastError, useApi, usePoll, type Tone } from "./ui";
 import { courseText } from "../lib/links";
-import { canCreate, type Role } from "../lib/roles";
+import { canCreate, isAdmin, otherOwner, type Role } from "../lib/roles";
 
 interface FirstError {
   file: string | null;
@@ -21,6 +21,9 @@ interface CourseState {
   name: string;
   slug: string;
   published: boolean;
+  owner_id?: number | null;
+  owner?: string | null;
+  can_write?: boolean;
   updated_at: string;
   chapter_count: number;
   status: "ok" | "working" | "error";
@@ -174,7 +177,7 @@ function buildRows(data: DashboardData): Row[] {
   // A course whose latest compile failed shows up as an error even if no job is involved.
   for (const c of data.courses) {
     const b = c.last_build;
-    if (c.reason !== "compile" || !b) continue;
+    if (c.reason !== "compile" || !b || !c.can_write) continue;
     const fe = b.first_error;
     const where = fe?.line ? `alla riga ${fe.line}` : "";
     rows.push({
@@ -358,6 +361,7 @@ function AiFeed({ turns }: { turns: AiTurn[] }) {
 
 function ReviewLine({ c }: { c: CourseState }) {
   const r = c.review;
+  if (!c.can_write) return null; // the review is a turn of the owner's assistant
   if (!r) {
     return (
       <a className="home-review none" href={courseText(c.id, { ask: "Fai una revisione completa del corso." })}>
@@ -381,7 +385,7 @@ function ReviewLine({ c }: { c: CourseState }) {
   );
 }
 
-export default function Dashboard({ role }: { role?: Role }) {
+export default function Dashboard({ role, userId }: { role?: Role; userId?: number }) {
   const { data, error, loading, reload } = useApi(() => get<DashboardData>("/api/dashboard"));
   const concepts = useApi(() => get<Concepts>("/api/concepts").catch(() => null));
   const [filter, setFilter] = useState<Filter>("all");
@@ -433,12 +437,15 @@ export default function Dashboard({ role }: { role?: Role }) {
               <div key={c.id} className="card home-course">
                 <div className="row between nowrap">
                   {c.ai_running ? <StatusPill tone="warn" label="In aggiornamento" /> : <StatusPill tone={COURSE_TONE[c.status]} label={COURSE_LABEL[c.status]} />}
-                  <PublishSwitch course={c} onChanged={changed} />
+                  {isAdmin(role) ? <PublishSwitch course={c} onChanged={changed} /> : <PublishedFlag published={c.published} />}
                 </div>
                 <h3 className="card-title">
                   <a href={`/admin/courses/${c.id}`}>{c.name}</a>
                 </h3>
-                <p className="home-course-meta">{courseMeta(c, conceptCount.get(c.id))}</p>
+                <p className="home-course-meta">
+                  {otherOwner(c, userId) && <>di {otherOwner(c, userId)} · </>}
+                  {courseMeta(c, conceptCount.get(c.id))}
+                </p>
                 <ReviewLine c={c} />
                 <div className="row">
                   <a className="btn primary" href={`/admin/courses/${c.id}`}>

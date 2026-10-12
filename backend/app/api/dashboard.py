@@ -10,9 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..models import Chapter, ChatMessage, ChatSession, Course, Job, ProjectFile
 from ..pipeline import agent
-from ..security.access import Access, access, chats_visible, jobs_readable, readable
+from ..security.access import Access, access, can_write, chats_visible, jobs_readable, readable
 from ..services import jobs as jobs_svc
 from ..services import overview
+from .courses import usernames
 from .jobs import job_out
 
 router = APIRouter(dependencies=[Depends(access)])
@@ -63,12 +64,16 @@ async def _courses(db: AsyncSession, acc: Access) -> list[dict]:
     states = await overview.course_states(db)
     counts = dict((await db.execute(select(Chapter.course_id, func.count()).group_by(Chapter.course_id))).all())
     courses = (await db.execute(select(Course).where(readable(acc.user)).order_by(Course.name))).scalars().all()
+    names = await usernames(db)
     return [
         {
             "id": c.id,
             "name": c.name,
             "slug": c.slug,
             "published": c.published,
+            "owner_id": c.owner_id,
+            "owner": names.get(c.owner_id),
+            "can_write": can_write(acc.user, c),
             "updated_at": c.updated_at,
             "chapter_count": counts.get(c.id, 0),
             "review": ({**reviews[c.id], "stale": c.updated_at > reviews[c.id]["at"]} if c.id in reviews else None),

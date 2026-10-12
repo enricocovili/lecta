@@ -54,7 +54,7 @@ const tab = is("/admin/map") ? "map" : is("/admin/lessons") ? "lessons" : is("/a
   </header>
   <div class="shell">
     <aside class="sidebar">
-      <Sidebar client:load currentPath={path} role={role} />
+      <Sidebar client:load currentPath={path} role={role} userId={Astro.locals.auth?.user_id} />
     </aside>
     <main class="main">
       <div class="main-inner">

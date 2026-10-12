@@ -249,12 +249,15 @@ async def tree(acc: Access = Depends(access), db: AsyncSession = Depends(get_db)
             {"id": ch.id, "title": ch.title, "path": ch.path, "position": ch.position}
         )
     states = await overview.course_states(db)
+    names = await usernames(db)
     return [
         {
             "id": c.id,
             "name": c.name,
             "slug": c.slug,
             "published": c.published,
+            "owner_id": c.owner_id,
+            "owner": names.get(c.owner_id),
             "can_write": can_write(acc.user, c),
             "chapters": by_course.get(c.id, []),
             "status": states.get(c.id, {}).get("status", "ok"),

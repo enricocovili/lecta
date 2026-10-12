@@ -23,6 +23,11 @@ export interface Course {
   published: boolean;
   created_at: string;
   updated_at: string;
+  owner_id?: number | null;
+  /** The owner's username. */
+  owner?: string | null;
+  /** The user may change it: otherwise the course and its draft are read-only. */
+  can_write?: boolean;
   chapter_count?: number;
   chapters?: Chapter[];
   publication?: { id: number; created_at: string; pdf_size: number };
@@ -71,6 +76,8 @@ export interface TreeCourse {
   /** ok | working | error */
   status?: string;
   sources?: number;
+  owner_id?: number | null;
+  owner?: string | null;
   /** The user may change it (and add lessons to it). */
   can_write?: boolean;
 }

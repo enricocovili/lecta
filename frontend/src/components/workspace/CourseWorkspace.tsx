@@ -1,13 +1,15 @@
 // The course workspace: the draft of the document in the middle, the outline on the left and the AI
 // assistant on the right. /admin/courses/{id}/testo?chapter={id} scrolls to a chapter, ?chat=1 opens the
-// assistant, ?ask=… prefills its message box.
+// assistant, ?ask=… prefills its message box. Whoever may not change the course (`can_write`: a viewer, an editor on
+// someone else's published course) reads it: no assistant, no writing in place, no structure or settings, no compile.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { get } from "../../lib/api";
+import { isAdmin, otherOwner, type Role } from "../../lib/roles";
 import { Icon } from "../icons";
 import type { Course } from "../types";
 import { Modal, Seg, toast, toastError, useLocalStorage } from "../ui";
 import AiPanel from "./AiPanel";
-import { compileFull, errorsText } from "./compile";
+import { compileFull, errorsText, latestPdf } from "./compile";
 import type { ScopeView } from "./Composer";
 import CourseSettings from "./CourseSettings";
 import DocView, { type FlashRequest, type ScrollRequest } from "./DocView";
@@ -43,7 +45,7 @@ const INTENT_MODE: Record<string, Mode> = { explain: "explain", fix: "edit" };
 const targetsOf = (files: ChangedFile[]): FlashTarget[] =>
   files.flatMap((f) => (f.chapter_id == null ? [] : f.hunks.map((h) => ({ chapterId: f.chapter_id!, from: h.from_line, to: h.to_line }))));
 
-export default function CourseWorkspace({ courseId }: { courseId: number }) {
+export default function CourseWorkspace({ courseId, role, userId }: { courseId: number; role?: Role; userId?: number }) {
   const [course, setCourse] = useState<Course | null>(null);
   const [preview, setPreview] = useState<DraftChapter[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -153,7 +155,8 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
     },
     [refresh],
   );
-  const assistant = useAssistant({ courseId, onChange: onAiChange });
+  const canWrite = !!course?.can_write;
+  const assistant = useAssistant({ courseId, onChange: onAiChange, enabled: canWrite });
 
   // A block written in place: its chapter is shown at once, the rest (references, the PDF) catches up.
   const blockWritten = useCallback(
@@ -198,13 +201,14 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
     const q = new URLSearchParams(location.search);
     const ch = Number(q.get("chapter"));
     if (ch && preview.some((p) => p.chapter.id === ch)) setTimeout(() => setScrollTo({ nonce: Date.now(), chapterId: ch }), 60);
+    if (!canWrite) return;
     const ask = q.get("ask");
     if (q.get("chat") || ask) {
       setAiOpen(true);
       setMtab("ai");
     }
     if (ask) setPrefill({ nonce: Date.now(), text: ask });
-  }, [preview, setAiOpen]);
+  }, [preview, canWrite, setAiOpen]);
 
   // ------------------------------------------------------------------ asking the assistant
 
@@ -280,6 +284,16 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
   const downloadPdf = async () => {
     if (compiling) return;
     const w = window.open("", "_blank"); // opened now, while the click still counts
+    if (!canWrite) {
+      const url = course && (await latestPdf(course));
+      if (url && w) w.location.href = url;
+      else if (url) window.location.href = url;
+      else {
+        w?.close();
+        toast("Il PDF di questa materia non è ancora stato compilato", "error");
+      }
+      return;
+    }
     setCompiling(true);
     try {
       const r = await compileFull(courseId);
@@ -341,10 +355,19 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
     ...(p.blocks ?? []).filter((b) => b.error).map((b) => ({ chapter: p.chapter.title, text: `Errore LaTeX, ${b.error}` })),
   ]);
   const showRail = compact ? drawer : railOpen;
-  const showAi = phone ? mtab === "ai" : aiOpen;
-  const showDocPane = !phone || mtab === "doc";
+  const showAi = canWrite && (phone ? mtab === "ai" : aiOpen);
+  const showDocPane = !phone || mtab === "doc" || !canWrite;
+  // Lessons and sources stay with the course's owner: viewers read them, other editors don't (decision 117).
+  const privateRead = canWrite || role === "viewer";
 
-  const empty = (
+  const empty = !canWrite ? (
+    <div className="doc-empty">
+      <span className="doc-empty-ico">
+        <Icon name="book" />
+      </span>
+      <h2>Questa materia è ancora vuota</h2>
+    </div>
+  ) : (
     <div className="doc-empty">
       <span className="doc-empty-ico">
         <Icon name="book" />
@@ -368,6 +391,10 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
     <div className={`ws ${phone ? "is-phone" : ""}`} data-testid="workspace" style={aiWidth ? ({ "--ai-w": `${aiWidth}px` } as React.CSSProperties) : undefined}>
       <TopBar
         course={course}
+        readOnly={!canWrite}
+        owner={otherOwner(course, userId)}
+        admin={isAdmin(role)}
+        lessons={privateRead}
         busy={assistant.busy}
         compiling={compiling}
         railOpen={showRail}
@@ -386,6 +413,8 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
             <div className={`ws-rail ${compact ? "drawer" : ""}`}>
               <Outline
                 courseId={courseId}
+                readOnly={!canWrite}
+                sources={privateRead}
                 chapters={chapters}
                 preview={preview}
                 activeChapterId={activeChapter}
@@ -453,11 +482,12 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
               onActiveChapter={setActiveChapter}
               onSelectionAction={askSelection}
               onBlockWritten={blockWritten}
+              readOnly={!canWrite}
             />
           </div>
           {pdfSeen && (
             <div className={`doc-stage ${view === "pdf" ? "" : "off"}`}>
-              <PdfPane courseId={courseId} revision={revision} active={view === "pdf"} onFix={fixBuild} />
+              <PdfPane course={course} revision={revision} active={view === "pdf"} readOnly={!canWrite} onFix={fixBuild} />
             </div>
           )}
           </div>
@@ -480,21 +510,23 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
             }}
           />
         )}
-        <div className={`ws-ai ${showAi ? "" : "off"}`}>
-          <AiPanel
-            assistant={assistant}
-            ctx={ctx}
-            scope={scopeView}
-            open={showAi}
-            focusNonce={focusNonce}
-            prefill={prefill}
-            onClearScope={clearScope}
-            onClose={phone ? undefined : () => setAiOpen(false)}
-          />
-        </div>
+        {canWrite && (
+          <div className={`ws-ai ${showAi ? "" : "off"}`}>
+            <AiPanel
+              assistant={assistant}
+              ctx={ctx}
+              scope={scopeView}
+              open={showAi}
+              focusNonce={focusNonce}
+              prefill={prefill}
+              onClearScope={clearScope}
+              onClose={phone ? undefined : () => setAiOpen(false)}
+            />
+          </div>
+        )}
       </div>
 
-      {phone && (
+      {phone && canWrite && (
         <nav className="ws-tabs" aria-label="Vista">
           <button type="button" className={mtab === "doc" ? "active" : ""} onClick={() => setMtab("doc")} aria-current={mtab === "doc"}>
             <Icon name="file-text" />
@@ -508,7 +540,7 @@ export default function CourseWorkspace({ courseId }: { courseId: number }) {
         </nav>
       )}
 
-      {settings && (
+      {settings && canWrite && (
         <Modal title="Impostazioni della materia" wide onClose={() => setSettings(false)}>
           <CourseSettings
             course={course}

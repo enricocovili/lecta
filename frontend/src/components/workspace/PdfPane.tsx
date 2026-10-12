@@ -1,11 +1,25 @@
-// The "PDF" view of the document: compiled on demand (the draft is what you normally work on).
+// The "PDF" view of the document: compiled on demand (the draft is what you normally work on). Whoever may only read
+// the course sees the PDF of the latest compile instead (compiling is for whoever changes it).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "../icons";
 import { toastError } from "../ui";
-import { compileFull, errorsText, type CompileResult } from "./compile";
+import { compileFull, errorsText, latestPdf, type CompileResult } from "./compile";
 import PdfViewer from "./PdfViewer";
 
-export default function PdfPane({ courseId, revision, active, onFix }: { courseId: number; revision: number; active: boolean; onFix: (text: string) => void }) {
+export default function PdfPane({
+  course,
+  revision,
+  active,
+  readOnly,
+  onFix,
+}: {
+  course: { id: number; slug: string; published: boolean };
+  revision: number;
+  active: boolean;
+  readOnly: boolean;
+  onFix: (text: string) => void;
+}) {
+  const courseId = course.id;
   const [url, setUrl] = useState<string | null>(null);
   const [compiling, setCompiling] = useState(false);
   const [failed, setFailed] = useState<CompileResult | null>(null);
@@ -15,6 +29,11 @@ export default function PdfPane({ courseId, revision, active, onFix }: { courseI
     setCompiling(true);
     compiledRev.current = revision;
     try {
+      if (readOnly) {
+        const u = await latestPdf(course);
+        setUrl(u && `${u}${u.includes("?") ? "&" : "?"}t=${Date.now()}`);
+        return;
+      }
       const r = await compileFull(courseId);
       if (r.status === "superseded") return;
       if (r.pdf_url) setUrl(`${r.pdf_url}&t=${Date.now()}`);
@@ -24,7 +43,7 @@ export default function PdfPane({ courseId, revision, active, onFix }: { courseI
     } finally {
       setCompiling(false);
     }
-  }, [courseId, revision]);
+  }, [courseId, revision, readOnly, course]);
 
   // compile when the tab opens, and again if the document changed since
   useEffect(() => {
@@ -34,7 +53,7 @@ export default function PdfPane({ courseId, revision, active, onFix }: { courseI
   const errs = failed ? errorsText(failed) : "";
   return (
     <div className="pdfpane">
-      {compiling && (
+      {compiling && !readOnly && (
         <div className="pdfpane-busy" role="status">
           <Icon name="loader" className="spin" />
           Compilo il PDF… può richiedere qualche secondo
@@ -59,7 +78,7 @@ export default function PdfPane({ courseId, revision, active, onFix }: { courseI
         </div>
       )}
       <div className="pdfpane-view">
-        <PdfViewer url={url} emptyText={compiling ? "" : "Il PDF non è ancora disponibile."} />
+        <PdfViewer url={url} emptyText={compiling ? "" : readOnly ? "Il PDF di questa materia non è ancora stato compilato." : "Il PDF non è ancora disponibile."} />
       </div>
     </div>
   );

@@ -28,3 +28,7 @@ export interface Me {
 export const isAdmin = (role?: Role) => role === "admin";
 /** Creating courses and lessons: editors and admins. */
 export const canCreate = (role?: Role) => role === "editor" || role === "admin";
+
+/** The owner of a course someone else owns, to show as «di <owner>»; null for one's own course (decision 125). */
+export const otherOwner = (c: { owner_id?: number | null; owner?: string | null }, userId?: number) =>
+  c.owner && c.owner_id !== userId ? c.owner : null;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { get } from "../lib/api";
-import { canCreate, type Role } from "../lib/roles";
+import { canCreate, otherOwner, type Role } from "../lib/roles";
 import { Icon } from "./icons";
 import { COURSE_LABEL, COURSE_TONE } from "./pagekit";
 import type { TreeCourse } from "./types";
@@ -20,7 +20,7 @@ function NavItem({ href, icon, label, active, count, hot }: { href: string; icon
   );
 }
 
-export default function Sidebar({ currentPath, role }: { currentPath: string; role?: Role }) {
+export default function Sidebar({ currentPath, role, userId }: { currentPath: string; role?: Role; userId?: number }) {
   const [tree, setTree] = useState<TreeCourse[] | null>(null);
   const [counts, setCounts] = useState<Counts | null>(null);
 
@@ -82,14 +82,18 @@ export default function Sidebar({ currentPath, role }: { currentPath: string; ro
             Nessuna materia.{canCreate(role) && <> <a href="/admin/courses?new=1">Creane una</a>.</>}
           </div>
         ) : (
-          tree.map((c) => (
-            <div key={c.id} className="tree-course">
-              <a href={`/admin/courses/${c.id}`} title={c.name}>
-                <span className="name">{c.name}</span>
-                <Dot tone={COURSE_TONE[c.status ?? "ok"] ?? "ok"} title={COURSE_LABEL[c.status ?? "ok"]} />
-              </a>
-            </div>
-          ))
+          tree.map((c) => {
+            const owner = otherOwner(c, userId);
+            return (
+              <div key={c.id} className="tree-course">
+                <a href={`/admin/courses/${c.id}`} title={owner ? `${c.name}, di ${owner}` : c.name}>
+                  <span className="name">{c.name}</span>
+                  {owner && <span className="owner">di {owner}</span>}
+                  <Dot tone={COURSE_TONE[c.status ?? "ok"] ?? "ok"} title={COURSE_LABEL[c.status ?? "ok"]} />
+                </a>
+              </div>
+            );
+          })
         )}
       </div>
     </nav>
