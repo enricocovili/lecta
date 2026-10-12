@@ -8,7 +8,7 @@ interface ApiLesson {
   number: number;
   status: string;
   last_page_id: number | null;
-  pages: { id: number; kind: string; notes: string; ink: unknown[] }[];
+  pages: { id: number; kind: string; notes: string; ink: unknown[]; unclear?: boolean }[];
   course_guidelines: string;
   generated_at: string | null;
 }
@@ -509,6 +509,34 @@ test.describe.serial("Lezioni", () => {
     await page.getByTestId("tool-pen").click();
     await expect(page.getByTestId("ask-area")).toHaveCount(0);
     await expect(pop.getByTestId("slide-ask-area")).toHaveCount(0);
+    con.assertClean(EXPECTED);
+  });
+
+  test("a slide marked «non capita» stays marked, and opening the assistant on it explains it; the answer kept, the mark goes", async ({ page }) => {
+    test.setTimeout(180_000);
+    const con = watchConsole(page);
+    await login(page);
+    await page.goto(`/admin/courses/${courseId}/lessons/1`);
+    const row = page.getByTestId("lesson-page").nth(2);
+    const mark = row.getByTestId("mark-unclear");
+    await expect(mark).toHaveAttribute("aria-pressed", "false");
+    await mark.click();
+    await expect(mark).toHaveAttribute("aria-pressed", "true");
+    // Saved at once: still there after a reload, and shown without the pointer on the page.
+    await expect.poll(async () => (await stored(page)).pages[2].unclear).toBe(true);
+    await page.reload();
+    await expect(mark).toHaveAttribute("aria-pressed", "true");
+    await expect(mark).toHaveCSS("opacity", "1");
+    await row.getByTestId("ask-page").click();
+    const pop = row.getByTestId("slide-ask");
+    await expect(pop.locator(".les-ask-q")).toContainText("Spiegami questa slide");
+    await expect(pop.getByTestId("ai-message")).toContainText("Domanda su [p. 3]", { timeout: 60_000 });
+    await page.screenshot({ path: "/e2e/.results/lesson-unclear.png" });
+    await pop.getByTestId("ai-keep").click();
+    await expect(mark).toHaveAttribute("aria-pressed", "false");
+    await expect.poll(async () => (await stored(page)).pages[2].unclear).toBe(false);
+    await page.keyboard.press("Control+z");
+    await save(page);
     con.assertClean(EXPECTED);
   });
 

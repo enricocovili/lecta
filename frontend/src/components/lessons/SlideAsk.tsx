@@ -1,6 +1,7 @@
 // The lesson's assistant, asked in place: a small popup under the slide's corner buttons. One question about the page (or the
 // area picked on it), one answer: the assistant sees the pages around it with the strokes and reads the whole lesson, and only
 // explains. The answer goes into the page's notes with a click, as a step of the lesson's history; a new question replaces it.
+// On a slide marked «non capita» the popup asks for its explanation by itself.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "../icons";
 import MessageView, { type MessageCtx } from "../workspace/MessageView";
@@ -21,6 +22,7 @@ export default function SlideAsk({
   pageId,
   label,
   area,
+  explain = false,
   onKeep,
   onDropArea,
   onClose,
@@ -31,6 +33,8 @@ export default function SlideAsk({
   label: string;
   /** the area picked on the page with the select tool, if any: the question is about it */
   area: Rect | null;
+  /** the page is marked «non capita»: opening the popup asks for the explanation of the slide at once */
+  explain?: boolean;
   /** put an answer at the end of the page's notes; false when it could not */
   onKeep: (text: string) => boolean;
   onDropArea: () => void;
@@ -58,6 +62,13 @@ export default function SlideAsk({
     if (reply?.status === "streaming") void assistant.cancel();
   };
   useEffect(() => () => live.current(), []);
+  // A slide marked «non capita» is explained as soon as its popup opens (once the conversation is known).
+  const explained = useRef(!explain);
+  useEffect(() => {
+    if (explained.current || assistant.loading) return;
+    explained.current = true;
+    void ask(QUICK[0].text);
+  });
 
   const ask = async (q: string, scope?: Scope) => {
     const s: Scope = scope ?? { mode: "explain", page_id: pageId, ...(area ? { region: [area.x0, area.y0, area.x1, area.y1] } : {}) };

@@ -199,6 +199,8 @@ class LessonPage(Base):
     # [{t: pen|hl, c: "#rrggbb", w: stroke width / page width, p: [x, y, pressure, …]}], x and y in page widths
     ink: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default="[]")
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # marked «non capita» by the owner during the lecture, to ask the assistant about later (not part of the notes)
+    unclear: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     updated_at: Mapped[datetime] = _now()
 
 

@@ -59,6 +59,11 @@ to ask about the whole page again); the question then carries it (`scope.region`
 the model gets it as a sharp cut (from a 2400 px picture of the page, 0.01 page widths of room around it) next to the pictures
 of the pages.
 
+**«Non capita»**: during the lecture there is no time to ask, so the «?» button beside the ✦ one marks the slide as not
+understood (`lesson_pages.unclear`, saved at once, not a step of the history; the owner's alone: share links neither see nor
+set it). A marked slide shows the button in orange at all times. Opening the popup on it asks for the explanation of the
+slide by itself; bringing an answer into the notes takes the mark away, and the button takes it away by hand.
+
 Every question is sent with the **whole lesson** in the prompt (every page: the text printed on its slide, the typed notes, whether
 it carries handwriting) and the **pictures of the pages from ten before to ten after** the one asked about, strokes and typed text
 drawn on them (the asked page at 1600 px, the others at 1100 px). Its tools are `view_page` (any other page as a picture) and
@@ -112,6 +117,7 @@ points per page, sane coordinates, colour and width.
 | `POST /api/lessons/{id}/slides?name=` | raw PDF body: adds the slides (only once; untouched blank pages are replaced) |
 | `GET /api/courses/{course_id}/lessons/{n}` · `GET /api/lessons/{id}?pages=false` | the lesson (+ pages with notes and ink), `course_guidelines` |
 | `PATCH /api/lessons/{id}` `{title?, course_id?, status?}` · `DELETE` | `status`: `working` \| `completed` |
+| `PUT /api/lessons/{id}/pages/{pid}/unclear` `{unclear}` | mark a page «non capita», or take the mark away (pages carry `unclear` for the owner only) |
 | `PUT /api/lessons/{id}/last-page` `{page_id}` | the page being looked at (the editor sends it a moment after the page settles); opening the lesson scrolls there |
 | `PUT /api/lessons/{id}/pages/{pid}` `{notes?, ink?}` | what is sent replaces what is stored, the rest is untouched → `{version}` |
 | `POST /api/lessons/{id}/pages` `{after_page_id?}` · `DELETE …/pages/{pid}` | add a blank page · remove any page, slides included (the last one stays); a removed slide leaves the lesson but not the stored PDF |

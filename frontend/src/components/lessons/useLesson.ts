@@ -16,6 +16,8 @@ export interface PageState {
   notes: string;
   ink: Stroke[];
   version: number;
+  /** marked «non capita» (the owner's editor only) */
+  unclear?: boolean;
 }
 
 export type SaveState = "saved" | "pending" | "saving" | "offline";
@@ -399,6 +401,18 @@ export function useLessonPages(src: LessonSource, initial: PageState[], poll: nu
 
   // ------------------------------------------------------------------ structure
 
+  /** Mark a page «non capita», or take the mark away (the owner's): saved at once, not a step of the history. */
+  const setUnclear = useCallback(
+    (pid: number, on: boolean) => {
+      patchPage(pid, (p) => ({ ...p, unclear: on }));
+      api(`${base}/pages/${pid}/unclear`, { method: "PUT", json: { unclear: on } }).catch((e) => {
+        patchPage(pid, (p) => ({ ...p, unclear: !on }));
+        toastError(e);
+      });
+    },
+    [base, patchPage],
+  );
+
   const addBlankAfter = useCallback(
     async (afterId: number | null) => {
       await flushAll();
@@ -439,6 +453,7 @@ export function useLessonPages(src: LessonSource, initial: PageState[], poll: nu
     async (page: PageState, index: number) => {
       const r = await post<{ version: number }>(`${base}/pages/restore`, {
         id: page.id, kind: page.kind, slide_page: page.slide_page, ratio: page.ratio, position: index + 1, notes: page.notes, ink: page.ink,
+        unclear: !!page.unclear,
       });
       removed.current.delete(page.id);
       churn.current = true;
@@ -538,7 +553,7 @@ export function useLessonPages(src: LessonSource, initial: PageState[], poll: nu
   );
 
   return useMemo(
-    () => ({ pages, saveState, gone, syncNow, setNotes, addStroke, eraseStrokes, moveStrokes, undo, redo, canUndo: hist.undo > 0, canRedo: hist.redo > 0, addBlankAfter, removePage, flushAll }),
-    [pages, saveState, gone, syncNow, setNotes, addStroke, eraseStrokes, moveStrokes, undo, redo, hist, addBlankAfter, removePage, flushAll],
+    () => ({ pages, saveState, gone, syncNow, setNotes, setUnclear, addStroke, eraseStrokes, moveStrokes, undo, redo, canUndo: hist.undo > 0, canRedo: hist.redo > 0, addBlankAfter, removePage, flushAll }),
+    [pages, saveState, gone, syncNow, setNotes, setUnclear, addStroke, eraseStrokes, moveStrokes, undo, redo, hist, addBlankAfter, removePage, flushAll],
   );
 }

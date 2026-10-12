@@ -194,7 +194,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   gestureOpts.current = { tool: draw.tool, fingerDraws, zoom, setZoom };
   const zoomTo = useGestures(scroller, gestureOpts);
 
-  const { setNotes, addStroke, eraseStrokes, moveStrokes, addBlankAfter, removePage, undo, redo, flushAll } = store;
+  const { setNotes, setUnclear, addStroke, eraseStrokes, moveStrokes, addBlankAfter, removePage, undo, redo, flushAll } = store;
   const save = useCallback(async () => {
     if (!(await flushAll())) toastError(new Error("Non riesco a salvare: riprovo appena torna la connessione"));
   }, [flushAll]);
@@ -218,6 +218,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
       select: (pid, strokes) => setSelection(strokes.length ? { pid, strokes } : null),
       visible: setCurrent,
       ask: owner ? (pid, open) => setAskPid((cur) => (cur === pid && !open ? null : pid)) : undefined,
+      mark: owner ? (pid) => setUnclear(pid, !pagesRef.current.find((p) => p.id === pid)?.unclear) : undefined,
       area: owner ? (pid, rect) => setArea(rect ? { pid, rect } : null) : undefined,
       addBlankAfter: (pid) => {
         addBlankAfter(pid)
@@ -231,7 +232,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
         else setAskRemove(pid);
       },
     }),
-    [setNotes, addStroke, eraseStrokes, moveStrokes, addBlankAfter, removePage, owner],
+    [setNotes, setUnclear, addStroke, eraseStrokes, moveStrokes, addBlankAfter, removePage, owner],
   );
 
   // The selection is let go when another tool is picked, and keeps only the strokes that are still there (undo, erasing,
@@ -402,7 +403,8 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
 
   const labels = useMemo(() => pages.map((_, i) => pageLabel(pages, i)), [pages]);
   const findWhere = find.hit ? `${labels[pages.findIndex((p) => p.id === find.hit!.pid)] ?? ""}${find.hit.where === "notes" ? ", appunti" : ""}` : null;
-  // An answer of the assistant goes at the end of the page's notes: one step of the history, so Ctrl+Z takes it out.
+  // An answer of the assistant goes at the end of the page's notes: one step of the history, so Ctrl+Z takes it out. A page
+  // marked «non capita» has been explained: the mark goes.
   const keepAnswer = useCallback(
     (pid: number, text: string) => {
       const i = pagesRef.current.findIndex((p) => p.id === pid);
@@ -413,10 +415,11 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
       const notes = pagesRef.current[i].notes.replace(/\s+$/, "");
       setNotes(pid, `${notes ? `${notes}\n\n` : ""}${text.trim()}\n`);
       reveal(pid, true);
+      if (pagesRef.current[i].unclear) setUnclear(pid, false);
       toast(`Aggiunta agli appunti di «${pageLabel(pagesRef.current, i)}»: Ctrl+Z la toglie`);
       return true;
     },
-    [setNotes],
+    [setNotes, setUnclear],
   );
   const colors = tool === "hl" ? HL_COLORS : COLORS;
   const colorSel = tool === "hl" ? hlIdx : colorIdx;
@@ -752,6 +755,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
                       pageId={p.id}
                       label={labels[i]}
                       area={area?.pid === p.id ? area.rect : null}
+                      explain={!!p.unclear}
                       onKeep={(text) => keepAnswer(p.id, text)}
                       onDropArea={() => setArea(null)}
                       onClose={() => setAskPid(null)}

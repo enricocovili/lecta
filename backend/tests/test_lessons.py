@@ -551,3 +551,30 @@ async def test_guidelines_can_be_used_once_without_saving(admin, worker, db):
     row = (await db.execute(select(Course).where(Course.id == course["id"]))).scalar_one()
     await db.refresh(row)
     assert row.guidelines == "Testo breve."
+
+
+async def test_a_page_marked_not_understood_keeps_the_mark_for_the_owner_only(admin, anon):
+    _, lesson = await new_lesson(admin, n=2)
+    lid, page = lesson["id"], lesson["pages"][1]
+    assert lesson["pages"][0]["unclear"] is False
+    r = await admin.put(f"/api/lessons/{lid}/pages/{page['id']}/unclear", json={"unclear": True})
+    assert r.status_code == 200 and r.json() == {"unclear": True}
+    got = (await admin.get(f"/api/lessons/{lid}")).json()["pages"]
+    # A mark, not a change of the notes: the version stays, so nobody's sync brings the page in again.
+    assert [p["unclear"] for p in got] == [False, True] and got[1]["version"] == page["version"]
+    # A share link does not see it, nor can it set it with an undo.
+    token = (await admin.post(f"/api/lessons/{lid}/shares", json={"mode": "write"})).json()["token"]
+    shared = (await anon.get(f"/api/public/lesson/{token}")).json()["pages"]
+    assert all("unclear" not in p for p in shared)
+    assert all("unclear" not in p for p in (await anon.post(f"/api/public/lesson/{token}/sync", json={"known": {}})).json()["pages"])
+    assert (await anon.put(f"/api/public/lesson/{token}/pages/{page['id']}/unclear", json={"unclear": False})).status_code in (404, 405)
+    # Removed and brought back by the owner's undo, the page keeps it; brought back through a link, it has none.
+    for via, kept in ((f"/api/lessons/{lid}", True), (f"/api/public/lesson/{token}", False)):
+        assert (await admin.delete(f"/api/lessons/{lid}/pages/{page['id']}")).status_code == 200
+        body = {"id": page["id"], "kind": "slide", "slide_page": 2, "ratio": page["ratio"], "position": 2, "notes": "", "ink": [], "unclear": True}
+        assert (await (admin if via.startswith("/api/lessons") else anon).post(f"{via}/pages/restore", json=body)).status_code == 201
+        assert (await admin.get(f"/api/lessons/{lid}")).json()["pages"][1]["unclear"] is kept
+    r = await admin.put(f"/api/lessons/{lid}/pages/{page['id']}/unclear", json={"unclear": False})
+    assert r.json() == {"unclear": False}
+    assert (await admin.put(f"/api/lessons/{lid}/pages/999999/unclear", json={"unclear": True})).status_code == 404
+    assert (await anon.put(f"/api/lessons/{lid}/pages/{page['id']}/unclear", json={"unclear": True})).status_code in (401, 403, 404)

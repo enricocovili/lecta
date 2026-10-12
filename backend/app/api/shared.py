@@ -44,7 +44,7 @@ async def shared_lesson(token: str, response: Response, db: AsyncSession = Depen
     course = await db.get(Course, lesson.course_id)
     return {
         "mode": sh.mode, "title": lesson.title, "course_name": course.name if course else "", "has_pdf": bool(lesson.pdf_blob),
-        "pdf_pages": lesson.pdf_pages, "pages": [owner.page_out(p) for p in await owner._pages(db, lesson.id)],
+        "pdf_pages": lesson.pdf_pages, "pages": [owner.page_out(p, owner=False) for p in await owner._pages(db, lesson.id)],
         "has_lab": (await db.execute(select(Lab.id).where(Lab.lesson_id == lesson.id))).scalar_one_or_none() is not None,
     }
 
@@ -53,7 +53,7 @@ async def shared_lesson(token: str, response: Response, db: AsyncSession = Depen
 async def shared_sync(token: str, body: owner.SyncIn, response: Response, db: AsyncSession = Depends(get_db)) -> dict:
     response.headers["cache-control"] = "no-store"
     lesson, _ = await _open(db, token)
-    return await owner.sync_out(db, lesson, body.known)
+    return await owner.sync_out(db, lesson, body.known, owner=False)
 
 
 @router.get("/pdf")
@@ -89,7 +89,7 @@ async def shared_add(token: str, body: owner.PageAdd, db: AsyncSession = Depends
 @router.post("/pages/restore", status_code=201)
 async def shared_restore(token: str, body: owner.PageRestore, db: AsyncSession = Depends(get_db)) -> dict:
     lesson, _ = await _open(db, token, write=True)
-    return await owner.restore_page(lesson.id, body, db)
+    return await owner.restore_page(lesson.id, body.model_copy(update={"unclear": False}), db)
 
 
 @router.delete("/pages/{page_id}")

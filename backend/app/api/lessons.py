@@ -43,11 +43,15 @@ def _now() -> datetime:
 # --------------------------------------------------------------------------- output
 
 
-def page_out(p: LessonPage) -> dict[str, Any]:
-    return {
+def page_out(p: LessonPage, owner: bool = True) -> dict[str, Any]:
+    """A page as the editor gets it; the «non capita» mark is the owner's alone (a share link does not see it)."""
+    out = {
         "id": p.id, "position": p.position, "kind": p.kind, "slide_page": p.slide_page, "ratio": p.ratio,
         "notes": p.notes, "ink": p.ink, "version": p.version,
     }
+    if owner:
+        out["unclear"] = p.unclear
+    return out
 
 
 def lesson_out(lesson: Lesson, course_name: str | None = None, stats: dict[str, int] | None = None) -> dict[str, Any]:
@@ -284,6 +288,19 @@ async def save_page(lesson_id: int, page_id: int, body: PageSave, db: AsyncSessi
     return {"version": p.version, "updated_at": p.updated_at}
 
 
+class Unclear(BaseModel):
+    unclear: bool
+
+
+@router.put("/lessons/{lesson_id}/pages/{page_id}/unclear")
+async def mark_unclear(lesson_id: int, page_id: int, body: Unclear, db: AsyncSession = Depends(get_db)) -> dict:
+    """Mark a page «non capita» (or take the mark away). Not a change of the notes: the version stays."""
+    p = await _page(db, lesson_id, page_id)
+    p.unclear = body.unclear
+    await db.commit()
+    return {"unclear": p.unclear}
+
+
 class Bookmark(BaseModel):
     page_id: int
 
@@ -342,6 +359,7 @@ class PageRestore(BaseModel):
     position: int = Field(ge=1)
     notes: str = Field("", max_length=ls.MAX_NOTES_CHARS)
     ink: list[dict[str, Any]] = Field(default_factory=list)
+    unclear: bool = False  # the owner's mark (a share link's restore leaves it off)
 
 
 @router.post("/lessons/{lesson_id}/pages/restore", status_code=201)
@@ -370,7 +388,7 @@ async def restore_page(lesson_id: int, body: PageRestore, db: AsyncSession = Dep
     await db.execute(update(LessonPage).where(LessonPage.lesson_id == lesson.id, LessonPage.position >= pos).values(position=LessonPage.position + 1))
     page = LessonPage(
         id=body.id, lesson_id=lesson.id, position=pos, kind=body.kind, slide_page=body.slide_page if body.kind == "slide" else None,
-        ratio=body.ratio, notes=body.notes.replace("\x00", ""), ink=ink,
+        ratio=body.ratio, notes=body.notes.replace("\x00", ""), ink=ink, unclear=body.unclear,
     )
     db.add(page)
     lesson.updated_at = _now()
@@ -382,11 +400,11 @@ class SyncIn(BaseModel):
     known: dict[int, int] = Field(default_factory=dict)  # page id -> the version the caller has
 
 
-async def sync_out(db: AsyncSession, lesson: Lesson, known: dict[int, int]) -> dict[str, Any]:
+async def sync_out(db: AsyncSession, lesson: Lesson, known: dict[int, int], owner: bool = True) -> dict[str, Any]:
     """What changed since the caller last looked: the order of the pages and the pages it doesn't have (or has another version of).
     Used by the shared views and by an editor that has share links, to follow what others write."""
     pages = await _pages(db, lesson.id)
-    return {"title": lesson.title, "order": [p.id for p in pages], "pages": [page_out(p) for p in pages if known.get(p.id) != p.version]}
+    return {"title": lesson.title, "order": [p.id for p in pages], "pages": [page_out(p, owner) for p in pages if known.get(p.id) != p.version]}
 
 
 @router.post("/lessons/{lesson_id}/sync")

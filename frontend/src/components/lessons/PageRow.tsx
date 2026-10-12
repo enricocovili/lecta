@@ -34,6 +34,8 @@ export interface Actions {
   visible: (index: number) => void;
   /** open the assistant's popup on this page, or close it when it is open there and `open` is not set (the owner only) */
   ask?: (pid: number, open?: boolean) => void;
+  /** mark the page «non capita», or take the mark away (the owner only) */
+  mark?: (pid: number) => void;
   /** a rectangle drawn with the select tool on this page is an area to ask about (null: let go); the owner only */
   area?: (pid: number, r: Rect | null) => void;
 }
@@ -158,8 +160,21 @@ function PageRow({ page, index, doc, draw, layout, zoom, preview, readOnly = fal
         <span className="les-tag">{label}</span>
       </div>
       {/* The slide's own buttons on its top-right corner (outside its box, so the popup is not cut), shown like the tag. */}
-      {(actions.ask || (layout === "slides" && !readOnly)) && (
+      {(actions.ask || actions.mark || (layout === "slides" && !readOnly)) && (
         <div className="les-corner">
+          {actions.mark && (
+            <button
+              type="button"
+              className={`btn icon les-corner-mark ${page.unclear ? "on" : ""}`}
+              onClick={() => actions.mark!(page.id)}
+              aria-pressed={!!page.unclear}
+              title={page.unclear ? "Segnata «non capita»: aprendo l’assistente la spiega; clicca per togliere il segno" : "Segna «non capita», da farti spiegare dopo"}
+              aria-label="Non capita"
+              data-testid="mark-unclear"
+            >
+              <Icon name="help" />
+            </button>
+          )}
           {actions.ask && (
             <button
               type="button"

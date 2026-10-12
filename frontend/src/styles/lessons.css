@@ -340,6 +340,14 @@ body.ws-page .les {
 .les .les-corner-ask.on {
   background: #2c4fa3;
 }
+.les .les-corner-mark:hover {
+  background: #a35a00;
+}
+/* A slide marked «non capita» shows it at all times. */
+.les .les-corner-mark.on {
+  background: #d97706;
+  opacity: 1;
+}
 .les .les-corner-remove:hover {
   background: #b3261e;
 }
