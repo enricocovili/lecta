@@ -767,3 +767,18 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      assistant); notes on unpublished courses for viewers (the product says published content, and an author working
      on a private draft hasn't asked for readers yet); re-anchoring by a fuzzy match (an edited block may mean the note
      no longer applies: the author decides, seeing «testo cambiato»).
+129. **A reader picks a block of a published course to comment on it or suggest a change, and sees their notes on the
+     blocks (#85).** In the read-only draft of a published course (`can_write` false: a viewer, an editor on someone
+     else's course) a click picks one block, as the owner's click does, and the floating toolbar offers «Commenta» and
+     «Suggerisci modifica» instead of the assistant's actions (one block at a time: a note is anchored to one). The
+     comment is a box for words; the suggestion is the box of the writing in place (113), holding the block's LaTeX,
+     plus an optional reason; Ctrl+Enter sends, Esc leaves. The box opens *under* the block, which stays in sight (the
+     owner's double click replaces it instead: they are rewriting it, a reader is proposing). A block with the reader's
+     notes has a marker in the margin; it opens the notes under the block with their state, and «Modifica» /
+     «Elimina» while open. Notes whose block isn't in the draft any more (`changed`, or closed ones whose text was
+     replaced) are listed at the end of their chapter, «testo cambiato», with the text they were written on. An
+     unpublished course shows the notes but offers nothing to add. An admin who isn't the owner can change the course,
+     so they get the owner's draft, not the notes (the API would take their note: they write the change instead).
+     *Alternatives:* a side panel of notes (the draft is already between the outline and the assistant, and the note
+     belongs next to its words); several blocks per note (the backend anchors one); the suggestion's box replacing the
+     block (the reader would lose the text they are proposing to change).

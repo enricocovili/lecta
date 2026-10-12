@@ -30,6 +30,10 @@ the top left goes back to the course page.
   anything there, blank lines make new paragraphs, empty removes the block. Ctrl+Enter (or *Salva*) writes it into the
   chapter and shows it typeset; Esc leaves it as it was. If the assistant changed that block meanwhile, the write is
   refused.
+* **Readers' notes**: someone who reads a published course they can't change (a viewer, another editor) clicks a block
+  of the draft for «Commenta» or «Suggerisci modifica» (the block's LaTeX in the same box as writing by hand, and why).
+  Their notes show up as a marker on the block, with their state; they change or delete them while open. A note whose
+  block's text changed is listed at the end of the chapter, «testo cambiato».
 * There is no revision history: edits and imports write straight into the files; the only safety net is **Annulla** on
   the assistant's last answers.
 

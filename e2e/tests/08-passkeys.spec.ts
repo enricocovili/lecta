@@ -235,13 +235,16 @@ test.describe("Passkey", () => {
     await expect(outline.getByRole("button", { name: "Aggiungi capitolo" })).toHaveCount(0);
     await expect(outline.getByRole("button", { name: /Azioni sul capitolo/ })).toHaveCount(0);
     await expect(outline.getByRole("link", { name: "Nuova lezione" })).toHaveCount(0);
-    // The draft is there to read: a click picks nothing, a double click opens nothing.
+    // The draft is there to read: a click offers only a note on the block (no assistant), a double click opens nothing.
     const block = reader.getByTestId("doc-preview").locator(".doc-block:not(.doc-heading):has(img)").first();
     await expect(block).toBeVisible({ timeout: 60_000 });
     await block.click();
-    await block.dblclick();
+    await expect(reader.getByTestId("selection-toolbar").getByRole("button")).toHaveText(["Commenta", "Suggerisci modifica"]);
+    await reader.keyboard.press("Escape");
     await expect(reader.getByTestId("selection-toolbar")).toHaveCount(0);
+    await block.dblclick();
     await expect(reader.getByTestId("block-editor")).toHaveCount(0);
+    await reader.keyboard.press("Escape");
     await reader.getByRole("button", { name: "Altre azioni" }).click();
     await expect(reader.getByRole("button", { name: "Impostazioni della materia" })).toHaveCount(0);
     await expect(reader.getByRole("link", { name: "Nuova lezione" })).toHaveCount(0);
@@ -275,6 +278,78 @@ test.describe("Passkey", () => {
     await expect(page.getByRole("button", { name: "Assistente AI" })).toBeVisible();
     await rc.close();
     await ac.close();
+  });
+
+  test("a reader comments on and suggests a change to a block of the admin's published course, and finds their notes again", async ({ page, browser, baseURL }) => {
+    test.setTimeout(180_000);
+    await login(page);
+    const { context: rc, p: reader } = await invited(page, browser, baseURL!, "viewer", "commentatore");
+    const con = watchConsole(reader);
+    await openCourse(reader, /Algebra Lineare/);
+    const doc = reader.getByTestId("doc-preview");
+    const block = doc.locator(".doc-block:not(.doc-heading):has(img)").first();
+    await expect(block).toBeVisible({ timeout: 60_000 });
+    const at = doc.locator(`.doc-block[data-line="${await block.getAttribute("data-line")}"]`);
+    const toolbar = reader.getByTestId("selection-toolbar");
+    const composer = reader.getByTestId("note-editor");
+
+    // «Commenta»: a box for the words, Ctrl+Enter sends them; the block gets a marker.
+    await block.click();
+    await toolbar.getByRole("button", { name: "Commenta" }).click();
+    const comment = composer.getByLabel("Commento");
+    await expect(comment).toBeFocused();
+    await comment.fill("Non è chiaro perché lo zero sta nello spazio.");
+    await comment.press("Control+Enter");
+    await expect(composer).toHaveCount(0);
+    await expect(at.getByTestId("note-mark")).toBeVisible();
+
+    // «Suggerisci modifica»: the block's LaTeX in the box of the writing in place, and why. Esc leaves it unsent.
+    await block.click();
+    await toolbar.getByRole("button", { name: "Suggerisci modifica" }).click();
+    const latex = composer.getByLabel("Testo proposto");
+    await expect(latex).toBeFocused();
+    const src = await latex.inputValue();
+    expect(src.trim().length).toBeGreaterThan(0);
+    await latex.press("Escape");
+    await expect(composer).toHaveCount(0);
+    await block.click();
+    await toolbar.getByRole("button", { name: "Suggerisci modifica" }).click();
+    await expect(latex).toHaveValue(src);
+    await latex.fill(`${src}\n\nPer esempio, i vettori del piano.`);
+    await composer.getByLabel("Motivo").fill("Manca un esempio.");
+    await latex.press("Control+Enter");
+    await expect(composer).toHaveCount(0);
+    await expect(at.getByTestId("note-mark")).toHaveText("2");
+
+    // After a reload the marker is still there, and shows the notes with their state.
+    await reader.reload();
+    await expect(at.getByTestId("note-mark")).toHaveText("2", { timeout: 60_000 });
+    await at.getByTestId("note-mark").click();
+    const notes = reader.getByTestId("block-notes").getByTestId("draft-note");
+    await expect(notes).toHaveCount(2);
+    await expect(notes.nth(0)).toContainText("Non è chiaro perché lo zero sta nello spazio.");
+    await expect(notes.nth(1)).toContainText("Manca un esempio.");
+    await expect(notes.nth(1)).toContainText("Per esempio, i vettori del piano.");
+    await expect(reader.getByTestId("block-notes").getByTestId("note-status")).toHaveText(["Aperta", "Aperta"]);
+
+    // The comment is deleted: one note left on the block.
+    await notes.nth(0).getByRole("button", { name: "Elimina" }).click();
+    await reader.getByRole("dialog").getByRole("button", { name: "Elimina", exact: true }).click();
+    await expect(notes).toHaveCount(1);
+    await expect(notes.nth(0)).toContainText("Manca un esempio.");
+    await expect(at.getByTestId("note-mark")).toHaveText("");
+    con.assertClean();
+
+    // On a course that isn't published (as if the admin had taken it back), the notes stay but take no new ones.
+    await reader.route(/\/api\/courses\/\d+$/, async (route) => {
+      const res = await route.fetch({ url: route.request().url().replace("//localhost:", "//lecta-frontend:") }); // the browser's localhost
+      await route.fulfill({ response: res, json: { ...(await res.json()), published: false } });
+    });
+    await reader.reload();
+    await expect(at.getByTestId("note-mark")).toBeVisible({ timeout: 60_000 });
+    await block.click();
+    await expect(toolbar).toHaveCount(0);
+    await rc.close();
   });
 
   test("a reader opens a lesson of the admin's course read-only: no tools, nothing sent", async ({ page, browser, baseURL }) => {

@@ -1,23 +1,33 @@
-// The small toolbar that floats next to the blocks picked in the draft.
+// The small toolbar that floats next to the blocks picked in the draft: the assistant's actions, or a reader's notes.
 import { useLayoutEffect, useRef, useState } from "react";
 import type { DraftSelection } from "./selection";
 
 /** remove: take it out at once · explain / fix: open the chat on this text and wait for the user's question. */
 export type SelectionAction = "remove" | "explain" | "fix";
 
-const ACTIONS: { key: SelectionAction; label: string; title: string }[] = [
+export interface ToolbarAction<K extends string> {
+  key: K;
+  label: string;
+  title: string;
+}
+
+const ACTIONS: ToolbarAction<SelectionAction>[] = [
   { key: "remove", label: "Rimuovi", title: "Toglie questo passaggio dal testo, sistemando la formattazione intorno" },
   { key: "explain", label: "Spiega", title: "Apre la chat su questo passaggio: poi fai la tua domanda" },
   { key: "fix", label: "Correggi", title: "Apre la chat su questo passaggio: poi dici cosa correggere" },
 ];
 
-export default function SelectionToolbar({
+export default function SelectionToolbar<K extends string = SelectionAction>({
   sel,
+  actions = ACTIONS as ToolbarAction<string>[] as ToolbarAction<K>[],
+  label = "Chiedi all'assistente su questo testo",
   onAction,
   onPress,
 }: {
   sel: DraftSelection;
-  onAction: (a: SelectionAction) => void;
+  actions?: ToolbarAction<K>[];
+  label?: string;
+  onAction: (a: K) => void;
   /** The pointer went down on the toolbar. */
   onPress?: () => void;
 }) {
@@ -51,7 +61,7 @@ export default function SelectionToolbar({
       className={`sel-toolbar ${pos?.below ? "below" : ""}`}
       data-testid="selection-toolbar"
       role="toolbar"
-      aria-label="Chiedi all'assistente su questo testo"
+      aria-label={label}
       style={{ top: pos?.top ?? -1000, left: pos?.left ?? 0, visibility: pos ? "visible" : "hidden" }}
       onPointerDown={(e) => {
         onPress?.();
@@ -59,7 +69,7 @@ export default function SelectionToolbar({
       }}
       onMouseDown={(e) => e.preventDefault()}
     >
-      {ACTIONS.map((a) => (
+      {actions.map((a) => (
         <button key={a.key} type="button" className="sel-btn" title={a.title} onClick={() => onAction(a.key)}>
           {a.label}
         </button>

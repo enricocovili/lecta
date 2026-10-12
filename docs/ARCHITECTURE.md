@@ -70,6 +70,8 @@ reasoning behind every change since.
   signed-in user but the owner comments on or suggests a change to a block of a *published* course; the author sees
   and changes their notes while open, the owner and admins see them all and accept (the block write of the draft),
   reject or resolve them. Notes are found again by their block's text after edits, or flagged «testo cambiato».
+  In the read-only draft a click on a block offers «Commenta» / «Suggerisci modifica», and a marker on a block opens
+  the reader's own notes on it (`workspace/DraftNotes.tsx`).
 * **Sessions**: accounts live in `users`, each with a role (`viewer`, `editor`, `admin`) and possibly disabled (a
   disabled user's sessions stop working); argon2id password (optional: invited users have only passkeys), httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe
   methods, login rate limiting, optional TOTP. **Passkeys** (WebAuthn, Settings → Account): add one with the

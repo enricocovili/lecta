@@ -1,12 +1,17 @@
 // The draft of the whole document: every chapter typeset by LaTeX, block by block (paragraphs, headings, environments
 // as SVG pictures), in one continuous scroll. A click picks a block (Shift+click extends the pick) and opens the
 // toolbar to ask the AI about it; a double click (or F2) opens the block's text in place, to write anything there.
-// Blocks are flashed where the AI just worked.
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { put } from "../../lib/api";
+// Blocks are flashed where the AI just worked. Someone reading another's published course picks a block to comment
+// on it or suggest a change (decision 129); a marker on a block shows the notes they left there.
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { post, put } from "../../lib/api";
 import { Icon } from "../icons";
+import { toast } from "../ui";
+import { NoteComposer, NoteList, useDraftNotes } from "./DraftNotes";
+import { EditBar, EditBox } from "./EditBox";
+import { placeNotes, type DraftNote, type NoteKind } from "./notes";
 import { pickBlock, pickScope, type BlockPick, type DraftSelection } from "./selection";
-import SelectionToolbar, { type SelectionAction } from "./SelectionToolbar";
+import SelectionToolbar, { type SelectionAction, type ToolbarAction } from "./SelectionToolbar";
 import type { DraftBlock, DraftChapter, FlashTarget } from "./types";
 
 export interface FlashRequest {
@@ -21,11 +26,33 @@ export interface ScrollRequest {
   sectionId?: string;
 }
 
-const Block = memo(function Block({ b, index, width, picked, still }: { b: DraftBlock; index: number; width: number; picked: boolean; still: boolean }) {
+const NOTE_ACTIONS: ToolbarAction<NoteKind>[] = [
+  { key: "comment", label: "Commenta", title: "Scrivi un commento su questo blocco: lo legge chi scrive la materia" },
+  { key: "suggestion", label: "Suggerisci modifica", title: "Riscrivi il testo di questo blocco: chi scrive la materia accetta o rifiuta la modifica" },
+];
+
+const Block = memo(function Block({
+  b,
+  index,
+  width,
+  picked,
+  still,
+  notes = 0,
+  notesOpen = false,
+}: {
+  b: DraftBlock;
+  index: number;
+  width: number;
+  picked: boolean;
+  still: boolean;
+  /** How many of the reader's notes are on it: a marker that shows them. */
+  notes?: number;
+  notesOpen?: boolean;
+}) {
   const failed = !!b.error;
   return (
     <div
-      className={`doc-block${b.heading ? " doc-heading" : ""}${picked ? " picked" : ""}${failed ? " failed" : ""}`}
+      className={`doc-block${b.heading ? " doc-heading" : ""}${picked ? " picked" : ""}${failed ? " failed" : ""}${notes ? " noted" : ""}`}
       data-line={b.start}
       data-end={b.end}
       data-index={index}
@@ -52,6 +79,19 @@ const Block = memo(function Block({ b, index, width, picked, still }: { b: Draft
           {!b.pages.length && <pre>{b.src}</pre>}
         </div>
       )}
+      {notes > 0 && (
+        <button
+          type="button"
+          className="doc-note-mark"
+          data-testid="note-mark"
+          aria-expanded={notesOpen}
+          aria-label={notes === 1 ? "Una tua nota su questo blocco" : `${notes} tue note su questo blocco`}
+          title="Le tue note su questo blocco"
+        >
+          <Icon name="message" />
+          {notes > 1 && <span>{notes}</span>}
+        </button>
+      )}
     </div>
   );
 });
@@ -67,19 +107,6 @@ function BlockEditor({ courseId, edit, onDone }: { courseId: number; edit: Editi
   const [text, setText] = useState(edit.block.src ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const area = useRef<HTMLTextAreaElement>(null);
-
-  useLayoutEffect(() => {
-    const el = area.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight + 2}px`;
-  }, [text]);
-  useEffect(() => {
-    const el = area.current;
-    el?.focus({ preventScroll: true });
-    el?.setSelectionRange(el.value.length, el.value.length);
-  }, []);
 
   const save = async () => {
     if (saving) return;
@@ -97,40 +124,15 @@ function BlockEditor({ courseId, edit, onDone }: { courseId: number; edit: Editi
 
   return (
     <div className="doc-edit" data-testid="block-editor">
-      <textarea
-        ref={area}
-        value={text}
-        spellCheck
-        aria-label="Testo del blocco"
-        disabled={saving}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            e.preventDefault();
-            e.stopPropagation();
-            onDone(null);
-          } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            void save();
-          }
-        }}
+      <EditBox value={text} onChange={setText} label="Testo del blocco" disabled={saving} autoFocus onSubmit={() => void save()} onCancel={() => onDone(null)} />
+      <EditBar
+        hint="Ctrl+Invio salva · Esc annulla · vuoto toglie il blocco"
+        error={error}
+        busy={saving}
+        submitLabel="Salva"
+        onSubmit={() => void save()}
+        onCancel={() => onDone(null)}
       />
-      <div className="doc-edit-bar">
-        {error ? (
-          <span className="doc-edit-error small">
-            <Icon name="alert-triangle" /> {error}
-          </span>
-        ) : (
-          <span className="muted small">Ctrl+Invio salva · Esc annulla · vuoto toglie il blocco</span>
-        )}
-        <button type="button" className="btn ghost sm" disabled={saving} onClick={() => onDone(null)}>
-          Annulla
-        </button>
-        <button type="button" className="btn primary sm" disabled={saving} onClick={() => void save()}>
-          {saving ? <Icon name="loader" className="spin" /> : null}
-          Salva
-        </button>
-      </div>
     </div>
   );
 }
@@ -166,6 +168,8 @@ export default function DocView({
   onSelectionAction,
   onBlockWritten,
   readOnly = false,
+  notes: showNotes = false,
+  canNote = false,
 }: {
   courseId: number;
   chapters: DraftChapter[] | null;
@@ -180,12 +184,21 @@ export default function DocView({
   onBlockWritten: (d: DraftChapter) => void;
   /** Only to read: blocks are neither picked (the assistant's actions) nor written in place. */
   readOnly?: boolean;
+  /** Show the user's own notes on the blocks (a reader's). */
+  notes?: boolean;
+  /** Read-only, and a click picks a block to comment on or suggest a change to (a published course). */
+  canNote?: boolean;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const article = useRef<HTMLElement>(null);
   const [pick, setPick] = useState<BlockPick | null>(null);
   const [rect, setRect] = useState<DraftSelection["rect"] | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [composing, setComposing] = useState<(Editing & { kind: NoteKind }) | null>(null);
+  const [shown, setShown] = useState<{ chapterId: number; index: number } | null>(null);
+  const noting = readOnly && canNote;
+  const still = readOnly && !noting;
+  const { notes, saved, removed } = useDraftNotes(courseId, showNotes);
   const activeRef = useRef<number | null>(null);
 
   // -- which chapter is being read
@@ -320,6 +333,43 @@ export default function DocView({
     return scope ? { chapterId: pick.chapterId, selection: scope, rect } : null;
   }, [pick, rect, chapters]);
 
+  // -- the reader's notes, on their blocks
+  const placed = useMemo(() => {
+    const m = new Map<number, ReturnType<typeof placeNotes>>();
+    for (const c of chapters ?? []) {
+      const mine = notes.filter((n) => n.chapter_id === c.chapter.id);
+      if (mine.length && c.blocks) m.set(c.chapter.id, placeNotes(c.blocks, mine));
+    }
+    return m;
+  }, [chapters, notes]);
+
+  const markAt = (target: Element) => {
+    const el = target.closest<HTMLElement>(".doc-block");
+    const sec = el?.closest<HTMLElement>("[data-chapter-id]");
+    if (!el || !sec) return;
+    const at = { chapterId: Number(sec.dataset.chapterId), index: Number(el.dataset.index) };
+    setPick(null);
+    setShown((cur) => (cur && cur.chapterId === at.chapterId && cur.index === at.index ? null : at));
+  };
+
+  const noteAct = (kind: NoteKind) => {
+    if (!pick) return;
+    const block = chapters?.find((c) => c.chapter.id === pick.chapterId)?.blocks?.[pick.from];
+    setPick(null);
+    if (!block) return;
+    setShown(null);
+    setComposing({ chapterId: pick.chapterId, index: pick.from, block, kind });
+  };
+
+  const sendNote = async (body: string, proposed: string | null) => {
+    if (!composing) return;
+    const { chapterId, block, kind } = composing;
+    const n = await post<DraftNote>(`/api/courses/${courseId}/chapters/${chapterId}/notes`, { kind, start: block.start, end: block.end, src: block.src ?? "", body, proposed });
+    saved(n);
+    setComposing(null);
+    toast(kind === "suggestion" ? "Suggerimento inviato a chi scrive la materia" : "Commento inviato a chi scrive la materia");
+  };
+
   const act = (a: SelectionAction) => {
     if (!sel) return;
     setPick(null);
@@ -329,23 +379,24 @@ export default function DocView({
   return (
     <div className="doc-scroll" ref={scroller}>
       <article
-        className={`doc${readOnly ? " readonly" : ""}`}
+        className={`doc${still ? " readonly" : ""}`}
         ref={article}
         data-testid="doc-preview"
         aria-label="Bozza del documento"
         aria-busy={loading}
         onClick={(e) => {
-          if (readOnly) return;
-          if (!(e.target instanceof Element && e.target.closest(".doc-edit"))) pickAt(e.target, e.shiftKey);
+          if (!(e.target instanceof Element) || e.target.closest(".doc-edit, .doc-notes")) return;
+          if (e.target.closest(".doc-note-mark")) return markAt(e.target);
+          if (!still) pickAt(e.target, e.shiftKey && !readOnly);
         }}
         onDoubleClick={(e) => !readOnly && editAt(e.target)}
         onKeyDown={(e) => {
-          if (readOnly) return;
+          if (still) return;
           if (!(e.target instanceof HTMLElement && e.target.classList.contains("doc-block"))) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            pickAt(e.target, e.shiftKey);
-          } else if (e.key === "F2") {
+            pickAt(e.target, e.shiftKey && !readOnly);
+          } else if (e.key === "F2" && !readOnly) {
             e.preventDefault();
             editAt(e.target);
           }
@@ -386,19 +437,33 @@ export default function DocView({
                 Composizione LaTeX…
               </div>
             ) : (
-              c.blocks.map((b, k) =>
-                editing && editing.chapterId === c.chapter.id && editing.index === k ? (
-                  <BlockEditor key={`edit:${b.start}`} courseId={courseId} edit={editing} onDone={edited} />
-                ) : (
-                  <Block key={`${b.start}:${b.pages[0]?.url ?? b.error ?? ""}`} b={b} index={k} width={c.width} picked={!!pick && pick.chapterId === c.chapter.id && k >= pick.from && k <= pick.to} still={readOnly} />
-                ),
-              )
+              c.blocks.map((b, k) => {
+                if (editing && editing.chapterId === c.chapter.id && editing.index === k)
+                  return <BlockEditor key={`edit:${b.start}`} courseId={courseId} edit={editing} onDone={edited} />;
+                const here = placed.get(c.chapter.id)?.onBlock.get(k);
+                const open = !!here && shown?.chapterId === c.chapter.id && shown.index === k;
+                return (
+                  <Fragment key={`${b.start}:${b.pages[0]?.url ?? b.error ?? ""}`}>
+                    <Block b={b} index={k} width={c.width} picked={(!!pick && pick.chapterId === c.chapter.id && k >= pick.from && k <= pick.to) || composing?.chapterId === c.chapter.id && composing.index === k} still={still} notes={here?.length} notesOpen={open} />
+                    {composing && composing.chapterId === c.chapter.id && composing.index === k && composing.block.start === b.start && (
+                      <NoteComposer kind={composing.kind} src={b.src ?? ""} onSend={sendNote} onCancel={() => setComposing(null)} />
+                    )}
+                    {open && here && (
+                      <NoteList notes={here} title="Le tue note su questo blocco" onSaved={saved} onRemoved={removed} onClose={() => setShown(null)} />
+                    )}
+                  </Fragment>
+                );
+              })
+            )}
+            {!!placed.get(c.chapter.id)?.apart.length && (
+              <NoteList notes={placed.get(c.chapter.id)!.apart} title="Le tue note su testo cambiato" withSrc onSaved={saved} onRemoved={removed} />
             )}
             {isHollow(c) && <p className="doc-ch-empty muted">{readOnly ? "Questo capitolo è ancora vuoto." : "Questo capitolo è ancora vuoto. Chiedi all’assistente di scriverlo."}</p>}
           </section>
         ))}
       </article>
-      {sel && <SelectionToolbar sel={sel} onAction={act} />}
+      {sel && !readOnly && <SelectionToolbar sel={sel} onAction={act} />}
+      {sel && noting && <SelectionToolbar sel={sel} actions={NOTE_ACTIONS} label="Lascia una nota su questo blocco" onAction={noteAct} />}
     </div>
   );
 }
