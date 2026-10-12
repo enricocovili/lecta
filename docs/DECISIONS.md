@@ -614,3 +614,10 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      and whether the user can change it. Course slugs stay unique across users, since public URLs are
      `/courses/<slug>`. *Alternatives:* a check inside each endpoint only (a forgotten one is a leak, and a
      malformed body would answer 422 before it); per-user slugs (public URLs would need the user).
+117. **Lessons, labs and what the imports read stay with the course's owner, even when the course is published (#73).**
+     Publishing makes a course's text public, not the slides, notes, pen strokes and lab files it was written from: so
+     these are *private* content (`private_access`): the owner, admins and viewers read them, the owner and admins
+     change them, and another editor gets 404 whatever the course's state. Every path parameter that names a lesson, a
+     source file, an import's page or figure, or an import leads to its course and is checked before the route runs;
+     material whose course was deleted is left to admins and viewers. Lesson share links stay with the admins (115).
+     *Alternative:* opening lessons with the published course (a classmate's notes and slides would be readable).

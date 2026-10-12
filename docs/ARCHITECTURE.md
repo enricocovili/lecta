@@ -51,7 +51,8 @@ reasoning behind every change since.
   level and fails on a route it doesn't list.
 * **Ownership**: every course has an owner (`security/access.py`). Editors read their own courses and the published
   ones and change only their own; viewers read every course; admins read and change everything. A course the user
-  can't read is 404, one they can't change 403. `tests/test_ownership.py` calls every route under a course as another
+  can't read is 404, one they can't change 403. Lessons, labs and import material are private to the owner (and admins,
+  viewers) even when the course is published. `tests/test_ownership.py` calls every route under a course as another
   editor.
 * **Sessions**: accounts live in `users`, each with a role (`viewer`, `editor`, `admin`) and possibly disabled (a
   disabled user's sessions stop working); argon2id password (optional: invited users have only passkeys), httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe

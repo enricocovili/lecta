@@ -15,10 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..models import Chapter, Course, IngestFigure, IngestItem, Job, SourceFile, SourceLink, Upload
-from ..security.auth import require_content
+from ..security.access import private_access
 from ..services import blobs
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(private_access)])
 
 # --------------------------------------------------------------------------- sources
 

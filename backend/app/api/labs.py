@@ -18,11 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import config
 from ..db import get_db
 from ..models import Chapter, Course, Lab, LabComment, LabFile, Lesson
-from ..security.auth import require_content
+from ..security.access import private_access
 from ..services import blobs
 from ..services import labs as lb
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(private_access)])
 
 # Every file goes out as an opaque attachment (the guard adds `nosniff` to every answer): never rendered, never run.
 SAFE_HEADERS = {"Content-Security-Policy": "sandbox; default-src 'none'", "Cache-Control": "private, no-cache"}

@@ -21,7 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import config
 from ..db import get_db
 from ..models import Chapter, ChatSession, Course, Job, Lab, Lesson, LessonPage, LessonShare, Upload
-from ..security.auth import require_admin, require_content
+from ..security.access import Access, check, private_access, readable
+from ..security.auth import require_admin
 from ..services import blobs
 from ..services import jobs as jobs_svc
 from ..services import labs as labs_svc
@@ -31,7 +32,9 @@ from ..services.texttools import slugify
 from . import labs
 from .courses import GUIDELINES_MAX
 
-router = APIRouter(dependencies=[Depends(require_content)])
+router = APIRouter(dependencies=[Depends(private_access)])
+# Share links open a lesson to anybody: admins only, checked before the lesson so others get 403.
+shares_router = APIRouter(dependencies=[Depends(require_admin), Depends(private_access)])
 
 NOTEBOOK_RATIO = 1.4142  # a blank page of a lesson without slides: A4, portrait
 DEFAULT_SLIDE_RATIO = 0.5625
@@ -83,11 +86,9 @@ async def _pages(db: AsyncSession, lesson_id: int) -> list[LessonPage]:
     return list((await db.execute(select(LessonPage).where(LessonPage.lesson_id == lesson_id).order_by(LessonPage.position, LessonPage.id))).scalars())
 
 
-async def _course(db: AsyncSession, course_id: int) -> Course:
-    c = await db.get(Course, course_id)
-    if c is None:
-        raise HTTPException(status_code=404, detail="Not Found")
-    return c
+async def _course(db: AsyncSession, course_id: int, acc: Access) -> Course:
+    """A course named in a request's body, that the lesson goes into: the user must be able to change it."""
+    return check(acc, await db.get(Course, course_id), write=True, private=True)
 
 
 # --------------------------------------------------------------------------- lessons
@@ -105,8 +106,11 @@ class LessonPatch(BaseModel):
 
 
 @router.get("/lessons")
-async def list_lessons(course_id: int | None = None, db: AsyncSession = Depends(get_db)) -> list[dict]:
-    q = select(Lesson, Course.name).join(Course, Course.id == Lesson.course_id).order_by(Lesson.updated_at.desc(), Lesson.id.desc())
+async def list_lessons(course_id: int | None = None, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> list[dict]:
+    q = (
+        select(Lesson, Course.name).join(Course, Course.id == Lesson.course_id).where(readable(acc.user, private=True))
+        .order_by(Lesson.updated_at.desc(), Lesson.id.desc())
+    )
     if course_id is not None:
         q = q.where(Lesson.course_id == course_id)
     rows = (await db.execute(q.limit(500))).all()
@@ -131,8 +135,8 @@ async def list_lessons(course_id: int | None = None, db: AsyncSession = Depends(
 
 
 @router.post("/lessons", status_code=201)
-async def create_lesson(body: LessonIn, db: AsyncSession = Depends(get_db)) -> dict:
-    course = await _course(db, body.course_id)
+async def create_lesson(body: LessonIn, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
+    course = await _course(db, body.course_id, acc)
     lesson = Lesson(course_id=course.id, number=await _next_number(db, course.id), title=body.title.strip())
     db.add(lesson)
     await db.flush()
@@ -166,14 +170,14 @@ async def get_lesson_by_number(course_id: int, number: int, pages: bool = True, 
 
 
 @router.patch("/lessons/{lesson_id}")
-async def patch_lesson(lesson_id: int, body: LessonPatch, db: AsyncSession = Depends(get_db)) -> dict:
+async def patch_lesson(lesson_id: int, body: LessonPatch, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
     lesson = await _lesson(db, lesson_id)
     if body.title is not None:
         lesson.title = body.title.strip()
     if body.status is not None:
         lesson.status = body.status
     if body.course_id is not None and body.course_id != lesson.course_id:
-        target = await _course(db, body.course_id)
+        target = await _course(db, body.course_id, acc)
         lesson.number = await _next_number(db, target.id)  # before the move: the query flushes the lesson
         lesson.course_id = target.id
         lesson.chapter_id = None  # its text stays where it was written; the new course has no chapter of this lesson
@@ -429,13 +433,13 @@ async def _shares(db: AsyncSession, lesson_id: int) -> list[LessonShare]:
     return list((await db.execute(select(LessonShare).where(LessonShare.lesson_id == lesson_id).order_by(LessonShare.mode))).scalars())
 
 
-@router.get("/lessons/{lesson_id}/shares", dependencies=[Depends(require_admin)])
+@shares_router.get("/lessons/{lesson_id}/shares")
 async def list_shares(lesson_id: int, db: AsyncSession = Depends(get_db)) -> list[dict]:
     await _lesson(db, lesson_id)
     return [share_out(sh) for sh in await _shares(db, lesson_id)]
 
 
-@router.post("/lessons/{lesson_id}/shares", status_code=201, dependencies=[Depends(require_admin)])
+@shares_router.post("/lessons/{lesson_id}/shares", status_code=201)
 async def create_share(lesson_id: int, body: ShareIn, db: AsyncSession = Depends(get_db)) -> dict:
     """The link for this mode: made if there is none (or when asked for a new one), else the one that exists."""
     await _lesson(db, lesson_id)
@@ -451,7 +455,7 @@ async def create_share(lesson_id: int, body: ShareIn, db: AsyncSession = Depends
     return share_out(sh)
 
 
-@router.delete("/lessons/{lesson_id}/shares/{mode}", dependencies=[Depends(require_admin)])
+@shares_router.delete("/lessons/{lesson_id}/shares/{mode}")
 async def delete_share(lesson_id: int, mode: Literal["read", "write"], db: AsyncSession = Depends(get_db)) -> dict:
     await _lesson(db, lesson_id)
     await db.execute(LessonShare.__table__.delete().where(LessonShare.lesson_id == lesson_id, LessonShare.mode == mode))
@@ -504,9 +508,9 @@ class GenerateIn(BaseModel):
 
 
 @router.post("/lessons/{lesson_id}/generate")
-async def generate(lesson_id: int, body: GenerateIn, db: AsyncSession = Depends(get_db)) -> dict:
+async def generate(lesson_id: int, body: GenerateIn, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
     lesson = await _lesson(db, lesson_id)
-    course = await _course(db, lesson.course_id)
+    course = await _course(db, lesson.course_id, acc)
     pages = await _pages(db, lesson.id)
     if not lesson.pdf_blob and not any(p.notes.strip() or p.ink for p in pages):
         raise HTTPException(status_code=400, detail="La lezione è vuota: scrivi qualche appunto o carica le slide")
