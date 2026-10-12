@@ -19,13 +19,11 @@ log = logging.getLogger("lecta")
 async def lifespan(_app: FastAPI):
     logging.basicConfig(level=config.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     secrets = appsecrets.load()
-    from sqlalchemy import select
-
     from .db import SessionLocal
-    from .models import AdminUser
+    from .security.auth import admin_exists
 
     async with SessionLocal() as db:
-        if (await db.execute(select(AdminUser.id).limit(1))).first() is None:
+        if not await admin_exists(db):
             log.warning("No admin account yet. Open the site and use setup code: %s", secrets["setup_code"])
     yield
 

@@ -584,3 +584,15 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      a region it chooses, or the whole page) into `images/`. The list is recomputed on demand rather than read from the
      import's records, so it does not depend on what an import kept and numbers the same regions on every call. *Why:* only the student knows which dropped picture matters; a tool on request costs nothing when unused and
      never puts a logo in the notes by itself.
+
+## Più utenti (#69)
+
+114. **The single admin account becomes a table of users with a role, and nobody is ever deleted by disabling (#70).**
+     `admin_user` is renamed `users` (passkeys and sessions keep pointing at it), the existing account becomes the admin,
+     and each user has a role (`viewer`, `editor`, `admin`, each able to do what the ones before it can) and a
+     `disabled_at`: a disabled user can't sign in and their sessions stop working, but their content stays. The password
+     is optional, since invited users sign in only with passkeys. Password login looks the user up by username and
+     verifies against a fixed hash when the user is unknown, passwordless or disabled, so the answer takes as long and
+     says the same. Setup is needed until an admin exists, and two setups at once can't both create one. The CLI commands
+     act on the only admin, or on `--user NAME`. *Alternatives:* a separate table for invited users (two kinds of account
+     for sessions, passkeys and ownership to tell apart); deleting users (their courses would go too, or lose their owner).

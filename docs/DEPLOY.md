@@ -82,7 +82,10 @@ docker run --rm -v lecta_secrets:/v:ro -v "$PWD":/out alpine tar -C /v -czf /out
 ## Locked out?
 
 ```sh
-docker compose exec backend python -m app.cli reset-password   # prompts; signs out all sessions
+docker compose exec backend python -m app.cli reset-password   # prompts; signs out that user's sessions
 docker compose exec backend python -m app.cli disable-2fa
-docker compose exec backend python -m app.cli logout-all
+docker compose exec backend python -m app.cli logout-all       # everybody's sessions
 ```
+
+They act on the only admin; with several admins, or for another account, add `--user NAME` (`logout-all --user NAME`
+signs out only that user).

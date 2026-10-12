@@ -5,7 +5,7 @@ import pytest
 
 from app import appsecrets
 from app.db import SessionLocal
-from app.models import AdminUser
+from app.models import User
 from app.security.auth import login_global_limiter, login_limiter
 
 from .conftest import ADMIN_PASSWORD, ADMIN_USER, ensure_admin, make_client
@@ -15,14 +15,20 @@ async def _wipe_admin() -> None:
     from sqlalchemy import delete
 
     async with SessionLocal() as db:
-        await db.execute(delete(AdminUser))
+        await db.execute(delete(User))
         await db.commit()
 
 
 @pytest.fixture(autouse=True)
-def _reset_limits():
+async def _reset_limits():
     login_limiter.hits.clear()
     login_global_limiter.hits.clear()
+    yield
+    from sqlalchemy import delete
+
+    async with SessionLocal() as db:  # the users a test added
+        await db.execute(delete(User).where(User.username != ADMIN_USER))
+        await db.commit()
 
 
 async def test_setup_wizard_requires_code_and_csrf(app):
@@ -118,7 +124,7 @@ async def test_password_hash_is_argon2(app):
     async with SessionLocal() as db:
         from sqlalchemy import select
 
-        user = (await db.execute(select(AdminUser))).scalar_one()
+        user = (await db.execute(select(User).where(User.username == ADMIN_USER))).scalar_one()
         assert user.password_hash.startswith("$argon2id$")
 
 
@@ -175,3 +181,83 @@ async def test_csrf_cookie_resyncs_to_the_session(app):
         assert f"lecta_csrf={session_token}" in r.headers.get("set-cookie", "")
         r = await c.post("/api/courses", json={"name": "Resync"}, headers={"x-csrf-token": r.json()["csrf"]})
         assert r.status_code in (200, 201), r.text
+
+
+async def _add_user(username: str, role: str, password: str | None = None) -> int:
+    from app.security.auth import hash_password, user_by_username
+
+    async with SessionLocal() as db:
+        if (old := await user_by_username(db, username)) is not None:
+            await db.delete(old)
+            await db.flush()
+        user = User(username=username, role=role, password_hash=hash_password(password) if password else None)
+        db.add(user)
+        await db.commit()
+        return user.id
+
+
+async def _password_login(c, username: str, password: str):  # noqa: ANN001
+    await c.get("/api/auth/csrf")
+    return await c.post("/api/auth/login", json={"username": username, "password": password})
+
+
+async def test_each_user_signs_in_with_their_own_password(app):
+    await ensure_admin(app)
+    await _add_user("second", "editor", "second-users-password")
+    async with make_client(app) as c:
+        assert (await _password_login(c, "second", ADMIN_PASSWORD)).status_code == 401
+        r = await _password_login(c, "second", "second-users-password")
+        assert r.status_code == 200 and r.json()["username"] == "second"
+        assert (await c.get("/api/auth/me")).json()["username"] == "second"
+
+
+async def test_a_passkey_only_user_never_signs_in_with_a_password(app):
+    await _add_user("keyonly", "viewer")
+    async with make_client(app) as c:
+        r = await _password_login(c, "keyonly", "")
+        assert r.status_code in (401, 422)
+        r = await _password_login(c, "keyonly", "anything-at-all-123")
+        assert r.status_code == 401
+
+
+async def test_a_disabled_user_is_signed_out_and_cannot_sign_in(app):
+    from datetime import UTC, datetime
+
+    user_id = await _add_user("leaving", "editor", "leaving-users-password")
+    async with make_client(app) as c:
+        assert (await _password_login(c, "leaving", "leaving-users-password")).status_code == 200
+        assert (await c.get("/api/courses")).status_code == 200
+        async with SessionLocal() as db:
+            (await db.get(User, user_id)).disabled_at = datetime.now(UTC)
+            await db.commit()
+        assert (await c.get("/api/courses")).status_code == 404
+        assert not (await c.get("/api/auth/me")).json()["authenticated"]
+        assert (await _password_login(c, "leaving", "leaving-users-password")).status_code == 401
+
+
+async def test_setup_is_needed_until_an_admin_exists(app):
+    await _wipe_admin()
+    await _add_user("not-an-admin", "editor", "editors-password-123")
+    async with make_client(app) as c:
+        assert (await c.get("/api/setup/status")).json() == {"needs_setup": True}
+    await _wipe_admin()
+    await ensure_admin(app)
+    async with make_client(app) as c:
+        assert (await c.get("/api/setup/status")).json() == {"needs_setup": False}
+
+
+async def test_cli_acts_on_the_user_it_is_given(app):
+    from app import cli
+
+    await ensure_admin(app)
+    await _add_user("someone-else", "editor", "someone-elses-password")
+    await cli.reset_password("a-reset-by-the-cli-1", "someone-else")
+    async with make_client(app) as c:
+        assert (await _password_login(c, "someone-else", "a-reset-by-the-cli-1")).status_code == 200
+        assert (await _password_login(c, ADMIN_USER, ADMIN_PASSWORD)).status_code == 200
+    with pytest.raises(SystemExit):
+        await cli.reset_password("a-reset-by-the-cli-1", "nobody-by-this-name")
+    # Without --user it means the only admin; with two admins it asks which one.
+    await _add_user("second-admin", "admin", "second-admins-password")
+    with pytest.raises(SystemExit, match="--user"):
+        await cli.disable_2fa()

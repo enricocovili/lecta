@@ -47,7 +47,8 @@ reasoning behind every change since.
   path that isn't explicitly public (`/api/public/*`, health, setup and auth endpoints), before routing. Every private
   route also depends on `require_admin`. Private admin pages also 404. `tests/test_boundary.py` sweeps every route ×
   method anonymously.
-* **Sessions**: argon2id password, httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe
+* **Sessions**: accounts live in `users`, each with a role (`viewer`, `editor`, `admin`) and possibly disabled (a
+  disabled user's sessions stop working); argon2id password (optional: invited users have only passkeys), httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe
   methods, login rate limiting, optional TOTP. **Passkeys** (WebAuthn, Settings → Account): add one with the
   fingerprint, a PIN or a password manager such as Bitwarden and the sign-in page offers «Accedi con una passkey» — no
   username, password or 2FA code (a passkey with user verification is both factors); the password stays as the

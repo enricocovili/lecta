@@ -40,7 +40,7 @@ from webauthn.helpers.structs import (
 )
 
 from ..db import get_db
-from ..models import AdminUser, Passkey
+from ..models import Passkey, User
 from ..security import auth
 from ..security.auth import AuthContext, require_admin
 
@@ -88,7 +88,7 @@ def _out(p: Passkey) -> dict[str, Any]:
     return {"id": p.id, "name": p.name, "synced": p.synced, "transports": p.transports, "created_at": p.created_at, "last_used_at": p.last_used_at}
 
 
-# --------------------------------------------------------------------------- the admin's passkeys (settings)
+# --------------------------------------------------------------------------- the signed-in user's passkeys (settings)
 
 
 class PasskeyAdd(BaseModel):
@@ -192,9 +192,9 @@ async def passkey_login(body: PasskeyLogin, request: Request, response: Response
     pending = _take(body.state, "login")
     cred = _credential(body.credential)
     pk = (await db.execute(select(Passkey).where(Passkey.credential_id == cred["id"]))).scalar_one_or_none()
-    user = await db.get(AdminUser, pk.user_id) if pk else None
+    user = await db.get(User, pk.user_id) if pk else None
     fail = HTTPException(status_code=401, detail="Passkey non riconosciuta")
-    if pk is None or user is None:
+    if pk is None or user is None or user.disabled_at is not None:
         auth.record_login_failure(request)
         raise fail
     try:

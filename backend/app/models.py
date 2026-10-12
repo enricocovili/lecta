@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -34,25 +35,33 @@ def _now() -> Any:
 # --------------------------------------------------------------------------- auth
 
 
-class AdminUser(Base):
-    __tablename__ = "admin_user"
+ROLES = ("viewer", "editor", "admin")  # each one can do what the ones before it can
+
+
+class User(Base):
+    """A person who signs in. The first admin has a password (and optional TOTP); invited users only passkeys."""
+
+    __tablename__ = "users"
+    __table_args__ = (CheckConstraint("role IN ('viewer', 'editor', 'admin')", name="ck_users_role"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True)
-    password_hash: Mapped[str] = mapped_column(Text)
+    password_hash: Mapped[str | None] = mapped_column(Text)
+    role: Mapped[str] = mapped_column(String(16))
     totp_secret_enc: Mapped[str | None] = mapped_column(Text)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = _now()
     password_changed_at: Mapped[datetime] = _now()
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # can't sign in; content kept
 
 
 class Passkey(Base):
-    """A WebAuthn credential of the admin: signing in with it (fingerprint, PIN, a password manager such as Bitwarden) needs no password."""
+    """A WebAuthn credential of a user: signing in with it (fingerprint, PIN, a password manager such as Bitwarden) needs no password."""
 
     __tablename__ = "passkeys"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("admin_user.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     credential_id: Mapped[str] = mapped_column(String(1024), unique=True)  # base64url
     public_key: Mapped[bytes] = mapped_column(LargeBinary)  # COSE
     sign_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -68,7 +77,7 @@ class Session(Base):
 
     # sha256 of the cookie token; the raw token is never stored.
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("admin_user.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     csrf_token: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = _now()
     last_seen_at: Mapped[datetime] = _now()

@@ -128,12 +128,12 @@ async def anon(app):
 
 async def ensure_admin(app) -> None:  # noqa: ANN001
     from app.db import SessionLocal
-    from app.models import AdminUser
-    from app.security.auth import get_admin_user, hash_password
+    from app.models import User
+    from app.security.auth import hash_password, user_by_username
 
     async with SessionLocal() as db:
-        if await get_admin_user(db) is None:
-            db.add(AdminUser(username=ADMIN_USER, password_hash=hash_password(ADMIN_PASSWORD)))
+        if await user_by_username(db, ADMIN_USER) is None:
+            db.add(User(username=ADMIN_USER, password_hash=hash_password(ADMIN_PASSWORD), role="admin"))
             await db.commit()
 
 

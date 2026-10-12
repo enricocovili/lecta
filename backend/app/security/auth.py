@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import config
 from ..db import get_db
-from ..models import AdminUser, Session
+from ..models import Session, User
 
 SESSION_COOKIE = "lecta_session"
 CSRF_COOKIE = "lecta_csrf"
@@ -50,6 +50,16 @@ def verify_password(hash_: str, password: str) -> bool:
 
 def needs_rehash(hash_: str) -> bool:
     return _hasher.check_needs_rehash(hash_)
+
+
+_equaliser: list[str] = []
+
+
+def timing_equaliser_hash() -> str:
+    """A hash to verify against when the username is unknown, so a failure takes as long as a wrong password."""
+    if not _equaliser:
+        _equaliser.append(hash_password(secrets.token_urlsafe(16)))
+    return _equaliser[0]
 
 
 def _token_id(token: str) -> str:
@@ -151,11 +161,11 @@ def check_double_submit(request: Request) -> None:
 
 @dataclass
 class AuthContext:
-    user: AdminUser
+    user: User
     session: Session
 
 
-async def create_session(db: AsyncSession, request: Request, response: Response, user: AdminUser) -> Session:
+async def create_session(db: AsyncSession, request: Request, response: Response, user: User) -> Session:
     token = secrets.token_urlsafe(32)
     now = datetime.now(UTC)
     sess = Session(
@@ -212,8 +222,8 @@ async def load_session(request: Request, db: AsyncSession) -> AuthContext | None
         await db.delete(sess)
         await db.commit()
         return None
-    user = await db.get(AdminUser, sess.user_id)
-    if user is None:
+    user = await db.get(User, sess.user_id)
+    if user is None or user.disabled_at is not None:
         return None
     if now - sess.last_seen_at > timedelta(minutes=5):
         sess.last_seen_at = now
@@ -237,8 +247,13 @@ async def require_admin(request: Request, db: AsyncSession = Depends(get_db)) ->
     return ctx
 
 
-async def get_admin_user(db: AsyncSession) -> AdminUser | None:
-    return (await db.execute(select(AdminUser).limit(1))).scalar_one_or_none()
+async def admin_exists(db: AsyncSession) -> bool:
+    """Whether setup is done: some admin account exists (even a disabled one)."""
+    return (await db.execute(select(User.id).where(User.role == "admin").limit(1))).first() is not None
+
+
+async def user_by_username(db: AsyncSession, username: str) -> User | None:
+    return (await db.execute(select(User).where(User.username == username))).scalar_one_or_none()
 
 
 # --------------------------------------------------------------------------- TOTP

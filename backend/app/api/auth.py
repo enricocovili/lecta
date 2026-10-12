@@ -8,12 +8,12 @@ from datetime import UTC, datetime
 import segno
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import delete
+from sqlalchemy import delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import appsecrets
 from ..db import get_db
-from ..models import AdminUser, Session
+from ..models import Session, User
 from ..security import auth
 from ..security.auth import AuthContext, require_admin
 from ..services import settings as settings_svc
@@ -36,7 +36,7 @@ class LoginIn(BaseModel):
 
 @router.get("/setup/status")
 async def setup_status(db: AsyncSession = Depends(get_db)) -> dict:
-    return {"needs_setup": await auth.get_admin_user(db) is None}
+    return {"needs_setup": not await auth.admin_exists(db)}
 
 
 @router.get("/auth/csrf")
@@ -55,16 +55,21 @@ async def csrf(request: Request, response: Response, db: AsyncSession = Depends(
 async def setup(body: SetupIn, request: Request, response: Response, db: AsyncSession = Depends(get_db)) -> dict:
     auth.check_double_submit(request)
     auth.check_login_rate(request)
-    if await auth.get_admin_user(db) is not None:
+    if await auth.admin_exists(db):
         raise auth.not_found()
     if not hmac.compare_digest(body.setup_code.strip().lower(), appsecrets.setup_code()):
         auth.record_login_failure(request)
         raise HTTPException(status_code=403, detail="Codice di configurazione errato (vedi il log del backend)")
-    user = AdminUser(username=body.username, password_hash=auth.hash_password(body.password))
+    # Two setups racing: the second waits here, then finds the admin the first one created.
+    await db.execute(text("SELECT pg_advisory_xact_lock(hashtext('lecta-setup'))"))
+    if await auth.admin_exists(db):
+        await db.rollback()
+        raise auth.not_found()
+    user = User(username=body.username, password_hash=auth.hash_password(body.password), role="admin")
     db.add(user)
     try:
         await db.flush()
-    except Exception as e:  # unique race: somebody else finished setup first
+    except Exception as e:  # the username is taken
         await db.rollback()
         raise auth.not_found() from e
     if body.site_title:
@@ -78,14 +83,16 @@ async def setup(body: SetupIn, request: Request, response: Response, db: AsyncSe
 async def login(body: LoginIn, request: Request, response: Response, db: AsyncSession = Depends(get_db)) -> dict:
     auth.check_double_submit(request)
     auth.check_login_rate(request)
-    user = await auth.get_admin_user(db)
+    user = await auth.user_by_username(db, body.username)
+    if user is not None and (user.password_hash is None or user.disabled_at is not None):
+        user = None  # passkey-only and disabled accounts never sign in with a password
     # Always run a hash verification so timing doesn't reveal the username.
-    target_hash = user.password_hash if user else auth.hash_password("timing-equaliser")
-    ok = auth.verify_password(target_hash, body.password) and user is not None and user.username == body.username
+    target_hash = user.password_hash if user else auth.timing_equaliser_hash()
+    ok = auth.verify_password(target_hash, body.password) and user is not None
     if not ok:
         auth.record_login_failure(request)
         raise HTTPException(status_code=401, detail="Nome utente o password non validi")
-    assert user is not None
+    assert user is not None and user.password_hash is not None
     if user.totp_enabled:
         if not body.totp:
             return {"ok": False, "totp_required": True}
@@ -117,7 +124,7 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
 @router.get("/auth/me")
 async def me(request: Request, response: Response, db: AsyncSession = Depends(get_db)) -> dict:
     ctx = await auth.load_session(request, db)
-    needs_setup = await auth.get_admin_user(db) is None
+    needs_setup = not await auth.admin_exists(db)
     if ctx is None:
         return {"authenticated": False, "needs_setup": needs_setup}
     return {
@@ -145,8 +152,10 @@ async def change_password(
     ctx: AuthContext = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    user = await db.get(AdminUser, ctx.user.id)
+    user = await db.get(User, ctx.user.id)
     assert user is not None
+    if user.password_hash is None:
+        raise HTTPException(status_code=400, detail="Questo account entra solo con le passkey")
     if not auth.verify_password(user.password_hash, body.current_password):
         raise HTTPException(status_code=400, detail="La password attuale è sbagliata")
     user.password_hash = auth.hash_password(body.new_password)
@@ -163,8 +172,8 @@ class TotpEnableIn(BaseModel):
 
 @router.post("/account/totp/setup")
 async def totp_setup(ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> dict:
-    user = await db.get(AdminUser, ctx.user.id)
-    assert user is not None
+    user = await db.get(User, ctx.user.id)
+    assert user is not None and user.password_hash is not None
     if user.totp_enabled:
         raise HTTPException(status_code=400, detail="La verifica in due passaggi è già attiva")
     secret = auth.new_totp_secret()
@@ -179,7 +188,7 @@ async def totp_setup(ctx: AuthContext = Depends(require_admin), db: AsyncSession
 async def totp_enable(
     body: TotpEnableIn, ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)
 ) -> dict:
-    user = await db.get(AdminUser, ctx.user.id)
+    user = await db.get(User, ctx.user.id)
     assert user is not None
     secret = appsecrets.decrypt(user.totp_secret_enc)
     if not secret or not auth.verify_totp(secret, body.code):
@@ -198,10 +207,10 @@ class TotpDisableIn(BaseModel):
 async def totp_disable(
     body: TotpDisableIn, ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)
 ) -> dict:
-    user = await db.get(AdminUser, ctx.user.id)
+    user = await db.get(User, ctx.user.id)
     assert user is not None
     secret = appsecrets.decrypt(user.totp_secret_enc)
-    if not auth.verify_password(user.password_hash, body.password) or not secret or not auth.verify_totp(secret, body.code):
+    if not user.password_hash or not auth.verify_password(user.password_hash, body.password) or not secret or not auth.verify_totp(secret, body.code):
         raise HTTPException(status_code=400, detail="Password o codice errati")
     user.totp_enabled = False
     user.totp_secret_enc = None
