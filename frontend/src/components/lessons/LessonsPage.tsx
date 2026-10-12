@@ -14,6 +14,8 @@ interface Row {
   course_name: string;
   title: string;
   status: LessonStatus;
+  /** whether the user may change it (its course's owner, an admin): a viewer only opens it */
+  can_write: boolean;
 }
 
 
@@ -67,7 +69,9 @@ export default function LessonsPage({ role }: { role?: Role }) {
         <Loading />
       ) : shown.length === 0 ? (
         <Empty icon="notebook">
-          Nessuna lezione. Crea una lezione, carica le slide in PDF e prendi appunti durante la lezione: a mano sulle slide e in Markdown accanto.
+          {canCreate(role)
+            ? "Nessuna lezione. Crea una lezione, carica le slide in PDF e prendi appunti durante la lezione: a mano sulle slide e in Markdown accanto."
+            : "Nessuna lezione."}
         </Empty>
       ) : (
         <div className="card flush">
@@ -83,10 +87,12 @@ export default function LessonsPage({ role }: { role?: Role }) {
                   </a>
                   <div className="pg-row-sub">{r.course_name}</div>
                 </div>
-                <LessonStatusPill id={r.id} status={r.status} editable onChange={(status) => setRows((all) => all && all.map((x) => (x.id === r.id ? { ...x, status } : x)))} />
-                <button className="btn ghost icon sm" onClick={() => setToDelete(r)} aria-label={`Elimina ${r.title}`} title="Elimina">
-                  <Icon name="trash" />
-                </button>
+                <LessonStatusPill id={r.id} status={r.status} editable={r.can_write} onChange={(status) => setRows((all) => all && all.map((x) => (x.id === r.id ? { ...x, status } : x)))} />
+                {r.can_write && (
+                  <button className="btn ghost icon sm" onClick={() => setToDelete(r)} aria-label={`Elimina ${r.title}`} title="Elimina">
+                    <Icon name="trash" />
+                  </button>
+                )}
               </div>
             ))}
           </div>

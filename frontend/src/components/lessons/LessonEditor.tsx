@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, fmtDay, get, patch } from "../../lib/api";
 import { courseText } from "../../lib/links";
+import { isAdmin, type Role } from "../../lib/roles";
 import { Icon } from "../icons";
 import Pop from "../workspace/Pop";
 import { Confirm, Seg, toast, toastError, useLocalStorage } from "../ui";
@@ -34,14 +35,17 @@ export interface LessonData {
   /** the lesson's laboratory, if it has one */
   lab?: { files: number; comments: number } | null;
   pages: PageState[];
+  /** whether the signed-in user may change the lesson (its course's owner, an admin); false: a viewer, who only reads it */
+  can_write?: boolean;
 }
 
-/** owner: the signed-in author; write: a share link that can edit; read: a share link that only looks. */
-export type Access = "owner" | "write" | "read";
+/** owner: signed in and may change the lesson (its course's owner or an admin); reader: signed in, only reads it (a viewer);
+ * write: a share link that can edit; read: a share link that only looks. */
+export type Access = "owner" | "reader" | "write" | "read";
 
 const SAVE_LABEL: Record<SaveState, string> = { saved: "Salvato", pending: "Da salvare", saving: "Salvataggio…", offline: "Non salvato · riprovo" };
 
-export default function LessonEditor({ courseId, number }: { courseId: number; number: number }) {
+export default function LessonEditor({ courseId, number, role }: { courseId: number; number: number; role?: Role }) {
   const [data, setData] = useState<LessonData | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -63,7 +67,7 @@ export default function LessonEditor({ courseId, number }: { courseId: number; n
       </div>
     );
   }
-  return <Editor lesson={data} access="owner" source={{ base: `/api/lessons/${data.id}`, key: String(data.id) }} />;
+  return <Editor lesson={data} access={data.can_write ? "owner" : "reader"} admin={isAdmin(role)} source={{ base: `/api/lessons/${data.id}`, key: String(data.id) }} />;
 }
 
 /** Brings a page (the slide and its notes) to the middle of the editor; one taller than the editor starts at the top instead. */
@@ -81,9 +85,13 @@ function pageLabel(pages: PageState[], index: number): string {
   return after ? `Pagina aggiunta dopo la slide ${after}` : "Pagina aggiunta";
 }
 
-export function Editor({ lesson, access, source, labHref }: { lesson: LessonData; access: Access; source: LessonSource; labHref?: string | null }) {
+export function Editor({ lesson, access, source, labHref, admin = false }: { lesson: LessonData; access: Access; source: LessonSource; labHref?: string | null; admin?: boolean }) {
   const owner = access === "owner";
-  const readOnly = access === "read";
+  // Signed in, in the app (not through a share link): its links to the lessons, the subject and the lab.
+  const inApp = owner || access === "reader";
+  const readOnly = access === "read" || access === "reader";
+  // Share links are made by admins only (decision 115).
+  const shares = owner && admin;
   const [title, setTitle] = useState(lesson.title);
   const [hasShares, setHasShares] = useState(false);
   // Others save too when the lesson is shared (and a visitor sees what the owner and the others write): their pages are brought in.
@@ -95,7 +103,8 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
     },
     [owner],
   );
-  const store = useLessonPages(source, lesson.pages, readOnly ? 5000 : access === "write" ? 6000 : hasShares ? 8000 : null, onTitle);
+  // A viewer reads the lesson as it was when opened: following the others' saves is a POST, which is the editors' (decision 126).
+  const store = useLessonPages(source, lesson.pages, access === "read" ? 5000 : access === "write" ? 6000 : hasShares ? 8000 : null, onTitle);
   const { pages } = store;
   const scroller = useRef<HTMLDivElement>(null);
   const { doc, error: pdfError } = usePdfDoc(lesson.has_pdf ? `${source.base}/pdf` : null);
@@ -124,8 +133,8 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   const [area, setArea] = useState<{ pid: number; rect: Rect } | null>(null);
 
   useEffect(() => {
-    if (owner) get<unknown[]>(`/api/lessons/${lesson.id}/shares`).then((l) => setHasShares(l.length > 0)).catch(() => undefined);
-  }, [owner, lesson.id]);
+    if (shares) get<unknown[]>(`/api/lessons/${lesson.id}/shares`).then((l) => setHasShares(l.length > 0)).catch(() => undefined);
+  }, [shares, lesson.id]);
 
   // Opening the lesson lands on the page that was open last, or the first one (the rows take their height while they measure
   // themselves, so the scroll is repeated a few times unless the user already moved).
@@ -428,7 +437,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
   return (
     <div className="les" data-testid="lesson-editor">
       <header className="wsb">
-        {owner && (
+        {inApp && (
           <a className="btn ghost icon wsb-back" href="/admin/lessons" aria-label="Torna alle lezioni" title="Lezioni">
             <Icon name="arrow-left" />
           </a>
@@ -444,7 +453,13 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         />
         <span className="les-course muted small">{lesson.course_name}</span>
-        {owner && <LessonStatusPill id={lesson.id} status={status} editable onChange={setStatus} />}
+        {inApp && <LessonStatusPill id={lesson.id} status={status} editable={owner} onChange={setStatus} />}
+        {access === "reader" && (
+          <span className="badge wsb-ro" data-testid="read-only" title="Puoi leggere questa lezione, non modificarla">
+            <Icon name="eye" />
+            <span className="wsb-lbl">Sola lettura</span>
+          </span>
+        )}
         <div className="wsb-actions">
           {!readOnly && (
           <button type="button" className={`btn ghost icon les-save ${store.saveState}`} data-testid="save-state" role="status" aria-live="polite" onClick={() => void save()} title={`${SAVE_LABEL[store.saveState]}. Salva ora (Ctrl+S); il salvataggio automatico avviene ogni minuto.`}>
@@ -452,7 +467,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
             <span className="sr-only">{SAVE_LABEL[store.saveState]}</span>
           </button>
           )}
-          {owner && lesson.generated_at && lesson.last_result?.chapters?.length ? (
+          {inApp && lesson.generated_at && lesson.last_result?.chapters?.length ? (
             <a className="btn ghost hide-mobile" href={courseText(lesson.course_id, { chapter: lesson.last_result.chapters[0].chapter_id })} title="Apri il testo generato da questa lezione">
               <Icon name="book" />
               <span className="wsb-lbl">Testo del {fmtDay(lesson.generated_at)}</span>
@@ -472,10 +487,10 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
               Appunti (.md)
             </a>
           </Pop>
-          {(owner || labHref) && (
+          {(owner || (inApp && lesson.lab) || labHref) && (
             <a
               className="btn ghost"
-              href={owner ? `/admin/courses/${lesson.course_id}/lessons/${lesson.number}/lab` : labHref!}
+              href={inApp ? `/admin/courses/${lesson.course_id}/lessons/${lesson.number}/lab` : labHref!}
               data-testid="lesson-lab"
               title={
                 !owner
@@ -489,7 +504,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
               <span className="wsb-lbl">Laboratorio</span>
             </a>
           )}
-          {owner && (
+          {shares && (
             <button type="button" className="btn les-wide" onClick={() => setShowShare(true)} data-testid="share-open" title="Condividi la lezione con un link, in sola lettura o modificabile">
               <Icon name="link" />
               <span className="wsb-lbl">Condividi</span>
@@ -523,7 +538,7 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
               <Icon name="file" />
               Scarica gli appunti (.md)
             </a>
-            {owner && (
+            {shares && (
               <button type="button" onClick={() => setShowShare(true)} className="les-narrow">
                 <Icon name="link" />
                 Condividi
@@ -538,13 +553,13 @@ export function Editor({ lesson, access, source, labHref }: { lesson: LessonData
               <Icon name={awake ? "check" : "monitor"} />
               Tieni lo schermo acceso{awake ? " (attivo)" : ""}
             </button>
-            {owner && (
+            {inApp && (
               <a href={`/admin/courses/${lesson.course_id}`}>
                 <Icon name="book" />
                 Apri la materia
               </a>
             )}
-            {owner && (
+            {inApp && (
               <a href="/admin/lessons">
                 <Icon name="notebook" />
                 Tutte le lezioni

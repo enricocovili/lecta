@@ -155,12 +155,16 @@ async def test_every_change_to_a_published_course_is_403_to_another_editor(app, 
 async def test_lessons_and_labs_are_their_course_owners(editor, other_editor, viewer, admin):
     ids = await _material(editor, published=True, admin=admin)
     lesson, course_id = ids["lesson_id"], ids["course_id"]
-    for client in (editor, viewer, admin):
-        assert (await client.get(f"/api/lessons/{lesson}")).status_code == 200
+    for client, writes in ((editor, True), (viewer, False), (admin, True)):
+        r = await client.get(f"/api/lessons/{lesson}")
+        assert r.status_code == 200
+        # The editor learns from the lesson whether it may change it: the viewer gets it read-only.
+        assert r.json()["can_write"] is writes
+        assert (await client.get(f"/api/courses/{course_id}/lessons/{ids['number']}")).json()["can_write"] is writes
         assert (await client.get(f"/api/lessons/{lesson}/lab")).status_code == 200
         assert (await client.get(f"/api/sources/{ids['sid']}")).status_code == 200
         assert (await client.get(f"/api/jobs/{ids['job_id']}/ingest")).status_code == 200
-        assert any(l["id"] == lesson for l in (await client.get("/api/lessons")).json())
+        assert [l["can_write"] for l in (await client.get("/api/lessons")).json() if l["id"] == lesson] == [writes]
     # Another editor doesn't see them, even on a published course, nor can put a lesson into it.
     assert all(l["id"] != lesson for l in (await other_editor.get("/api/lessons")).json())
     assert all(l["id"] != lesson for l in (await other_editor.get(f"/api/lessons?course_id={course_id}")).json())

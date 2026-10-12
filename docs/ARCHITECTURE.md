@@ -60,6 +60,9 @@ reasoning behind every change since.
   editor. The course JSON (`/api/courses`, `/api/tree`, the home page's courses) carries `owner` and `can_write`: the
   UI shows others' courses as «di <owner>» and, when `can_write` is false, the course page and its text read-only (no
   assistant, writing in place, structure, settings, compile or new lessons); publishing controls are only for admins.
+  Lessons (`/api/lessons`, `/api/lessons/{id}`) carry `can_write` too: a viewer opens them read-only, like a share
+  link's read mode (no tools, notes, pages, assistant, «Integra appunti», nor any unsafe request), and share links are
+  offered only to admins.
 * **Sessions**: accounts live in `users`, each with a role (`viewer`, `editor`, `admin`) and possibly disabled (a
   disabled user's sessions stop working); argon2id password (optional: invited users have only passkeys), httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe
   methods, login rate limiting, optional TOTP. **Passkeys** (WebAuthn, Settings → Account): add one with the

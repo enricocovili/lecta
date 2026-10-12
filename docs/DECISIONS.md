@@ -714,3 +714,18 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      the API refuses all of these anyway. *Alternatives:* greying controls out (says «you can't» on every button for
      nothing); compiling for readers too (the compile service is the editors', and a reader has no use for a build
      newer than the author's last one).
+126. **A lesson the user may not change opens read-only, like a share link's read mode (#82).** `/api/lessons` and
+     `/api/lessons/{id}` (and its address by number) say `can_write`, computed from the lesson's course like everything
+     private (117): the editor follows it, not the role (today only viewers read a lesson they can't change; another
+     editor never sees it, an admin changes it). The editor gets one more access mode, `reader`, which is the share
+     link's `read` (tools, typing, «non capita», pages, the assistant and «Integra appunti» gone; the notes shown
+     rendered) with the app's own links kept: back to the lessons, the subject, the text it went into, and the lab
+     when there is one. The title can't be edited, the state is a pill, the bar says «Sola lettura», and the last open
+     page is not saved (it is the lesson's, 119). A viewer sees the lesson as it was when opened: following the others'
+     saves is `POST /sync`, which is the editors' like every unsafe method, so a reader doesn't poll (reloading brings
+     the news). In the lessons list a viewer has no state switch and no delete. «Condividi» is shown only to admins,
+     who are the only ones who may make links (115): an editor's own lesson no longer offers it or asks for its links
+     on opening (that was a 403). Hiding is courtesy, as in 124. *Alternatives:* deciding from the role (wrong for an
+     admin on someone else's lesson, and the next role change would have to remember it); letting viewers sync (a
+     reader of the app is not following a lecture live, and a POST open to viewers would be the one exception of
+     `require_content`).

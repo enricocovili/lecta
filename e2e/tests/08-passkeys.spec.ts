@@ -276,4 +276,54 @@ test.describe("Passkey", () => {
     await rc.close();
     await ac.close();
   });
+
+  test("a reader opens a lesson of the admin's course read-only: no tools, nothing sent", async ({ page, browser, baseURL }) => {
+    test.setTimeout(120_000);
+    await login(page);
+    // The admin's lesson in Algebra Lineare, with notes on its first page.
+    const lesson = await page.evaluate(async () => {
+      const csrf = document.cookie.match(/lecta_csrf=([^;]+)/)?.[1] ?? "";
+      const headers = { "content-type": "application/json", "x-csrf-token": csrf };
+      const course = ((await (await fetch("/api/courses")).json()) as { id: number; name: string }[]).find((c) => c.name.includes("Algebra Lineare"))!;
+      const l = await (await fetch("/api/lessons", { method: "POST", headers, body: JSON.stringify({ course_id: course.id, title: "Lezione da leggere" }) })).json();
+      const full = await (await fetch(`/api/lessons/${l.id}`)).json();
+      await fetch(`/api/lessons/${l.id}/pages/${full.pages[0].id}`, { method: "PUT", headers, body: JSON.stringify({ notes: "Una **base** genera lo spazio." }) });
+      return { course_id: course.id as number, number: l.number as number };
+    });
+
+    const { context: rc, p: reader } = await invited(page, browser, baseURL!, "viewer", "uditore");
+    const con = watchConsole(reader);
+    // In the lessons list: no switch for the state and no delete.
+    await reader.goto(`/admin/lessons?course=${lesson.course_id}`);
+    const row = reader.getByTestId("lesson-row").filter({ hasText: "Lezione da leggere" });
+    await expect(row.getByTestId("lesson-status")).toHaveText("In corso");
+    await expect(row.getByRole("switch")).toHaveCount(0);
+    await expect(row.getByRole("button", { name: /Elimina/ })).toHaveCount(0);
+
+    // Only reads go out from the lesson editor (no sync, no last page), and nothing is refused.
+    const sent: string[] = [];
+    reader.on("request", (r) => r.url().includes("/api/") && r.method() !== "GET" && sent.push(`${r.method()} ${r.url()}`));
+    reader.on("response", (r) => r.url().includes("/api/") && r.status() >= 400 && sent.push(`${r.status()} ${r.url()}`));
+    await row.locator("a.pg-row-title").click();
+    await reader.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
+    const editor = reader.getByTestId("lesson-editor");
+    await expect(editor.getByTestId("lesson-page").first()).toContainText("Una base genera lo spazio.");
+    await expect(editor.getByTestId("read-only")).toHaveText("Sola lettura");
+    await expect(editor.locator("textarea")).toHaveCount(0);
+    await expect(editor.getByLabel("Titolo della lezione")).toHaveAttribute("readonly", "");
+    for (const id of ["tool-pen", "tool-text", "undo", "save-state", "add-page", "add-blank-page", "remove-page", "mark-unclear", "ask-page", "generate-open", "share-open"]) {
+      await expect(editor.getByTestId(id)).toHaveCount(0);
+    }
+    await expect(editor.getByTestId("lesson-status").getByRole("switch")).toHaveCount(0);
+    await reader.waitForTimeout(2500); // past the moment the last open page would be saved
+    expect(sent).toEqual([]);
+    con.assertClean();
+
+    // The admin's editor keeps everything.
+    await page.goto(`/admin/courses/${lesson.course_id}/lessons/${lesson.number}`);
+    await expect(page.getByTestId("tool-pen")).toBeVisible();
+    await expect(page.getByTestId("share-open")).toBeVisible();
+    await expect(page.getByTestId("read-only")).toHaveCount(0);
+    await rc.close();
+  });
 });

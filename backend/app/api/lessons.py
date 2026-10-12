@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import config
 from ..db import get_db
 from ..models import Chapter, ChatSession, Course, Job, Lab, Lesson, LessonPage, LessonShare, Upload
-from ..security.access import Access, check, private_access, readable
+from ..security.access import Access, can_write, check, private_access, readable
 from ..security.auth import require_admin
 from ..services import blobs
 from ..services import jobs as jobs_svc
@@ -108,7 +108,7 @@ class LessonPatch(BaseModel):
 @router.get("/lessons")
 async def list_lessons(course_id: int | None = None, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> list[dict]:
     q = (
-        select(Lesson, Course.name).join(Course, Course.id == Lesson.course_id).where(readable(acc.user, private=True))
+        select(Lesson, Course).join(Course, Course.id == Lesson.course_id).where(readable(acc.user, private=True))
         .order_by(Lesson.updated_at.desc(), Lesson.id.desc())
     )
     if course_id is not None:
@@ -129,8 +129,11 @@ async def list_lessons(course_id: int | None = None, acc: Access = Depends(priva
     }
     labs_of = await labs.lab_counts(db, [l.id for l, _ in rows])
     return [
-        {**lesson_out(l, name, stats.get(l.id, {"page_count": 0, "notes_pages": 0, "ink_pages": 0})), "lab": labs_of.get(l.id)}
-        for l, name in rows
+        {
+            **lesson_out(l, c.name, stats.get(l.id, {"page_count": 0, "notes_pages": 0, "ink_pages": 0})), "lab": labs_of.get(l.id),
+            "can_write": can_write(acc.user, c),
+        }
+        for l, c in rows
     ]
 
 
@@ -147,10 +150,12 @@ async def create_lesson(body: LessonIn, acc: Access = Depends(private_access), d
 
 
 @router.get("/lessons/{lesson_id}")
-async def get_lesson(lesson_id: int, pages: bool = True, db: AsyncSession = Depends(get_db)) -> dict:
+async def get_lesson(lesson_id: int, pages: bool = True, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
+    """The lesson with its pages; `can_write` says whether the user may change it (else the editor only shows it)."""
     lesson = await _lesson(db, lesson_id)
     course = await db.get(Course, lesson.course_id)
     out = lesson_out(lesson, course.name if course else None)
+    out["can_write"] = course is not None and can_write(acc.user, course)
     out["course_guidelines"] = (course.guidelines or "") if course else ""
     chapter = await db.get(Chapter, lesson.chapter_id) if lesson.chapter_id else None
     out["chapter"] = {"id": chapter.id, "title": chapter.title, "position": chapter.position} if chapter else None
@@ -161,12 +166,12 @@ async def get_lesson(lesson_id: int, pages: bool = True, db: AsyncSession = Depe
 
 
 @router.get("/courses/{course_id}/lessons/{number}")
-async def get_lesson_by_number(course_id: int, number: int, pages: bool = True, db: AsyncSession = Depends(get_db)) -> dict:
+async def get_lesson_by_number(course_id: int, number: int, pages: bool = True, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
     """A lesson by its address in the URL: the course and the lesson's number within it."""
     lesson = (await db.execute(select(Lesson).where(Lesson.course_id == course_id, Lesson.number == number))).scalar_one_or_none()
     if lesson is None:
         raise HTTPException(status_code=404, detail="Not Found")
-    return await get_lesson(lesson.id, pages, db)
+    return await get_lesson(lesson.id, pages, acc, db)
 
 
 @router.patch("/lessons/{lesson_id}")
@@ -198,7 +203,9 @@ async def delete_lesson(lesson_id: int, db: AsyncSession = Depends(get_db)) -> d
 
 
 @router.post("/lessons/{lesson_id}/slides")
-async def attach_slides(lesson_id: int, request: Request, name: str = Query("slide.pdf", max_length=500), db: AsyncSession = Depends(get_db)) -> dict:
+async def attach_slides(
+    lesson_id: int, request: Request, name: str = Query("slide.pdf", max_length=500), acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)
+) -> dict:
     """Body = the slides as a raw PDF. Only for a lesson without slides; its untouched blank pages are replaced."""
     lesson = await _lesson(db, lesson_id)
     if lesson.pdf_blob:
@@ -241,7 +248,7 @@ async def attach_slides(lesson_id: int, request: Request, name: str = Query("sli
     lesson.pdf_blob, lesson.pdf_name, lesson.pdf_pages = blob, re.sub(r"[\x00-\x1f/\\]", "", name)[:200] or "slide.pdf", len(ratios)
     lesson.updated_at = _now()
     await db.commit()
-    return await get_lesson(lesson.id, True, db)
+    return await get_lesson(lesson.id, True, acc, db)
 
 
 @router.get("/lessons/{lesson_id}/pdf")
