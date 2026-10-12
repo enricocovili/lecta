@@ -86,6 +86,25 @@ class Session(Base):
     user_agent: Mapped[str | None] = mapped_column(String(300))
 
 
+class Invite(Base):
+    """A link that lets someone create an account (with a passkey) with the role an admin chose. Shown once: only the
+    sha256 of its token is stored. Single use, it expires; `user_id` binds a recovery link to an existing user."""
+
+    __tablename__ = "invites"
+    __table_args__ = (CheckConstraint("role IN ('viewer', 'editor', 'admin')", name="ck_invites_role"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    role: Mapped[str] = mapped_column(String(16))
+    note: Mapped[str | None] = mapped_column(Text)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = _now()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
 class Setting(Base):
     __tablename__ = "settings"
 

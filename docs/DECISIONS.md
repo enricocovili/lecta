@@ -637,3 +637,15 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      conversation or the job the call is for; the costs page adds a «Per utente» split when more than one user spent.
      «Non capita» marks and the last open page stay shared per lesson for now (#87). *Alternative:* conversations shared
      by everybody who can read the course (one user's questions are not another's business).
+120. **New accounts come only from invite links, and an invited account has only passkeys (#76).** An admin creates
+     an invite with a role and an optional note (`POST /api/invites`); the link `/invito/<token>` is shown once (only
+     the token's sha256 is stored, like session tokens), expires after seven days and can be revoked while unused. The
+     public `/api/invite/{token}` routes (the only public prefix besides `/api/public/`; `/api/invites` stays admin-only)
+     tell the role, start the passkey ceremony for the username the person picks (not consuming the link; the answer is
+     bound to that invite and username) and accept it: one transaction consumes the invite with a conditional `UPDATE …
+     WHERE used_at IS NULL AND expires_at > now() RETURNING`, so two browsers racing on one link make one account, then
+     creates the user without a password and with the invite's role, stores the passkey and signs in. A taken username
+     rolls everything back and leaves the link usable. Unknown, used and expired tokens are 404 and count as failed
+     sign-ins, so tokens can't be guessed. A user without a password can't remove their last passkey (409), nor set up
+     TOTP. *Alternatives:* consuming the link when the ceremony starts (a cancelled passkey prompt would waste it); a
+     password for invited users too (one more secret to leak, and the passkey is already two factors).

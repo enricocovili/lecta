@@ -159,6 +159,9 @@ ADMIN = """
     GET    /api/lessons/{lesson_id}/shares
     POST   /api/lessons/{lesson_id}/shares
     DELETE /api/lessons/{lesson_id}/shares/{mode}
+    POST   /api/invites
+    GET    /api/invites
+    DELETE /api/invites/{invite_id}
 """
 
 # Websockets: the guard needs a session, the route checks the role itself.

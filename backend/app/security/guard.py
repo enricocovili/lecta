@@ -34,7 +34,7 @@ PUBLIC_EXACT = {
     "/api/auth/logout",
     "/api/auth/me",
 }
-PUBLIC_PREFIXES = ("/api/public/",)
+PUBLIC_PREFIXES = ("/api/public/", "/api/invite/")  # not /api/invites: the admin's list
 
 
 def is_public(path: str) -> bool:

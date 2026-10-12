@@ -44,7 +44,7 @@ reasoning behind every change since.
 ## Boundaries
 
 * **Public/private boundary**: an ASGI guard in front of all routes returns 404 to anonymous callers for every `/api`
-  path that isn't explicitly public (`/api/public/*`, health, setup and auth endpoints), before routing. Every private
+  path that isn't explicitly public (`/api/public/*`, `/api/invite/*`, health, setup and auth endpoints), before routing. Every private
   route also depends on an access level: `require_user` (any signed-in user), `require_content` (everyone reads,
   editors write), `require_editor` or `require_admin`; a signed-in user below it gets 403. Private admin pages also
   404. `tests/test_boundary.py` sweeps every route × method anonymously; `tests/test_access.py` lists every route's
@@ -61,7 +61,10 @@ reasoning behind every change since.
   methods, login rate limiting, optional TOTP. **Passkeys** (WebAuthn, Settings → Account): add one with the
   fingerprint, a PIN or a password manager such as Bitwarden and the sign-in page offers «Accedi con una passkey» — no
   username, password or 2FA code (a passkey with user verification is both factors); the password stays as the
-  fallback. They need HTTPS (or localhost); the site's host is the relying party. `DECISIONS.md` has the details.
+  fallback. They need HTTPS (or localhost); the site's host is the relying party. **Invites**: there are no sign-ups;
+  an admin creates a single-use link with a role (`/api/invites`, shown once, seven days), and whoever opens it picks a
+  username and creates a passkey: the account has no password and can't remove its last passkey. `DECISIONS.md` has
+  the details.
 * **Model input and output**: uploaded content (including file and folder names) is wrapped in per-request random
   fences and prompts instruct models to treat it as data; model LaTeX is sanitised (no `\input`, `\write18`, preamble
   commands…) and compiled in the sandbox.

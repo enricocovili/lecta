@@ -51,20 +51,21 @@ MAX_PENDING = 500
 _pending: dict[str, dict[str, Any]] = {}
 
 
-def _remember(purpose: str, challenge: bytes, rp_id: str, origin: str, user_id: int | None = None) -> str:
+def _remember(purpose: str, challenge: bytes, rp_id: str, origin: str, user_id: int | None = None, bound: Any = None) -> str:
+    """Keep a ceremony's challenge; `_take` returns it only for the same purpose, user and `bound` (e.g. an invite and a username)."""
     now = time.monotonic()
     for k in [k for k, v in _pending.items() if v["exp"] < now]:
         del _pending[k]
     if len(_pending) >= MAX_PENDING:
         _pending.pop(next(iter(_pending)))
     state = secrets.token_urlsafe(24)
-    _pending[state] = {"purpose": purpose, "challenge": challenge, "rp_id": rp_id, "origin": origin, "user_id": user_id, "exp": now + CHALLENGE_TTL}
+    _pending[state] = {"purpose": purpose, "challenge": challenge, "rp_id": rp_id, "origin": origin, "user_id": user_id, "bound": bound, "exp": now + CHALLENGE_TTL}
     return state
 
 
-def _take(state: str, purpose: str, user_id: int | None = None) -> dict[str, Any]:
+def _take(state: str, purpose: str, user_id: int | None = None, bound: Any = None) -> dict[str, Any]:
     entry = _pending.pop(state, None)
-    if entry is None or entry["exp"] < time.monotonic() or entry["purpose"] != purpose or entry["user_id"] != user_id:
+    if entry is None or entry["exp"] < time.monotonic() or entry["purpose"] != purpose or entry["user_id"] != user_id or entry["bound"] != bound:
         raise HTTPException(status_code=400, detail="La richiesta è scaduta: riprova")
     return entry
 
@@ -163,6 +164,11 @@ async def passkey_delete(passkey_id: int, ctx: AuthContext = Depends(require_use
     pk = await db.get(Passkey, passkey_id)
     if pk is None or pk.user_id != ctx.user.id:
         raise HTTPException(status_code=404, detail="Not Found")
+    # A user without a password (an invited one) signs in only with passkeys: the last one can't go. The lock on the user
+    # keeps two deletions at once from removing the last two.
+    user = (await db.execute(select(User).where(User.id == ctx.user.id).with_for_update())).scalar_one()
+    if user.password_hash is None and len((await db.execute(select(Passkey.id).where(Passkey.user_id == user.id))).all()) <= 1:
+        raise HTTPException(status_code=409, detail="È l'unica passkey di questo account, che non ha una password: aggiungine un'altra prima di toglierla")
     await db.delete(pk)
     await db.commit()
     return {"ok": True}

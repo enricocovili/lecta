@@ -173,7 +173,9 @@ class TotpEnableIn(BaseModel):
 @router.post("/account/totp/setup")
 async def totp_setup(ctx: AuthContext = Depends(require_user), db: AsyncSession = Depends(get_db)) -> dict:
     user = await db.get(User, ctx.user.id)
-    assert user is not None and user.password_hash is not None
+    assert user is not None
+    if user.password_hash is None:
+        raise HTTPException(status_code=400, detail="Questo account entra solo con le passkey")
     if user.totp_enabled:
         raise HTTPException(status_code=400, detail="La verifica in due passaggi è già attiva")
     secret = auth.new_totp_secret()
