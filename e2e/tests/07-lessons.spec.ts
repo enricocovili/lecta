@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { login, watchConsole } from "./helpers";
 
 const EXPECTED = [/status of 404/, /status of 409/];
@@ -38,6 +38,20 @@ async function scribble(page: Page, index: number, from: [number, number], to: [
   await page.mouse.move(x((from[0] + to[0]) / 2), y(from[1] + 0.05), { steps: 6 });
   await page.mouse.move(x(to[0]), y(to[1]), { steps: 6 });
   await page.mouse.up();
+}
+
+/** Where a page is once it stays put: opening a lesson scrolls to the page last looked at, maybe after the test looked. */
+async function steadyBox(locator: Locator) {
+  await locator.scrollIntoViewIfNeeded();
+  let last = await locator.boundingBox();
+  for (let i = 0; i < 20; i++) {
+    await locator.page().waitForTimeout(150);
+    const now = await locator.boundingBox();
+    if (now && last && Math.abs(now.x - last.x) < 1 && Math.abs(now.y - last.y) < 1) return now;
+    last = now;
+    await locator.scrollIntoViewIfNeeded();
+  }
+  return last!;
 }
 
 /** The selection's turn button dragged a quarter turn clockwise around the middle of its box (between its corner handles). */
@@ -481,9 +495,7 @@ test.describe.serial("Lezioni", () => {
     await page.goto(`/admin/courses/${courseId}/lessons/1`);
     await page.getByTestId("tool-select").click();
     const row = page.getByTestId("lesson-page").nth(2);
-    const surface = row.getByTestId("ink-surface");
-    await surface.scrollIntoViewIfNeeded();
-    const box = (await surface.boundingBox())!;
+    const box = await steadyBox(row.getByTestId("ink-surface"));
     await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.55);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.85, { steps: 8 });
