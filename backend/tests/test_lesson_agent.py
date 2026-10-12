@@ -75,6 +75,9 @@ async def test_a_question_sees_the_pages_around_it_and_the_whole_lesson(admin):
     assert stored[0]["scope"] == {"page_id": page["id"], "mode": "ask"}
     # Nothing can be undone: nothing was changed.
     assert (await admin.post(f"/api/chat/replies/{reply['id']}/undo")).status_code == 409
+    # The next question stands alone: the earlier turn is not sent with it.
+    reply, _ = await _ask(admin, s, "E questa?", page_id=lesson["pages"][3]["id"])
+    assert reply["status"] == "done" and "[p. 4] Slide 4" in reply["content"] and "Prima di questa domanda" not in reply["content"]
 
 
 async def test_it_looks_at_another_page_and_reads_the_chapter(admin):

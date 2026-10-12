@@ -4,7 +4,7 @@ nothing in the course or the lesson is changed (the student brings an answer int
 Every question comes with the whole lesson in the prompt (each page's slide text, typed notes, whether it carries
 handwriting) and the pictures of the pages from ten before to ten after the one asked about, with the strokes drawn on them
 (the asked page at full size), and a sharp cut of the area the user picked on it, if any; the model looks at any other page
-with view_page and reads the lesson's chapter.
+with view_page and reads the lesson's chapter. A question stands alone: the earlier turns of the conversation are not sent.
 """
 
 from __future__ import annotations
@@ -61,7 +61,8 @@ async def _prepare(turn: agent.Turn, user_msg_id: int) -> agent.Bench:
         ai = await settings_svc.get_section(db, "ai")
         nonce = gate.new_nonce()
         base, _ = await prompts.render(db, "lesson.system", nonce)
-        messages = await agent._history(db, session.id, user_msg.id)
+        # Every question stands alone (the editor asks one at a time, in a popup on the page): no earlier turns go with it.
+        messages: list[Message] = []
         session_id, lesson_id, language = session.id, session.lesson_id, course.language
     ctx = tools.LessonContext(lesson_id=lesson_id, course_id=session.course_id, nonce=nonce)
     lesson, pages = await tools.load(lesson_id)

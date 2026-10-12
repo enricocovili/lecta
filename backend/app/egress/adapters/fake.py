@@ -347,5 +347,6 @@ class FakeAdapter(Adapter):
             seen += f" e l'area scelta ({m['area']})"
         page = m.get("page") or "nessuna pagina"
         outline = "Student's notes:" in req.system
+        before = f" Prima di questa domanda: {len(req.messages) - 1} messaggi." if len(req.messages) > 1 else ""
         return done(f"Domanda su {page}: ho {seen} e la lezione intera ({m.get('pages')} pagine{', con gli appunti' if outline else ''}). "
-                    "Il passaggio si spiega così: $f_s > 2B$, perché ogni replica dello spettro non deve sovrapporsi." + suggestions)
+                    "Il passaggio si spiega così: $f_s > 2B$, perché ogni replica dello spettro non deve sovrapporsi." + before + suggestions)
