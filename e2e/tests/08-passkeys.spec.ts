@@ -13,6 +13,15 @@ async function virtualAuthenticator(context: BrowserContext, page: Page) {
   });
 }
 
+const PASSWORD = "password-della-collega";
+
+/** Fill the invite page's form: the username (not on a recovery link) and the password twice. */
+async function fillInvite(p: Page, username: string | null, password = PASSWORD) {
+  if (username !== null) await p.getByLabel("Nome utente").fill(username);
+  await p.getByTestId("invite-password").fill(password);
+  await p.getByTestId("invite-password2").fill(password);
+}
+
 /** A new account with this role, from an invite the admin (signed in on `admin`) makes, signed in in its own browser. */
 async function invited(admin: Page, browser: Browser, baseURL: string, role: string, username: string) {
   const path = await admin.evaluate(async (role) => {
@@ -22,9 +31,8 @@ async function invited(admin: Page, browser: Browser, baseURL: string, role: str
   }, role);
   const context = await browser.newContext({ baseURL });
   const p = await context.newPage();
-  await virtualAuthenticator(context, p);
   await p.goto(path);
-  await p.getByLabel("Nome utente").fill(username);
+  await fillInvite(p, username);
   await p.getByTestId("invite-accept").click();
   await p.waitForURL("**/admin", { timeout: 20_000 });
   return { context, p };
@@ -66,7 +74,7 @@ test.describe("Passkey", () => {
     con.assertClean([/status of 401/]);
   });
 
-  test("an invite link makes an account with a passkey, once", async ({ page, browser, baseURL }) => {
+  test("an invite link makes an account with a password and, if wanted, a passkey, once", async ({ page, browser, baseURL }) => {
     test.setTimeout(120_000);
     // The admin makes an invite in Settings → Utenti: the link is shown once.
     await login(page);
@@ -94,12 +102,18 @@ test.describe("Passkey", () => {
     await expect(guest.getByTestId("invite-note")).toHaveText("Per la collega di Analisi");
     await expect(guest.getByTestId("invite-form")).not.toContainText("accesso come");
 
-    // A taken username is said on the spot, and the link stays usable.
-    await guest.getByLabel("Nome utente").fill(USER);
+    // Passwords that differ, or a taken username, are said on the spot, and the link stays usable.
+    await fillInvite(guest, "collega");
+    await guest.getByTestId("invite-password2").fill("un'altra-password");
+    await guest.getByTestId("invite-accept").click();
+    await expect(guest.getByRole("alert")).toContainText("non coincidono");
+    await fillInvite(guest, USER);
     await guest.getByTestId("invite-accept").click();
     await expect(guest.getByRole("alert")).toContainText("già in uso");
 
-    await guest.getByLabel("Nome utente").fill("collega");
+    // The passkey is optional: this time the colleague wants one too.
+    await fillInvite(guest, "collega");
+    await guest.getByTestId("invite-with-passkey").check();
     await guest.getByTestId("invite-accept").click();
     await guest.waitForURL("**/admin", { timeout: 20_000 });
     await expect(guest.locator("body")).not.toContainText("404");
@@ -111,11 +125,12 @@ test.describe("Passkey", () => {
     await expect(guest.getByRole("heading", { name: "Pagina non trovata" })).toBeVisible();
     con.assertClean([/status of 409/, /status of 404/]);
 
-    // The admin sees the new account (passkey only) and the invite gone; disabling it signs the colleague out.
+    // The admin sees the new account (a password and a passkey) and the invite gone; disabling it signs the colleague out.
     await page.goto("/admin/settings#users");
     await expect(page.getByTestId("invite-row")).toHaveCount(0);
     const row = page.getByTestId("user-row").filter({ hasText: "collega" });
-    await expect(row).toContainText("solo passkey");
+    await expect(row).toContainText("1 passkey");
+    await expect(row).not.toContainText("solo passkey");
     await expect(row.getByTestId("user-role")).toHaveValue("editor");
     await row.getByTestId("user-disable").click();
     await page.keyboard.press("Enter");
@@ -124,7 +139,7 @@ test.describe("Passkey", () => {
     await row.getByTestId("user-enable").click();
     await expect(row).not.toContainText("disattivato");
 
-    // The colleague signs in again with the passkey, then loses the device: the admin makes a recovery link.
+    // The colleague signs in again with the passkey, then forgets the password and loses the device: the admin makes a recovery link.
     await guest.goto("/login");
     await guest.getByTestId("passkey-login").click();
     await guest.waitForURL("**/admin", { timeout: 20_000 });
@@ -133,15 +148,15 @@ test.describe("Passkey", () => {
     const recovery = new URL(await row.getByTestId("recovery-url").inputValue()).pathname;
     await expect(page.getByTestId("invite-row")).toContainText("Recupero di collega");
 
-    // A new browser with a new authenticator: no username asked, the new passkey signs in as the colleague.
+    // A new browser: no username asked, a new password signs in as the colleague.
     const fresh = await browser.newContext({ baseURL });
     const device = await fresh.newPage();
     const con2 = watchConsole(device);
-    await virtualAuthenticator(fresh, device);
     await device.goto(recovery);
     await expect(device.getByTestId("invite-form")).toContainText("Recupera l'accesso come collega");
     await expect(device.getByLabel("Nome utente")).toHaveCount(0);
-    await device.getByRole("button", { name: "Crea una nuova passkey" }).click();
+    await fillInvite(device, null, "nuova-password-della-collega");
+    await device.getByRole("button", { name: "Imposta la password ed entra" }).click();
     await device.waitForURL("**/admin", { timeout: 20_000 });
     expect(await device.evaluate(async () => (await (await fetch("/api/auth/me")).json()).username)).toBe("collega");
     // The lost device is signed out, the link is used up and gone from the pending list.
@@ -149,8 +164,15 @@ test.describe("Passkey", () => {
     expect((await device.goto(recovery))?.status()).toBe(404);
     con2.assertClean([/status of 404/]);
     await page.reload();
-    await expect(page.getByTestId("user-row").filter({ hasText: "collega" })).toContainText("2 passkey");
     await expect(page.getByTestId("invite-row")).toHaveCount(0);
+    // The new password signs in from the login page; the passkey is still there.
+    await fresh.clearCookies();
+    await device.goto("/login");
+    await device.getByLabel("Nome utente").fill("collega");
+    await device.getByLabel("Password").fill("nuova-password-della-collega");
+    await device.getByRole("button", { name: "Accedi", exact: true }).click();
+    await device.waitForURL("**/admin", { timeout: 20_000 });
+    await expect(page.getByTestId("user-row").filter({ hasText: "collega" })).toContainText("1 passkey");
     await fresh.close();
     await other.close();
   });
@@ -180,10 +202,11 @@ test.describe("Passkey", () => {
     await expect(reader.locator("#user-menu")).not.toContainText("AI e costi");
     await reader.goto("/admin/settings#providers");
     await expect(reader.getByRole("tab")).toHaveText(["Account", "Backup"]);
-    await expect(reader.getByRole("tabpanel")).toContainText("Lettore · accesso con passkey");
+    // Invited with a password: they change it, add passkeys and 2FA like anyone.
+    await expect(reader.getByRole("tabpanel")).toContainText("Lettore · accesso con password");
     await expect(reader.getByTestId("passkeys")).toBeVisible();
-    await expect(reader.getByRole("button", { name: "Cambia password" })).toHaveCount(0);
-    await expect(reader.getByRole("button", { name: "Configura la 2FA" })).toHaveCount(0);
+    await expect(reader.getByRole("button", { name: "Cambia password" })).toBeVisible();
+    await expect(reader.getByRole("button", { name: "Configura la 2FA" })).toBeVisible();
     // An admin page is an address like any unknown one.
     const audit = await reader.goto("/admin/audit");
     expect(audit?.status()).toBe(404);

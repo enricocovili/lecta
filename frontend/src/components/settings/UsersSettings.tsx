@@ -111,7 +111,7 @@ export default function UsersSettings() {
     }
   };
 
-  /** A recovery link for a user who lost their passkey, shown once under their row. */
+  /** A recovery link for a user who lost their password or passkey, shown once under their row. */
   const createRecovery = (u: UserRow) =>
     act(u, async () => {
       const inv = await post<InviteRow & { path: string }>(`/api/users/${u.id}/recovery`);
@@ -132,7 +132,7 @@ export default function UsersSettings() {
       >
         <div className="set-stack" style={{ gap: ".9rem" }}>
           <p className="set-help" style={{ margin: 0 }}>
-            Non ci si iscrive da soli: chi apre il link sceglie un nome utente e crea una passkey, senza password. Il link vale sette giorni e una volta sola.
+            Non ci si iscrive da soli: chi apre il link sceglie un nome utente e una password, e se vuole crea anche una passkey. Il link vale sette giorni e una volta sola.
           </p>
           <div className="form-grid">
             <label className="field">
@@ -257,7 +257,7 @@ export default function UsersSettings() {
                   className="btn sm ghost"
                   type="button"
                   disabled={busy === u.id || !!u.disabled_at}
-                  title="Un link per creare una nuova passkey, se ha perso la sua"
+                  title="Un link per scegliere una nuova password, se ha perso la sua o la passkey"
                   onClick={() => createRecovery(u)}
                   data-testid="user-recovery"
                 >
@@ -279,7 +279,7 @@ export default function UsersSettings() {
               {recovery?.userId === u.id && (
                 <div className="set-user-link">
                   <OneTimeLink url={recovery.url} label={`Link di recupero di ${u.username}`} onDone={() => setRecovery(null)} testid="recovery">
-                    Manda il link a {u.username}: aprendolo crea una nuova passkey per il suo account ed esce dagli altri dispositivi. Vale sette giorni e una volta
+                    Manda il link a {u.username}: aprendolo sceglie una nuova password per il suo account ed esce dagli altri dispositivi. Vale sette giorni e una volta
                     sola; non lo mostreremo più.
                   </OneTimeLink>
                 </div>

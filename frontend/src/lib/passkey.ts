@@ -63,14 +63,6 @@ export async function registerPasskey(name: string): Promise<void> {
   await post("/api/account/passkeys", { state, name, credential: await createCredential(options) });
 }
 
-/** Accept an invite: make the account `username` with a passkey (a recovery link, with no username, adds one to its
- * user); the server signs it in. */
-export async function acceptInvite(token: string, username?: string): Promise<void> {
-  const path = `/api/invite/${encodeURIComponent(token)}`;
-  const { state, options } = await post<Options>(`${path}/options`, { username });
-  await post(`${path}/accept`, { state, username, credential: await createCredential(options) });
-}
-
 /** Sign in with a passkey: the browser (or the password manager) offers the ones it holds for this site. */
 export async function signInWithPasskey(): Promise<void> {
   const { state, options } = await post<Options>("/api/auth/passkey/options");

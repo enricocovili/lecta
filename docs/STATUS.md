@@ -136,7 +136,7 @@ Done in 17 steps (#70–#86, DECISIONS 114–130); the plan that guided them is 
 deleted with the last step).
 
 * **Accounts**: `users` with a role (Lettore, Autore, Amministratore) and a disabled flag; no sign-ups: an admin makes
-  invite links (passkey only, seven days, once) and recovery links in Settings → Utenti.
+  invite links (username and password, an optional passkey, seven days, once) and recovery links (a new password) in Settings → Utenti.
 * **Content per owner**: every course has an owner; editors see their own and everyone's published courses, viewers
   and admins everything; others' lessons and labs are never an editor's. Jobs, conversations, search, the assistant's
   retrieval and the costs follow the user. Whoever may not change something reads it, with no tools.

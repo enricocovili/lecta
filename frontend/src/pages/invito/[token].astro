@@ -1,6 +1,6 @@
 ---
-// An invite link: whoever opens it picks a username and makes a passkey, and the account exists (decision 121); a recovery
-// link adds a new passkey to the user it was made for (decision 123). It works signed out; an unknown, used, revoked or
+// An invite link: whoever opens it picks a username and a password (a passkey is optional), and the account exists
+// (decisions 121, 132); a recovery link sets a new password for the user it was made for (decisions 123, 132). It works signed out; an unknown, used, revoked or
 // expired link is the generic 404, like any address that doesn't exist. The secret is in the address: noindex (Base),
 // same-origin referrer, never cached.
 import Base from "../../layouts/Base.astro";

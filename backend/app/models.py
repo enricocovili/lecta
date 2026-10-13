@@ -39,7 +39,8 @@ ROLES = ("viewer", "editor", "admin")  # each one can do what the ones before it
 
 
 class User(Base):
-    """A person who signs in. The first admin has a password (and optional TOTP); invited users only passkeys."""
+    """A person who signs in, with a password (and optional TOTP) and any passkeys; a user invited before the invites asked
+    for a password has only passkeys until they set one."""
 
     __tablename__ = "users"
     __table_args__ = (CheckConstraint("role IN ('viewer', 'editor', 'admin')", name="ck_users_role"),)
@@ -87,7 +88,7 @@ class Session(Base):
 
 
 class Invite(Base):
-    """A link that lets someone create an account (with a passkey) with the role an admin chose. Shown once: only the
+    """A link that lets someone create an account (a username and a password) with the role an admin chose. Shown once: only the
     sha256 of its token is stored. Single use, it expires; `user_id` binds a recovery link to an existing user."""
 
     __tablename__ = "invites"

@@ -25,7 +25,7 @@ publishes a host port, and nothing else is attached to `webnet`. The services an
 2. Open the site: you are redirected to `/setup`. Enter the code, then choose the admin username and password.
 3. Everything else (providers, prompts, LaTeX template, limits, …) is set from **Settings** in the browser.
 4. Further accounts come from invite links: Settings → **Utenti** → *Nuovo invito* (role and an optional note) gives a
-   link shown once, valid seven days; whoever opens it picks a username and creates a passkey. The same section changes
+   link shown once, valid seven days; whoever opens it picks a username and a password, and may add a passkey. The same section changes
    roles, disables, signs out and deletes users.
 
 Internal secrets (DB password, encryption key for API keys, setup code) are generated on first boot and stored in the
@@ -93,6 +93,6 @@ docker compose exec backend python -m app.cli logout-all       # everybody's ses
 They act on the only admin; with several admins, or for another account, add `--user NAME` (`logout-all --user NAME`
 signs out only that user).
 
-A user who lost their passkey (invited users have no password) doesn't need the shell: an admin opens Settings →
-Utenti and clicks «Link di recupero» on their row. The link (shown once, seven days, single use) lets them create a new
-passkey for the same account, and signs out their other browsers.
+A user who lost their password or passkey doesn't need the shell: an admin opens Settings → Utenti and clicks «Link di
+recupero» on their row. The link (shown once, seven days, single use) lets them choose a new password for the same
+account (their passkeys stay), and signs out their other browsers.

@@ -808,3 +808,16 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      and may remove their last passkey; the other sessions are signed out, as on every password change. This replaces
      the «no password for invited users» part of 120 and 124. *Alternative:* asking an admin for a recovery link to get
      a password (a detour for someone already signed in).
+132. **An invite link asks for a username and a password, a recovery link for a new password; a passkey is optional,
+     made right after.** `POST /api/invite/{token}/accept` takes `username` (not for a recovery link) and `password`
+     (12 characters at least, like everywhere): accepting consumes the link as before (one transaction, conditional
+     `UPDATE`, a taken username rolls back and leaves the link usable) and creates the user with that password, or, on a
+     recovery link, replaces the user's password, signs out all their sessions and keeps their passkeys. The passkey
+     ceremony is gone from the invite routes: the page offers «Crea anche una passkey» and, once signed in, makes it
+     through the user's own `/api/account/passkeys` routes; a cancelled prompt leaves the account made, says so and
+     points to Account. This replaces the passkey-only accounts of 120, 121 and 123: a password works on every device
+     and browser (a passkey needs a recent one, and HTTPS), and someone who lost their passkey or forgot their password
+     gets back in the same way. Users invited before keep their passkeys and set a password from Account (131).
+     *Alternatives:* password or passkey, one of the two (two kinds of account, and recovery would depend on which);
+     the passkey ceremony inside the accept transaction (the invite routes would keep a second copy of registration for
+     an optional step).

@@ -75,16 +75,16 @@ reasoning behind every change since.
   hold the readers' open notes, to accept, reject or resolve. `/api/courses` and `/api/dashboard` count the open notes
   (`open_notes`) only on the courses the user may change.
 * **Sessions**: accounts live in `users`, each with a role (`viewer`, `editor`, `admin`) and possibly disabled (a
-  disabled user's sessions stop working); argon2id password (optional: invited users have only passkeys), httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe
+  disabled user's sessions stop working); argon2id password (missing only for users invited before invites asked for one; they set it from Account), httpOnly SameSite=Lax cookie (Secure over HTTPS), CSRF token required for unsafe
   methods, login rate limiting, optional TOTP. **Passkeys** (WebAuthn, Settings → Account): add one with the
   fingerprint, a PIN or a password manager such as Bitwarden and the sign-in page offers «Accedi con una passkey» — no
   username, password or 2FA code (a passkey with user verification is both factors); the password stays as the
   fallback. They need HTTPS (or localhost); the site's host is the relying party. **Invites**: there are no sign-ups;
   an admin creates a single-use link with a role (`/api/invites`, shown once, seven days), and whoever opens it
-  (`/invito/<token>`, public; a used or expired link is the generic 404) picks a username and creates a passkey: the
-  account has no password and can't remove its last passkey. A **recovery link** (made from «Utenti» for a user who
-  lost their passkey) is the same kind of link bound to that user: it adds a passkey to them and signs out their other
-  sessions. **Users** (Settings → Utenti, `/api/users`, admins):
+  (`/invito/<token>`, public; a used or expired link is the generic 404) picks a username and a password, and may
+  make a passkey right after (the signed-in user's own passkey routes). A user without a password can't remove their
+  last passkey. A **recovery link** (made from «Utenti» for a user who lost their password or passkey) is the same kind
+  of link bound to that user: it sets a new password and signs out their other sessions. **Users** (Settings → Utenti, `/api/users`, admins):
   change role, disable (drops the sessions), sign out everywhere, delete only without courses; the last active admin
   can't be demoted, disabled or deleted (checked under an advisory lock). `DECISIONS.md` has the details.
 * **Model input and output**: uploaded content (including file and folder names) is wrapped in per-request random

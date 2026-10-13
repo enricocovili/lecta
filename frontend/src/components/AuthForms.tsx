@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ApiError, post } from "../lib/api";
-import { acceptInvite, passkeyError, passkeysSupported, signInWithPasskey } from "../lib/passkey";
+import { passkeyError, passkeysSupported, registerPasskey, signInWithPasskey } from "../lib/passkey";
 import { ROLE_HINT, ROLE_LABEL, type Role } from "../lib/roles";
 import { Icon } from "./icons";
 
@@ -239,124 +239,155 @@ export interface InviteInfo {
   role: Role;
   note: string | null;
   expires_at: string;
-  /** A recovery link: a new passkey for the existing user `username`, who lost theirs. */
+  /** A recovery link: a new password for the existing user `username`, who lost theirs (or their passkey). */
   recovery: boolean;
   username: string | null;
 }
 
-/** The page of an invite link: pick a username, make a passkey, and the account exists (and is signed in). A recovery
- * link asks no username: the passkey is added to its user, who is signed in. */
+/** The page of an invite link: pick a username and a password, and the account exists (and is signed in). A recovery link
+ * asks no username: the password is set for its user, who is signed in. Either may also make a passkey right after. */
 export function InviteForm({ token, invite, signedInAs }: { token: string; invite: InviteInfo; signedInAs?: string }) {
   const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [withPasskey, setWithPasskey] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Known only in the browser (the page is rendered on the server first); assume yes until then, so the button doesn't flicker.
-  const [canPasskey, setCanPasskey] = useState(true);
+  // Signed in, but the passkey wasn't made: say so and let them go on.
+  const [noPasskey, setNoPasskey] = useState<string | null>(null);
+  // Known only in the browser (the page is rendered on the server first): set after the first render.
+  const [canPasskey, setCanPasskey] = useState(false);
   useEffect(() => setCanPasskey(passkeysSupported()), []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password !== password2) return setError("Le password non coincidono");
     setBusy(true);
     setError(null);
     try {
-      await acceptInvite(token, invite.recovery ? undefined : username);
-      location.href = "/admin";
+      await post(`/api/invite/${encodeURIComponent(token)}/accept`, { username: invite.recovery ? undefined : username, password });
     } catch (err) {
       // The link was used, revoked or expired while the page was open.
       const gone = invite.recovery ? "Questo link non è più valido: chiedine uno nuovo all'amministratore." : "Questo invito non è più valido: chiedine uno nuovo a chi te l'ha mandato.";
-      setError(err instanceof ApiError && err.status === 404 ? gone : passkeyError(err));
+      setError(err instanceof ApiError && err.status === 404 ? gone : err instanceof Error ? err.message : String(err));
       setBusy(false);
+      return;
     }
+    if (withPasskey && canPasskey) {
+      try {
+        await registerPasskey("");
+      } catch (err) {
+        setNoPasskey(passkeyError(err));
+        setBusy(false);
+        return;
+      }
+    }
+    location.href = "/admin";
   };
 
-  const expires = new Date(invite.expires_at).toLocaleDateString("it-IT", { day: "numeric", month: "long" });
-  const unsupported = (
-    <div className="alert warn">
-      <Icon name="alert-circle" />
-      <span>Questo browser non supporta le passkey: apri il link con un browser recente (Chrome, Safari, Firefox, Edge).</span>
-    </div>
-  );
-  if (invite.recovery)
+  if (noPasskey)
     return (
-      <form className="card auth-card" onSubmit={submit} data-testid="invite-form">
-        <h1 className="auth-title">Recupera l'accesso</h1>
-        <p className="auth-sub">
-          Recupera l'accesso come <strong data-testid="invite-username">{invite.username}</strong>: crea una nuova passkey per il tuo account.
-        </p>
-        {signedInAs && signedInAs !== invite.username && (
-          <div className="alert warn">
-            <Icon name="alert-circle" />
-            <span>
-              Hai già effettuato l'accesso come <strong>{signedInAs}</strong>: continuando entrerai come {invite.username}.
-            </span>
-          </div>
-        )}
-        <FormError error={error} />
-        {canPasskey ? (
-          <>
-            <button className="btn primary lg auth-submit" disabled={busy} type="submit" data-testid="invite-accept">
-              <Icon name="key" />
-              {busy ? "Creazione in corso…" : "Crea una nuova passkey"}
-            </button>
-            <p className="auth-foot">
-              Le passkey che hai già restano valide; gli altri dispositivi su cui eri entrato escono. Il link vale fino al {expires} e si usa una volta sola.
-            </p>
-          </>
-        ) : (
-          unsupported
-        )}
-      </form>
+      <div className="card auth-card" data-testid="invite-form">
+        <h1 className="auth-title">{invite.recovery ? "Accesso recuperato" : "Account creato"}</h1>
+        <div className="alert warn" data-testid="invite-no-passkey">
+          <Icon name="alert-circle" />
+          <span>La passkey non è stata creata ({noPasskey}). Entri con la password; puoi aggiungerla quando vuoi da Impostazioni → Account.</span>
+        </div>
+        <a className="btn primary lg auth-submit" href="/admin">
+          Continua
+          <Icon name="arrow-right" />
+        </a>
+      </div>
     );
+
+  const expires = new Date(invite.expires_at).toLocaleDateString("it-IT", { day: "numeric", month: "long" });
   return (
     <form className="card auth-card" onSubmit={submit} data-testid="invite-form">
-      <h1 className="auth-title">Sei invitato</h1>
-      <p className="auth-sub">
-        Crea il tuo account come <strong data-testid="invite-role">{ROLE_LABEL[invite.role]}</strong>. {ROLE_HINT[invite.role]}
-      </p>
-      {invite.note && (
-        <div className="alert accent" data-testid="invite-note">
-          <Icon name="info" />
-          <span>{invite.note}</span>
-        </div>
+      {invite.recovery ? (
+        <>
+          <h1 className="auth-title">Recupera l'accesso</h1>
+          <p className="auth-sub">
+            Recupera l'accesso come <strong data-testid="invite-username">{invite.username}</strong>: scegli una nuova password per il tuo account.
+          </p>
+        </>
+      ) : (
+        <>
+          <h1 className="auth-title">Sei invitato</h1>
+          <p className="auth-sub">
+            Crea il tuo account come <strong data-testid="invite-role">{ROLE_LABEL[invite.role]}</strong>. {ROLE_HINT[invite.role]}
+          </p>
+          {invite.note && (
+            <div className="alert accent" data-testid="invite-note">
+              <Icon name="info" />
+              <span>{invite.note}</span>
+            </div>
+          )}
+        </>
       )}
-      {signedInAs && (
+      {signedInAs && (!invite.recovery || signedInAs !== invite.username) && (
         <div className="alert warn">
           <Icon name="alert-circle" />
           <span>
-            Hai già effettuato l'accesso come <strong>{signedInAs}</strong>: creando l'account entrerai con quello nuovo.
+            Hai già effettuato l'accesso come <strong>{signedInAs}</strong>:{" "}
+            {invite.recovery ? `continuando entrerai come ${invite.username}.` : "creando l'account entrerai con quello nuovo."}
           </span>
         </div>
       )}
       <FormError error={error} />
-      {canPasskey ? (
-        <>
-          <label className="field">
-            Nome utente <span className="hint">lettere, numeri e . _ @ -</span>
-            <input
-              type="text"
-              autoComplete="username"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              maxLength={64}
-              pattern="[A-Za-z0-9._@\-]+"
-              autoFocus
-            />
-          </label>
-          <button className="btn primary lg auth-submit" disabled={busy} type="submit" data-testid="invite-accept">
-            <Icon name="key" />
-            {busy ? "Creazione in corso…" : "Crea la passkey"}
-          </button>
-          <p className="auth-foot">
-            Niente password: entrerai con l'impronta, il PIN del dispositivo o il tuo gestore di password. Il link vale fino al {expires} e
-            si usa una volta sola.
-          </p>
-        </>
+      {invite.recovery ? (
+        // For password managers: the account the new password belongs to.
+        <input type="text" autoComplete="username" value={invite.username ?? ""} readOnly hidden />
       ) : (
-        unsupported
+        <label className="field">
+          Nome utente <span className="hint">lettere, numeri e . _ @ -</span>
+          <input
+            type="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            maxLength={64}
+            pattern="[A-Za-z0-9._@\-]+"
+            autoFocus
+            data-testid="invite-username-input"
+          />
+        </label>
       )}
+      <label className="field">
+        {invite.recovery ? "Nuova password" : "Password"} <span className="hint">almeno 12 caratteri</span>
+        <input
+          type="password"
+          autoComplete="new-password"
+          minLength={12}
+          maxLength={1024}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          autoFocus={invite.recovery}
+          data-testid="invite-password"
+        />
+      </label>
+      <label className="field">
+        Ripeti la password
+        <input type="password" autoComplete="new-password" minLength={12} maxLength={1024} value={password2} onChange={(e) => setPassword2(e.target.value)} required data-testid="invite-password2" />
+      </label>
+      {canPasskey && (
+        <label className="check small">
+          <input type="checkbox" checked={withPasskey} onChange={(e) => setWithPasskey(e.target.checked)} data-testid="invite-with-passkey" />
+          Crea anche una passkey, per entrare con l'impronta, il PIN o il gestore di password
+        </label>
+      )}
+      <button className="btn primary lg auth-submit" disabled={busy} type="submit" data-testid="invite-accept">
+        {busy ? (invite.recovery ? "Salvataggio…" : "Creazione in corso…") : invite.recovery ? "Imposta la password ed entra" : "Crea l'account"}
+      </button>
+      <p className="auth-foot">
+        {invite.recovery
+          ? "La password di prima non vale più; le passkey che hai restano valide e gli altri dispositivi su cui eri entrato escono."
+          : "La passkey è facoltativa: puoi aggiungerla anche dopo, da Impostazioni → Account."}{" "}
+        Il link vale fino al {expires} e si usa una volta sola.
+      </p>
     </form>
   );
 }
