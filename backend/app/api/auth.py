@@ -145,7 +145,7 @@ async def me(request: Request, response: Response, db: AsyncSession = Depends(ge
 
 
 class PasswordIn(BaseModel):
-    current_password: str = Field(max_length=1024)
+    current_password: str = Field("", max_length=1024)  # not asked of a user who has no password yet
     new_password: str = Field(min_length=12, max_length=1024)
 
 
@@ -157,11 +157,10 @@ async def change_password(
     ctx: AuthContext = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    """Changes the password, or sets the first one of a user who signed in with a passkey (no current password to give)."""
     user = await db.get(User, ctx.user.id)
     assert user is not None
-    if user.password_hash is None:
-        raise HTTPException(status_code=400, detail="Questo account entra solo con le passkey")
-    if not auth.verify_password(user.password_hash, body.current_password):
+    if user.password_hash is not None and not auth.verify_password(user.password_hash, body.current_password):
         raise HTTPException(status_code=400, detail="La password attuale è sbagliata")
     user.password_hash = auth.hash_password(body.new_password)
     user.password_changed_at = datetime.now(UTC)

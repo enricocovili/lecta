@@ -53,7 +53,7 @@ export default function SettingsPage({ role, hasPassword }: { role?: Role; hasPa
   };
   const cur = sections.find((s) => s.key === tab)!;
   const sub =
-    cur.key === "account" && !hasPassword ? "Passkey e sessioni attive." : cur.key === "backup" && !isAdmin(role) ? "Esportazione delle materie." : cur.sub;
+    cur.key === "account" && !hasPassword ? "Password, passkey e sessioni attive." : cur.key === "backup" && !isAdmin(role) ? "Esportazione delle materie." : cur.sub;
   return (
     <div className="set-page">
       <div className="page-head">

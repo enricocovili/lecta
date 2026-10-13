@@ -801,3 +801,10 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      and the courses page show it, «N note aperte», as a link to the draft. *Alternatives:* showing closed notes folded
      under the open ones (the history is the author's; the writer would scroll past what is done); a notes panel beside
      the draft (the same reason as 129); a notification when a note arrives (an idea on the board, with replies).
+131. **A user who signs in only with passkeys may set a password from Account, without a current one.** The «Password»
+     card of Settings → Account is there for everyone: a user with a password changes it (the current one asked), a
+     user without one sets it (`POST /api/account/password` with no `current_password`): signing in with a passkey is
+     already two factors, so it is proof enough. From then on the user signs in with the password too, may set up 2FA
+     and may remove their last passkey; the other sessions are signed out, as on every password change. This replaces
+     the «no password for invited users» part of 120 and 124. *Alternative:* asking an admin for a recovery link to get
+     a password (a detour for someone already signed in).

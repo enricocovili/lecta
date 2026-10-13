@@ -51,7 +51,8 @@ function describeUA(ua: string | null): string {
   return os ? `${browser} · ${os}` : browser;
 }
 
-/** `hasPassword` false: an invited user, who signs in only with passkeys (no password to change, no 2FA). */
+/** `hasPassword` false: a user who signs in only with passkeys; they may set a password (no current one to give), and
+ * then get 2FA too. */
 export default function AccountSettings({ role, hasPassword }: { role?: Role; hasPassword: boolean }) {
   const me = useApi(() => get<Me>("/api/auth/me"));
   const sessions = useApi(() => get<SessionRow[]>("/api/account/sessions"));
@@ -100,6 +101,8 @@ export default function AccountSettings({ role, hasPassword }: { role?: Role; ha
     if (pw.new_password !== pw.repeat) return toast("Le password non coincidono", "error");
     try {
       await post("/api/account/password", { current_password: pw.current_password, new_password: pw.new_password });
+      // The first password changes what the page offers (2FA, the passkeys' wording): read it again.
+      if (!hasPassword) return location.reload();
       setPw({ current_password: "", new_password: "", repeat: "" });
       toast("Password cambiata; le altre sessioni sono state disconnesse");
       sessions.reload();
@@ -130,17 +133,17 @@ export default function AccountSettings({ role, hasPassword }: { role?: Role; ha
         {hasPassword && me.data && (me.data.totp_enabled ? <StatusPill tone="ok" label="2FA attiva" size="sm" /> : <StatusPill tone="warn" label="2FA non attiva" size="sm" />)}
       </div>
 
-      {hasPassword && (
-        <form onSubmit={changePassword}>
-          <SetCard
-            title="Password"
-            actions={
-              <button className="btn primary" type="submit" disabled={!pw.current_password || pw.new_password.length < 12}>
-                Cambia password
-              </button>
-            }
-          >
-            <div className="form-grid">
+      <form onSubmit={changePassword} data-testid="password-form">
+        <SetCard
+          title="Password"
+          actions={
+            <button className="btn primary" type="submit" disabled={(hasPassword && !pw.current_password) || pw.new_password.length < 12}>
+              {hasPassword ? "Cambia password" : "Imposta la password"}
+            </button>
+          }
+        >
+          <div className="form-grid">
+            {hasPassword && (
               <label className="field">
                 Password attuale
                 <input
@@ -150,19 +153,23 @@ export default function AccountSettings({ role, hasPassword }: { role?: Role; ha
                   onChange={(e) => setPw({ ...pw, current_password: e.target.value })}
                 />
               </label>
-              <label className="field">
-                Nuova password <span className="hint">almeno 12 caratteri</span>
-                <input type="password" autoComplete="new-password" minLength={12} value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} />
-              </label>
-              <label className="field">
-                Ripeti la nuova password
-                <input type="password" autoComplete="new-password" minLength={12} value={pw.repeat} onChange={(e) => setPw({ ...pw, repeat: e.target.value })} />
-              </label>
-            </div>
-            <p className="set-help">Cambiando la password vengono chiuse tutte le altre sessioni.</p>
-          </SetCard>
-        </form>
-      )}
+            )}
+            <label className="field">
+              {hasPassword ? "Nuova password" : "Password"} <span className="hint">almeno 12 caratteri</span>
+              <input type="password" autoComplete="new-password" minLength={12} value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} />
+            </label>
+            <label className="field">
+              {hasPassword ? "Ripeti la nuova password" : "Ripeti la password"}
+              <input type="password" autoComplete="new-password" minLength={12} value={pw.repeat} onChange={(e) => setPw({ ...pw, repeat: e.target.value })} />
+            </label>
+          </div>
+          <p className="set-help">
+            {hasPassword
+              ? "Cambiando la password vengono chiuse tutte le altre sessioni."
+              : "Entri solo con le passkey: con una password potrai entrare anche da un dispositivo che non le ha, e attivare la verifica in due passaggi. Le altre sessioni vengono chiuse."}
+          </p>
+        </SetCard>
+      </form>
 
       <SetCard title={`Passkey · accesso senza password${passkeyList.length ? ` · ${passkeyList.length}` : ""}`}>
         <div className="set-stack" style={{ gap: ".9rem" }} data-testid="passkeys">

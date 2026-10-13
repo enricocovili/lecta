@@ -232,6 +232,28 @@ async def test_a_passkey_only_user_keeps_their_last_passkey(app, admin):
     await c.aclose()
 
 
+async def test_a_passkey_only_user_sets_a_password_and_then_signs_in_with_it(app, admin):
+    token = (await invite(admin))["token"]
+    c = await browser(app)
+    assert (await accept(c, token, "inv-pw", Authenticator())).status_code == 200
+    c.csrf = (await c.get("/api/auth/me")).json()["csrf"]
+    other = await browser(app)
+    assert (await other.post("/api/auth/login", json={"username": "inv-pw", "password": "una-password-nuova"})).status_code == 401
+    # No current password to give: the passkey session is enough.
+    assert (await c.post("/api/account/password", json={"new_password": "corta"})).status_code == 422
+    assert (await c.post("/api/account/password", json={"new_password": "una-password-nuova"})).status_code == 200
+    assert (await c.get("/api/auth/me")).json()["has_password"] is True
+    assert (await other.post("/api/auth/login", json={"username": "inv-pw", "password": "una-password-nuova"})).status_code == 200
+    # From now on, changing it asks for the current one; the last passkey may go, and TOTP may be set up.
+    r = await c.post("/api/account/password", json={"current_password": "sbagliata", "new_password": "un'altra-password"})
+    assert r.status_code == 400
+    only = (await c.get("/api/account/passkeys")).json()[0]
+    assert (await c.delete(f"/api/account/passkeys/{only['id']}")).status_code == 200
+    assert (await c.post("/api/account/totp/setup")).status_code == 200
+    await c.aclose()
+    await other.aclose()
+
+
 # --------------------------------------------------------------------------- recovery links
 
 
