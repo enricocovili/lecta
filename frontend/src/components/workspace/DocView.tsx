@@ -21,6 +21,9 @@ export interface FlashRequest {
   scroll: boolean;
 }
 
+/** Events that mean the reader scrolls by themselves. */
+const TAKE_OVER = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
+
 export interface ScrollRequest {
   nonce: number;
   chapterId: number;
@@ -268,12 +271,31 @@ export default function DocView({
   }, [chapters, pick]);
 
   // -- scroll to a chapter / section (outline, deep link, change card)
+  // Chapters are typeset one by one, so the ones above the target grow from a spinner to their pages while it is being
+  // reached: the target is kept at the top until the reader takes over the scroll.
   useEffect(() => {
-    if (!scrollTo || !article.current) return;
-    const sec = article.current.querySelector<HTMLElement>(`[data-chapter-id="${scrollTo.chapterId}"]`);
-    if (!sec) return;
-    const target = (scrollTo.sectionId && sec.querySelector<HTMLElement>(`[id="${CSS.escape(scrollTo.sectionId)}"]`)) || sec;
+    const sc = scroller.current;
+    const art = article.current;
+    if (!scrollTo || !sc || !art) return;
+    const find = () => {
+      const sec = art.querySelector<HTMLElement>(`[data-chapter-id="${scrollTo.chapterId}"]`);
+      if (!sec) return null;
+      return (scrollTo.sectionId && sec.querySelector<HTMLElement>(`[id="${CSS.escape(scrollTo.sectionId)}"]`)) || sec;
+    };
+    const target = find();
+    if (!target) return;
     target.scrollIntoView({ block: "start", behavior: "smooth" });
+    const align = () => find()?.scrollIntoView({ block: "start", behavior: "auto" });
+    const watch = new ResizeObserver(align);
+    watch.observe(art);
+    const stop = () => {
+      watch.disconnect();
+      window.clearTimeout(limit);
+      for (const ev of TAKE_OVER) sc.removeEventListener(ev, stop);
+    };
+    const limit = window.setTimeout(stop, 30_000);
+    for (const ev of TAKE_OVER) sc.addEventListener(ev, stop, { passive: true });
+    return stop;
   }, [scrollTo]);
 
   // -- flash what the AI changed

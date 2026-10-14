@@ -12,7 +12,7 @@ lessons (files and comments), each a click from its lab and its lesson.
 
 The text of a course opens at `/admin/courses/{id}/testo`: the centre is the **draft**, the left rail is the outline
 (chapters and sections, sources, structure actions), the right panel is the **AI assistant**. `?chapter={id}` scrolls to
-a chapter, `?chat=1` opens the assistant, `?ask=…` also puts a question in its box; the old addresses
+a chapter (and keeps it at the top while the chapters above it are typeset, until the reader scrolls), `?chat=1` opens the assistant, `?ask=…` also puts a question in its box; the old addresses
 (`/admin/editor/{id}`, `…/chapters/{id}`, and the course address with one of those parameters) lead there. The arrow at
 the top left goes back to the course page.
 
