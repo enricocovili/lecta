@@ -61,7 +61,6 @@ test.describe.serial("Laboratorio", () => {
     await page.getByTestId("lab-create").click();
     await expect(page.getByTestId("lab-editor")).toBeVisible();
     await expect(page.getByTestId("lab-title")).toHaveText("Lezione 3 - Cicli");
-    await expect(page.getByTestId("lab-publish")).toContainText("in sviluppo");
 
     // Several files at once.
     await page.getByTestId("lab-file-input").setInputFiles([

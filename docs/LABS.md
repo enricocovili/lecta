@@ -53,8 +53,7 @@ files (folders from the names, folders first), on the right the open file, remem
 **Uploading**: «Carica file» (several at once), the folder button (a whole folder with its sub-folders: the names keep the
 folders) or a **drop** of files and folders anywhere on the page. Files over 20 MB are refused before sending; hidden files
 and `__pycache__`, `node_modules`, `__MACOSX` are left out of a folder; a file with a name that exists replaces it (a
-notice says so). Each file has «Rinomina» (also into a folder: `src/main.c`) and «Elimina». The top bar shows
-«Pubblicazione: in sviluppo»: labs are private for now (#59).
+notice says so). Each file has «Rinomina» (also into a folder: `src/main.c`) and «Elimina». A lab is always private: it is never published.
 
 ## Comments, written live
 

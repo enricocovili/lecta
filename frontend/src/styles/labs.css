@@ -107,11 +107,6 @@ body.ws-page .lab {
   text-overflow: ellipsis;
   margin-left: 0.5rem;
 }
-.lab-publish {
-  color: var(--fg-muted);
-  cursor: default;
-}
-
 .lab-progress {
   display: flex;
   align-items: center;

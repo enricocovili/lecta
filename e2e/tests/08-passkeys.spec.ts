@@ -555,7 +555,7 @@ test.describe("Passkey", () => {
     await expect(comment).toContainText("Righe 2–3");
     await expect(comment).toContainText("Il determinante dell’identità è 1.");
     // Nothing to change: no upload, rename, delete, edit, comments, assistant; the code is not editable.
-    for (const id of ["lab-upload", "lab-file-input", "lab-save-state", "lab-ai-toggle", "lab-publish", "lab-edit", "lab-comment-file", "lab-comment-selection"]) {
+    for (const id of ["lab-upload", "lab-file-input", "lab-save-state", "lab-ai-toggle", "lab-edit", "lab-comment-file", "lab-comment-selection"]) {
       await expect(editor.getByTestId(id)).toHaveCount(0);
     }
     await expect(editor.getByRole("button", { name: /Rinomina|Elimina/ })).toHaveCount(0);

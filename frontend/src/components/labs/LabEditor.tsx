@@ -359,11 +359,6 @@ export function LabEditor({
               <span className="wsb-lbl">Assistente</span>
             </button>
           )}
-          {owner && (
-            <span className="pill sm lab-publish" title="Il laboratorio è privato: la pubblicazione sul sito arriverà più avanti" data-testid="lab-publish">
-              <Icon name="globe" /> Pubblicazione: in sviluppo
-            </span>
-          )}
           {canManage && (
             <>
               <button type="button" className="btn" onClick={() => fileInput.current?.click()} disabled={!!uploading} data-testid="lab-upload">
