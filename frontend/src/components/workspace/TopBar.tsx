@@ -1,6 +1,8 @@
 // The top bar of the workspace: where I am, publishing ON/OFF (admins), downloads and the panels. Whoever may only read
 // the course sees it marked read-only, with its owner, and no control that changes it.
+import { useState } from "react";
 import { Icon } from "../icons";
+import { NewLessonDialog } from "../lessons/NewLesson";
 import Pop from "./Pop";
 import PublishControl from "./PublishControl";
 import type { Course } from "../types";
@@ -39,6 +41,7 @@ export default function TopBar({
   onSettings: () => void;
   onPublishChanged: () => void;
 }) {
+  const [newLesson, setNewLesson] = useState(false);
   return (
     <header className="wsb">
       <a className="btn ghost icon wsb-back" href={`/admin/courses/${course.id}`} aria-label="Torna alla materia" title="La materia: lezioni e capitoli">
@@ -101,16 +104,16 @@ export default function TopBar({
             </button>
           )}
           {lessons && (
-            <a href={`/admin/lessons?course=${course.id}`}>
+            <a href={`/admin/courses/${course.id}`}>
               <Icon name="notebook" />
               Lezioni di questa materia
             </a>
           )}
           {!readOnly && (
-            <a href={`/admin/lessons?new=1&course=${course.id}`}>
+            <button type="button" onClick={() => setNewLesson(true)}>
               <Icon name="plus" />
               Nuova lezione
-            </a>
+            </button>
           )}
           {course.published && (
             <a href={`/courses/${course.slug}`} target="_blank" rel="noreferrer">
@@ -125,6 +128,7 @@ export default function TopBar({
           </a>
         </Pop>
       </div>
+      {newLesson && <NewLessonDialog courseId={course.id} onClose={() => setNewLesson(false)} />}
     </header>
   );
 }

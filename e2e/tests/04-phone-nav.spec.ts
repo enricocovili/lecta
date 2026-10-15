@@ -3,13 +3,14 @@ import { login, watchConsole } from "./helpers";
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-test("on a phone the navigation is the bottom bar and the account menu", async ({ page }) => {
+test("on a phone the navigation is the title and the account menu", async ({ page }) => {
   const con = watchConsole(page);
   await login(page);
-  await expect(page.locator(".bottom-nav").getByText("Materie")).toBeVisible();
-  await expect(page.locator(".bottom-nav").getByText("Carica")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Materie" })).toBeVisible();
+  await expect(page.locator(".bottom-nav")).toHaveCount(0);
   await page.locator("#user-menu summary").click();
-  await expect(page.locator("#user-menu").getByText("Lezioni")).toBeVisible();
+  await expect(page.locator("#user-menu").getByText("Materie")).toBeVisible();
+  await expect(page.locator("#user-menu").getByText("Lezioni")).toHaveCount(0);
   await expect(page.locator("#user-menu").getByText("Da smistare")).toHaveCount(0);
   con.assertClean([/status of 404/]);
 });

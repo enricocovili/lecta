@@ -1,13 +1,13 @@
 import type { APIRoute } from "astro";
 import { BRAND_VERSION } from "../lib/brand";
 
-// The installed app (the phone's home-screen icon opens the lessons), with the icons of the current logo.
+// The installed app (the phone's home-screen icon opens the subjects), with the icons of the current logo.
 export const GET: APIRoute = () => {
   const v = `?v=${BRAND_VERSION}`;
   const manifest = {
     name: "Lecta",
     short_name: "Lecta",
-    start_url: "/admin/lessons",
+    start_url: "/admin",
     display: "standalone",
     background_color: "#f3f2ed",
     theme_color: "#fcfbf7",

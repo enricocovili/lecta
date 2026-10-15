@@ -85,7 +85,7 @@ Taking notes during the lecture, and using them as the input of the text (DECISI
 
 * **Lessons**: slides (PDF) with, per page, Markdown notes next to the slide and pen strokes over it (pen, highlighter,
   stroke eraser, undo/redo; mouse, stylus and finger with palm rejection), blank pages to write more, autosave that
-  survives a lost connection, screen kept on, layouts for tablet and foldable laptop. New `/admin/lessons`.
+  survives a lost connection, screen kept on, layouts for tablet and foldable laptop. New `/admin/lessons` (removed since, DECISIONS 135).
 * **Downloads**: PDF with the strokes drawn on it, the notes as Markdown.
 * **Lesson → text**: the import takes the annotated slides (as pictures), the notes (a section per slide) and the handwritten
   pages; one lesson is one chapter; notes and slides stay paired all the way.
@@ -150,6 +150,8 @@ deleted with the last step).
 * **No map** (DECISIONS 133): `/admin/map` and `GET /api/concepts` are gone; the embeddings stay for search and retrieval.
 * **Home = the subjects** (DECISIONS 134): `/admin` lists the subjects with their state and publishing; `/admin/courses`
   redirects there. The job list is in Attività, the assistant's turns in its panel, the AI review on the course page.
+* **No list of all the lessons** (DECISIONS 135): a course's lessons are on its page, «Nuova lezione» is a dialog
+  opened from the home page, the course page and the text; the phone's bottom bar is gone.
 
 ## Definition of done: how each point is verified
 

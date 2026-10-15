@@ -47,7 +47,6 @@
   --mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --sidebar-w: 280px;
   --header-h: 60px;
-  --bottom-nav-h: 0px;
   color-scheme: light;
 }
 
@@ -567,16 +566,11 @@ details.dropdown > summary::-webkit-details-marker {
   font-size: 0.8rem;
 }
 
-/* ------------------------------------------------------------------ bottom nav (phones) */
-
-.bottom-nav {
-  display: none;
-}
+/* ------------------------------------------------------------------ phones */
 
 @media (max-width: 860px) {
   :root {
     --header-h: 56px;
-    --bottom-nav-h: 72px;
   }
   .shell {
     grid-template-columns: 1fr;
@@ -584,7 +578,7 @@ details.dropdown > summary::-webkit-details-marker {
   .sidebar {
     display: none;
     position: fixed;
-    inset: var(--header-h) 0 var(--bottom-nav-h) 0;
+    inset: var(--header-h) 0 0 0;
     z-index: 40;
     height: auto;
     border-right: 0;
@@ -593,7 +587,7 @@ details.dropdown > summary::-webkit-details-marker {
     display: flex;
   }
   .main {
-    padding: 1.4rem 1rem calc(var(--bottom-nav-h) + 2rem);
+    padding: 1.4rem 1rem 2rem;
   }
   h1 {
     font-size: 2.25rem;
@@ -609,49 +603,6 @@ details.dropdown > summary::-webkit-details-marker {
   .topbar .searchbox,
   .topbar .hide-mobile {
     display: none;
-  }
-  .bottom-nav {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: var(--bottom-nav-h);
-    padding: 0.45rem 0.5rem calc(0.45rem + env(safe-area-inset-bottom));
-    background: var(--bg-elev);
-    border-top: 1px solid var(--border);
-    z-index: 35;
-  }
-  .bottom-nav a,
-  .bottom-nav button {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.2rem;
-    color: var(--fg-muted);
-    font-size: 0.8rem;
-    background: none;
-    border: 0;
-    font-family: inherit;
-    cursor: pointer;
-  }
-  .bottom-nav .icon {
-    width: 1.45rem;
-    height: 1.45rem;
-  }
-  .bottom-nav a.active,
-  .bottom-nav button.active {
-    color: var(--fg);
-    font-weight: 600;
-  }
-  .bottom-nav a:hover {
-    text-decoration: none;
-  }
-  .toasts {
-    bottom: calc(var(--bottom-nav-h) + 0.75rem) !important;
   }
 }
 /* Visibility helpers keep the element's own display value. */

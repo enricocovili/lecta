@@ -438,7 +438,7 @@ export function Editor({ lesson, access, source, labHref, admin = false }: { les
     <div className="les" data-testid="lesson-editor">
       <header className="wsb">
         {inApp && (
-          <a className="btn ghost icon wsb-back" href="/admin/lessons" aria-label="Torna alle lezioni" title="Lezioni">
+          <a className="btn ghost icon wsb-back" href={`/admin/courses/${lesson.course_id}`} aria-label="Torna alla materia" title="La materia: lezioni e capitoli">
             <Icon name="arrow-left" />
           </a>
         )}
@@ -557,12 +557,6 @@ export function Editor({ lesson, access, source, labHref, admin = false }: { les
               <a href={`/admin/courses/${lesson.course_id}`}>
                 <Icon name="book" />
                 Apri la materia
-              </a>
-            )}
-            {inApp && (
-              <a href="/admin/lessons">
-                <Icon name="notebook" />
-                Tutte le lezioni
               </a>
             )}
           </Pop>

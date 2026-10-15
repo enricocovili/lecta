@@ -1,13 +1,6 @@
 ---
-import Admin from "../../../layouts/Admin.astro";
-import LessonsPage from "../../../components/lessons/LessonsPage";
-const role = Astro.locals.auth.role;
+// There is no list of all the lessons (decision 135): a course's lessons are on its page. Old links land there, or on
+// the home page.
+const course = Number(Astro.url.searchParams.get("course"));
+return Astro.redirect(course > 0 ? `/admin/courses/${course}` : "/admin");
 ---
-<Admin title="Lezioni">
-  <div class="page-head">
-    <div>
-      <h1>Lezioni</h1>
-    </div>
-  </div>
-  <LessonsPage client:load role={role} />
-</Admin>

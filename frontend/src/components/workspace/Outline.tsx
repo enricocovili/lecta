@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { del, fmtSize, get, patch, post } from "../../lib/api";
 import { Icon } from "../icons";
+import { NewLessonButton } from "../lessons/NewLesson";
 import { kindIcon } from "../pagekit";
 import { Confirm, toastError, useApi } from "../ui";
 import Pop from "./Pop";
@@ -180,10 +181,10 @@ function Sources({ courseId, readOnly }: { courseId: number; readOnly: boolean }
         </ul>
       )}
       {!readOnly && (
-        <a className="btn sm rail-import" href={`/admin/lessons?new=1&course=${courseId}`}>
+        <NewLessonButton courseId={courseId} className="btn sm rail-import">
           <Icon name="plus" />
           Nuova lezione
-        </a>
+        </NewLessonButton>
       )}
     </div>
   );

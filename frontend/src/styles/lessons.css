@@ -1,5 +1,5 @@
 /* Lessons: the note-taking workspace (slides with ink + Markdown notes) and the list of lessons.
- * Classes: `.les*` editor, `.les-ink` drawing surface, `.les-list-row` list. The top bar reuses `.wsb*`. */
+ * Classes: `.les*` editor, `.les-ink` drawing surface. The top bar reuses `.wsb*`. */
 
 body.ws-page .les {
   display: flex;
@@ -767,20 +767,6 @@ body.ws-page .les {
   .les-tools > .grow {
     display: none;
   }
-}
-
-/* ------------------------------------------------------------------ the list */
-
-.les-filter {
-  width: min(320px, 60vw);
-}
-.les-list-row {
-  align-items: center;
-}
-.les-list-row .pg-row-title {
-  display: block;
-  font-weight: 600;
-  color: var(--fg);
 }
 
 /* ------------------------------------------------------------------ sharing */

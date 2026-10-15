@@ -462,14 +462,14 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 
 ## A simpler interface (#17)
 
-95. **Every place is reached one way.** The sidebar lists only the places of work (Materie, Lezioni, Mappa; see 133–134) and the
+95. **Every place is reached one way.** The sidebar lists only the places of work (Materie, Lezioni, Mappa; see 133–135) and the
     subjects; the Home opens from the «Lecta» title like on most sites, search is the bar at the top (on a phone, the
     lens in the top bar), Attività and Impostazioni are in the user menu. The phone's bottom bar has no Home either.
     *Why:* the same link in two places made the sidebar long and the app harder to read.
 96. **Material comes in from the lessons only.** The upload page (`/admin/upload`), the phone page (`/admin/quick`) and
     `POST /api/uploads…` are gone: almost always the material belonged to the subject already open, and a lesson always
     has its subject, so the import never has to guess the course. The import keeps its `Upload` rows (a lesson makes one,
-    `via = "lesson"`), the source files and the manifest. The phone's home-screen icon opens the lessons.
+    `via = "lesson"`), the source files and the manifest. The phone's home-screen icon opens the subjects (135).
 97. **No «Da smistare».** With material coming only from lessons the course is always known, so placement only chooses
     among the chapters of that course or starts a new one; nothing is left in an inbox. The inbox page and API, the
     `inbox.assign` job, the «new course from the inbox» path, the confidence threshold and the `inbox_items` table
@@ -694,7 +694,7 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      leaves them out for the other roles and their hash opens Account. Everyone keeps Account (passkeys and sessions;
      password and 2FA only for users who have a password) and Backup (the export of the courses they can read; the
      server backup instructions only for admins). Viewers see no «Nuova materia» or «Nuova lezione» and «Prendi
-     appunti a lezione» (sidebar, home, courses and lessons pages, `?new=1` does nothing); an editor's new lesson offers
+     appunti a lezione» (sidebar, home and course pages); an editor's new lesson offers
      only the courses they may change. The controls inside a course, a lesson or a lab follow its `can_write` instead
      (#81–#83). Hiding is only courtesy: every call is checked by the backend, which answers 403 anyway. *Alternatives:*
      a page per settings section (`/admin/settings/providers`) so that each could be a server 404 (breaks every link and
@@ -846,4 +846,14 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      (the subjects) shared the screen with three that repeated other pages. *Alternatives:* keeping the home and
      trimming it to the cards (two pages with the same list); keeping a short error list above the cards (the card
      already says it).
+135. **No list of all the lessons.** `/admin/lessons` redirects to the course in `?course=`, or to the home page: a
+     lesson is always looked for through its subject, and the course page already lists its lessons, now with the
+     delete button the list had. «Nuova lezione» is one dialog (`lessons/NewLesson.tsx`) opened in place from the home
+     page («Prendi appunti a lezione», the subject to choose), the course page and the text (the rail, the empty
+     course, the «…» menu), with the subject already chosen; it lists only the subjects the user may change. The
+     lesson's back arrow leads to its course; the installed app opens on the home page. The sidebar keeps «Materie» and
+     the subjects, and the phone's bottom bar (Materie, Lezioni, Mappa) is gone: the title leads home and the user
+     menu has «Materie». *Why:* a list of every lesson of every subject was never where a lesson was looked for, and it
+     was the page the installed app opened on. *Alternatives:* keeping the list filtered on one subject (the course page
+     is that list); a bottom bar with a single tab.
 

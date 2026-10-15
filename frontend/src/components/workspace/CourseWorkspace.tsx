@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { get } from "../../lib/api";
 import { isAdmin, otherOwner, type Role } from "../../lib/roles";
 import { Icon } from "../icons";
+import { NewLessonButton } from "../lessons/NewLesson";
 import type { Course } from "../types";
 import { Modal, Seg, toast, toastError, useLocalStorage } from "../ui";
 import AiPanel from "./AiPanel";
@@ -376,10 +377,10 @@ export default function CourseWorkspace({ courseId, role, userId }: { courseId: 
       <h2>Questa materia è ancora vuota</h2>
       <p>Prendi appunti a lezione, sulle slide o su pagine bianche: Lecta li trasforma in un testo da studiare. Oppure lascia fare all’assistente a partire dalle fonti che hai già.</p>
       <div className="row" style={{ justifyContent: "center" }}>
-        <a className="btn primary" href={`/admin/lessons?new=1&course=${courseId}`}>
+        <NewLessonButton courseId={courseId} className="btn primary">
           <Icon name="notebook" />
           Nuova lezione
-        </a>
+        </NewLessonButton>
         <button type="button" className="btn" onClick={() => void ask("Parti dalle fonti caricate: crea i capitoli e scrivi una prima bozza del corso.", { mode: "edit", noScope: true })}>
           <Icon name="sparkles" />
           Scrivi una prima bozza

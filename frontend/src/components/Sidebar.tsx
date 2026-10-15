@@ -59,7 +59,6 @@ export default function Sidebar({ currentPath, role, userId }: { currentPath: st
     <nav className="sidebar-nav" aria-label="Navigazione" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div className="nav">
         <NavItem href="/admin" icon="folder" label="Materie" active={currentPath === "/admin" || is("/admin/courses")} />
-        <NavItem href="/admin/lessons" icon="notebook" label="Lezioni" active={is("/admin/lessons")} />
       </div>
 
       <div className="nav-group-title">

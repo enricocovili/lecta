@@ -13,7 +13,8 @@ test("a lesson's slides and notes are written into the course by themselves", as
   const courseId = /\/admin\/courses\/(\d+)/.exec(page.url())![1];
 
   // The material comes from a lesson: the slides, and notes next to the first one.
-  await page.goto(`/admin/lessons?new=1&course=${courseId}`);
+  await page.goto(`/admin/courses/${courseId}`);
+  await page.getByTestId("new-lesson").click();
   await page.getByTestId("lesson-title").fill("Lezione 3 - Sistemi LTI");
   await page.getByTestId("lesson-pdf").setInputFiles("/e2e/.fixtures/slides.pdf");
   await page.getByTestId("lesson-title").press("Enter");

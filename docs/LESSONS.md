@@ -1,6 +1,6 @@
 # Lessons: taking notes during the lecture
 
-The lesson workspace (`/admin/lessons`, editor at `/admin/courses/{course}/lessons/{n}` where `n` counts the lessons of that course: 1, 2, 3…; the old `/admin/lessons/{id}` redirects) is where the notes of a lecture are taken,
+The lesson workspace (listed on its course's page, editor at `/admin/courses/{course}/lessons/{n}` where `n` counts the lessons of that course: 1, 2, 3…; the old `/admin/lessons/{id}` redirects) is where the notes of a lecture are taken,
 and the input of the import: what is written there becomes the study text of the subject.
 
 A **lesson** belongs to a course and has **pages**: the slides of an uploaded PDF (one page per slide) plus blank

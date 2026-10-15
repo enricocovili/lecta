@@ -184,15 +184,14 @@ test.describe("Passkey", () => {
 
     const { context: rc, p: reader } = await join("viewer", "lettore");
     const con = watchConsole(reader);
-    // No create actions: not on the home page (the subjects), in the sidebar or the lessons.
+    // No create actions: not on the home page (the subjects) or in the sidebar; the old lessons address leads home.
     await reader.reload();
     await expect(reader.getByRole("heading", { name: "Materie" })).toBeVisible();
-    await expect(reader.getByRole("link", { name: "Prendi appunti a lezione" })).toHaveCount(0);
+    await expect(reader.getByTestId("new-lesson")).toHaveCount(0);
     await expect(reader.getByRole("link", { name: "Nuova materia" })).toHaveCount(0);
     await expect(reader.getByRole("button", { name: "Nuova materia" })).toHaveCount(0);
     await reader.goto("/admin/lessons?new=1");
-    await expect(reader.getByRole("heading", { name: "Lezioni" })).toBeVisible();
-    await expect(reader.getByTestId("new-lesson")).toHaveCount(0);
+    await reader.waitForURL(/\/admin$/);
     await expect(reader.getByRole("dialog")).toHaveCount(0);
     // No admin entries: the menu has no costs, the settings only the account (passkeys, no password or 2FA) and the export.
     await reader.locator("#user-menu summary").click();
@@ -245,7 +244,7 @@ test.describe("Passkey", () => {
     await expect(overview.getByText("Pubblicata")).toBeVisible();
     await expect(overview.locator(".pub-ctl")).toHaveCount(0);
     await expect(overview.getByRole("button", { name: "Impostazioni della materia" })).toHaveCount(0);
-    await expect(overview.getByRole("link", { name: "Nuova lezione" })).toHaveCount(0);
+    await expect(overview.getByRole("button", { name: "Nuova lezione" })).toHaveCount(0);
     await overview.getByRole("link", { name: "Apri il testo" }).first().click();
     await reader.waitForURL(/\/admin\/courses\/\d+\/testo$/);
     await expect(reader.getByTestId("read-only")).toHaveText(`Sola lettura · di ${USER}`);
@@ -255,7 +254,7 @@ test.describe("Passkey", () => {
     await expect(outline.getByText("Spazi vettoriali")).toBeVisible();
     await expect(outline.getByRole("button", { name: "Aggiungi capitolo" })).toHaveCount(0);
     await expect(outline.getByRole("button", { name: /Azioni sul capitolo/ })).toHaveCount(0);
-    await expect(outline.getByRole("link", { name: "Nuova lezione" })).toHaveCount(0);
+    await expect(outline.getByRole("button", { name: "Nuova lezione" })).toHaveCount(0);
     // The draft is there to read: a click offers only a note on the block (no assistant), a double click opens nothing.
     const block = reader.getByTestId("doc-preview").locator(".doc-block:not(.doc-heading):has(img)").first();
     await expect(block).toBeVisible({ timeout: 60_000 });
@@ -268,7 +267,7 @@ test.describe("Passkey", () => {
     await reader.keyboard.press("Escape");
     await reader.getByRole("button", { name: "Altre azioni" }).click();
     await expect(reader.getByRole("button", { name: "Impostazioni della materia" })).toHaveCount(0);
-    await expect(reader.getByRole("link", { name: "Nuova lezione" })).toHaveCount(0);
+    await expect(reader.getByRole("button", { name: "Nuova lezione" })).toHaveCount(0);
     await expect(reader.getByRole("link", { name: "Lezioni di questa materia" })).toBeVisible();
     // Only the PDF already compiled: nothing is compiled for a reader.
     await reader.keyboard.press("Escape");
@@ -482,9 +481,9 @@ test.describe("Passkey", () => {
 
     const { context: rc, p: reader } = await invited(page, browser, baseURL!, "viewer", "uditore");
     const con = watchConsole(reader);
-    // In the lessons list: no switch for the state and no delete.
-    await reader.goto(`/admin/lessons?course=${lesson.course_id}`);
-    const row = reader.getByTestId("lesson-row").filter({ hasText: "Lezione da leggere" });
+    // Among the course's lessons: no switch for the state and no delete.
+    await reader.goto(`/admin/courses/${lesson.course_id}`);
+    const row = reader.getByTestId("overview-lesson").filter({ hasText: "Lezione da leggere" });
     await expect(row.getByTestId("lesson-status")).toHaveText("In corso");
     await expect(row.getByRole("switch")).toHaveCount(0);
     await expect(row.getByRole("button", { name: /Elimina/ })).toHaveCount(0);

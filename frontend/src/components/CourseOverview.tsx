@@ -1,14 +1,15 @@
 // The page of a course: its lessons and the chapters of its text, publishing and downloads. The text itself (draft,
 // outline, assistant) opens from here at /admin/courses/{id}/testo.
 import { useState } from "react";
-import { fmtDate, get } from "../lib/api";
+import { del, fmtDate, get } from "../lib/api";
 import { courseText } from "../lib/links";
 import { isAdmin, otherOwner, type Role } from "../lib/roles";
 import { Icon } from "./icons";
 import LessonStatusPill, { type LessonStatus } from "./lessons/LessonStatus";
+import { NewLessonButton } from "./lessons/NewLesson";
 import { CoursePill, PublishedFlag } from "./pagekit";
 import type { Course, TreeCourse } from "./types";
-import { Empty, ErrorBox, fmtWhen, Loading, Modal, toast, useApi } from "./ui";
+import { Confirm, Empty, ErrorBox, fmtWhen, Loading, Modal, toast, useApi } from "./ui";
 import { compileFull, latestPdf } from "./workspace/compile";
 import CourseSettings from "./workspace/CourseSettings";
 import PublishControl from "./workspace/PublishControl";
@@ -68,13 +69,13 @@ export default function CourseOverview({ courseId, role, userId }: { courseId: n
   const review = useApi(() => get<LatestReview>(`/api/courses/${courseId}/review/latest`).catch(() => null), [courseId]);
   const [settings, setSettings] = useState(false);
   const [compiling, setCompiling] = useState(false);
+  const [toDelete, setToDelete] = useState<LessonRow | null>(null);
 
   if (course.error) return <ErrorBox error={course.error} />;
   const c = course.data;
   if (!c) return <Loading />;
   const chapters = [...(c.chapters ?? [])].sort((a, b) => a.position - b.position);
   const labs = [...(lessons.data ?? [])].filter((l) => l.lab).sort((a, b) => a.number - b.number);
-  const newLesson = `/admin/lessons?new=1&course=${courseId}`;
   const canWrite = !!c.can_write;
   const owner = otherOwner(c, userId);
   const showLessons = canWrite || role === "viewer";
@@ -151,10 +152,10 @@ export default function CourseOverview({ courseId, role, userId }: { courseId: n
             <div className="section-label">
               <span id="co-lessons">Lezioni</span>
               {canWrite && (
-                <a className="link" href={newLesson}>
+                <NewLessonButton courseId={courseId} className="link link-btn" testId="new-lesson">
                   <Icon name="plus" />
                   Nuova lezione
-                </a>
+                </NewLessonButton>
               )}
             </div>
             {lessons.data === null ? (
@@ -163,7 +164,11 @@ export default function CourseOverview({ courseId, role, userId }: { courseId: n
               <Empty icon="notebook">
                 {canWrite ? (
                   <>
-                    Ancora nessuna lezione. <a href={newLesson}>Creane una</a>, prendi appunti sulle slide e poi aggiungili al testo.
+                    Ancora nessuna lezione.{" "}
+                    <NewLessonButton courseId={courseId} className="link-btn">
+                      Creane una
+                    </NewLessonButton>
+                    , prendi appunti sulle slide e poi aggiungili al testo.
                   </>
                 ) : (
                   "Ancora nessuna lezione."
@@ -193,6 +198,11 @@ export default function CourseOverview({ courseId, role, userId }: { courseId: n
                         editable={canWrite}
                         onChange={(s) => lessons.setData((all) => all && all.map((x) => (x.id === l.id ? { ...x, status: s } : x)))}
                       />
+                      {canWrite && (
+                        <button className="btn ghost icon sm" onClick={() => setToDelete(l)} aria-label={`Elimina ${l.title}`} title="Elimina">
+                          <Icon name="trash" />
+                        </button>
+                      )}
                     </div>
                   ))}
               </div>
@@ -259,6 +269,20 @@ export default function CourseOverview({ courseId, role, userId }: { courseId: n
             </div>
           )}
         </section>
+      )}
+
+      {toDelete && (
+        <Confirm
+          title="Elimina la lezione"
+          danger
+          confirmLabel="Elimina"
+          message={<>«{toDelete.title}» e tutto ciò che hai scritto a mano e in Markdown vengono eliminati. Il testo già generato nella materia resta.</>}
+          onConfirm={async () => {
+            await del(`/api/lessons/${toDelete.id}`);
+            await lessons.reload();
+          }}
+          onClose={() => setToDelete(null)}
+        />
       )}
 
       {settings && canWrite && (

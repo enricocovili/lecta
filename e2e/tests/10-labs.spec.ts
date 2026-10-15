@@ -39,7 +39,7 @@ async function newLesson(page: Page, course: string, title: string): Promise<str
   await page.getByRole("button", { name: "Crea materia" }).click();
   await page.waitForURL(/\/admin\/courses\/\d+(\/testo)?$/);
   const courseId = /\/admin\/courses\/(\d+)/.exec(page.url())![1];
-  await page.goto(`/admin/lessons?course=${courseId}`);
+  await page.goto(`/admin/courses/${courseId}`);
   await page.getByTestId("new-lesson").click();
   await page.getByTestId("lesson-title").fill(title);
   await page.getByTestId("lesson-title").press("Enter");

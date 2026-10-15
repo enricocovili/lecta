@@ -182,7 +182,7 @@ test.describe.serial("Lezioni", () => {
     courseId = /\/admin\/courses\/(\d+)/.exec(page.url())![1];
 
     // New lesson with the slides.
-    await page.goto(`/admin/lessons?course=${courseId}`);
+    await page.goto(`/admin/courses/${courseId}`);
     await expect(page.getByText("Nessuna lezione")).toBeVisible();
     await page.getByTestId("new-lesson").click();
     await page.getByTestId("lesson-title").fill("Lezione 1 - Sistemi LTI");
@@ -372,8 +372,8 @@ test.describe.serial("Lezioni", () => {
   test("the «Completata» switch marks a lesson completed by hand, in the list and in the editor", async ({ page }) => {
     const con = watchConsole(page);
     await login(page);
-    await page.goto(`/admin/lessons?course=${courseId}`);
-    const row = page.getByTestId("lesson-row");
+    await page.goto(`/admin/courses/${courseId}`);
+    const row = page.getByTestId("overview-lesson");
     const href = (await row.locator("a.pg-row-title").getAttribute("href"))!;
     const toggle = row.getByRole("switch", { name: "Completata" });
     await expect(toggle).toBeVisible();
@@ -382,7 +382,7 @@ test.describe.serial("Lezioni", () => {
     await expect(toggle).toBeChecked();
     await expect.poll(async () => (await stored(page, href)).status).toBe("completed");
     await page.reload();
-    await expect(page.getByTestId("lesson-row").getByRole("switch", { name: "Completata" })).toBeChecked();
+    await expect(page.getByTestId("overview-lesson").getByRole("switch", { name: "Completata" })).toBeChecked();
 
     // In the editor's top bar the same switch puts it back in progress.
     await page.goto(href);
@@ -398,9 +398,9 @@ test.describe.serial("Lezioni", () => {
     test.setTimeout(300_000);
     const con = watchConsole(page);
     await login(page);
-    await page.goto(`/admin/lessons?course=${courseId}`);
-    await expect(page.getByTestId("lesson-row")).toHaveCount(1);
-    await page.getByTestId("lesson-row").getByRole("link", { name: "Lezione 1 - Sistemi LTI" }).click();
+    await page.goto(`/admin/courses/${courseId}`);
+    await expect(page.getByTestId("overview-lesson")).toHaveCount(1);
+    await page.getByTestId("overview-lesson").getByRole("link", { name: "Lezione 1 - Sistemi LTI" }).click();
     await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
 
     await page.getByTestId("generate-open").click();
@@ -641,8 +641,8 @@ test.describe.serial("Lezioni", () => {
     test.setTimeout(120_000);
     const con = watchConsole(page);
     await login(page);
-    await page.goto(`/admin/lessons?course=${courseId}`);
-    await page.getByTestId("lesson-row").locator("a.pg-row-title").click();
+    await page.goto(`/admin/courses/${courseId}`);
+    await page.getByTestId("overview-lesson").locator("a.pg-row-title").click();
     await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
     const pages = page.getByTestId("lesson-page");
     const before = await stored(page);
@@ -696,8 +696,8 @@ test.describe.serial("Lezioni", () => {
     test.setTimeout(120_000);
     const con = watchConsole(page);
     await login(page);
-    await page.goto(`/admin/lessons?course=${courseId}`);
-    await page.getByTestId("lesson-row").locator("a.pg-row-title").click();
+    await page.goto(`/admin/courses/${courseId}`);
+    await page.getByTestId("overview-lesson").locator("a.pg-row-title").click();
     await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
     const pages = page.getByTestId("lesson-page");
     const count = (await stored(page)).pages.length;
@@ -858,8 +858,8 @@ test.describe.serial("Lezioni", () => {
     test.setTimeout(120_000);
     const con = watchConsole(page);
     await login(page);
-    await page.goto(`/admin/lessons?course=${courseId}`);
-    await page.getByTestId("lesson-row").locator("a.pg-row-title").click();
+    await page.goto(`/admin/courses/${courseId}`);
+    await page.getByTestId("overview-lesson").locator("a.pg-row-title").click();
     await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
     const pages = page.getByTestId("lesson-page");
     const count = (await stored(page)).pages.length;
@@ -962,8 +962,8 @@ test.describe.serial("Lezioni", () => {
     test.setTimeout(180_000);
     const con = watchConsole(page);
     await login(page);
-    await page.goto(`/admin/lessons?course=${courseId}`);
-    await page.getByTestId("lesson-row").locator("a.pg-row-title").click();
+    await page.goto(`/admin/courses/${courseId}`);
+    await page.getByTestId("overview-lesson").locator("a.pg-row-title").click();
     await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
     const pages = page.getByTestId("lesson-page");
     const count = (await stored(page)).pages.length;
@@ -1034,8 +1034,8 @@ test.describe.serial("Lezioni", () => {
     test("the editor fits the screen: tools reachable, the slide and its notes stacked", async ({ page }) => {
       const con = watchConsole(page);
       await login(page);
-      await page.goto(`/admin/lessons?course=${courseId}`);
-      await page.getByTestId("lesson-row").locator("a.pg-row-title").click();
+      await page.goto(`/admin/courses/${courseId}`);
+      await page.getByTestId("overview-lesson").locator("a.pg-row-title").click();
       await page.waitForURL(/\/admin\/courses\/\d+\/lessons\/\d+$/);
       await expect(page.getByTestId("lesson-page").first().locator("canvas.les-slide-canvas")).toBeVisible();
       await expect(page.getByTestId("tool-pen")).toBeVisible();

@@ -4,6 +4,7 @@ import { get, post } from "../lib/api";
 import { courseText } from "../lib/links";
 import { canCreate, isAdmin, otherOwner, type Role } from "../lib/roles";
 import { Icon } from "./icons";
+import { NewLessonButton } from "./lessons/NewLesson";
 import { COURSE_TONE, CoursePill, courseStateText, fmtUpdated, OpenNotes, openNotesText, PublishedFlag, useCourseStates, type CourseState } from "./pagekit";
 import type { Course } from "./types";
 import { Confirm, Dot, Empty, ErrorBox, Loading, Modal, Seg, Switch, toast, toastError, useApi, useLocalStorage, usePoll } from "./ui";
@@ -260,10 +261,10 @@ export default function CoursesBrowser({ role, userId }: { role?: Role; userId?:
               <Icon name="plus" />
               Nuova materia
             </button>
-            <a className="btn primary" href="/admin/lessons?new=1">
+            <NewLessonButton className="btn primary" testId="new-lesson">
               <Icon name="notebook" />
               Prendi appunti a lezione
-            </a>
+            </NewLessonButton>
           </div>
         )}
       </div>
