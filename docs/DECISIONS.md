@@ -859,9 +859,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 136. **A subject's card leads back into its lesson.** `/api/courses` gives each course its `last_lesson` (`number`,
      `title`, `status`): the lesson most recently written in (`lessons.updated_at`, moved by every page saved), only on
      the courses whose lessons the user may see (their own; everything for admins and viewers), `null` otherwise. The
-     card on the home page shows it as «Continua: <title>», or «Ultima lezione: <title>» once completed or for whoever
-     only reads it, one click from the lesson. *Why:* going back to the lesson in progress was the one use of the list
-     of all lessons (135). *Alternative:* the lesson the user last opened (one more thing to store per user, and the
+     card on the home page (and its row, in the list view) shows it as «Continua: <title>», or «Ultima lezione:
+     <title>» once completed or for whoever only reads it, one click from the lesson. *Why:* going back to the lesson
+     in progress was the one use of the list of all lessons (135). *Alternative:* the lesson the user last opened (one more thing to store per user, and the
      one written in is almost always the same).
 137. **«Non capita» marks and the last open page are each user's (#87).** `lesson_marks` (page, user) holds a mark,
      `lesson_places` (lesson, user → page) the page a user had open last; both go with the page, the lesson or the user.

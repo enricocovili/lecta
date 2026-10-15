@@ -212,6 +212,11 @@ a.pg-row-title:hover {
   background: var(--bg-hover);
   text-decoration: none;
 }
+/* «Continua» under the row of the list, lined up with the subject's name (past the dot) */
+.pg-course-item > .pg-continue {
+  margin: -0.55rem 0 0;
+  padding: 0 1.4rem 0.95rem calc(1.4rem + 9px + 1rem);
+}
 
 /* course page header */
 .pg-head-pills {
@@ -641,6 +646,9 @@ a.pg-row-title:hover {
   .pg-course-row {
     padding: 0.9rem 1rem;
     gap: 0.6rem 0.75rem;
+  }
+  .pg-course-item > .pg-continue {
+    padding: 0 1rem 0.85rem calc(1rem + 9px + 0.75rem);
   }
   /* badges and buttons drop below the title when they don't fit */
   .pg-row {

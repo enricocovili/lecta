@@ -396,6 +396,10 @@ test.describe.serial("Lezioni", () => {
     await expect(page.locator(".pg-course-row").first()).toBeVisible();
     await expect(views.getByRole("tab", { name: "Elenco" })).toHaveAttribute("aria-selected", "true");
     await expect(views.getByRole("tab", { name: "Griglia" })).toHaveAttribute("aria-selected", "false");
+    // The list leads back into the lesson too, under the subject's row.
+    const item = page.locator(".pg-course-item").filter({ has: page.locator(`a.pg-course-row[href="/admin/courses/${courseId}"]`) });
+    await expect(item.getByTestId("course-continue")).toHaveText("Ultima lezione: Lezione 1 - Sistemi LTI");
+    await expect(item.getByTestId("course-continue")).toHaveAttribute("href", `/admin/courses/${courseId}/lessons/1`);
 
     // In the editor's top bar the same switch puts it back in progress.
     await page.goto(href);

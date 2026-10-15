@@ -152,7 +152,7 @@ deleted with the last step).
   redirects there. The job list is in Attività, the assistant's turns in its panel, the AI review on the course page.
 * **No list of all the lessons** (DECISIONS 135): a course's lessons are on its page, «Nuova lezione» is a dialog
   opened from the home page, the course page and the text; the phone's bottom bar is gone.
-* **«Continua»** (DECISIONS 136): each subject's card links to the lesson last written in.
+* **«Continua»** (DECISIONS 136): each subject's card, and its row in the list view, links to the lesson last written in.
 
 ## Definition of done: how each point is verified
 

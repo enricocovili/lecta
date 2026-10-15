@@ -173,6 +173,20 @@ function PublishSwitch({ course, updating, onChanged }: { course: Course; updati
   );
 }
 
+/** «Continua: <title>» into the lesson last written in (decision 136), on the card and under the row of the list. */
+function ContinueLink({ c }: { c: Course }) {
+  if (!c.last_lesson) return null;
+  return (
+    <a className="pg-continue" href={`/admin/courses/${c.id}/lessons/${c.last_lesson.number}`} data-testid="course-continue">
+      <Icon name="notebook" />
+      <span className="ellipsis">
+        {c.can_write && c.last_lesson.status !== "completed" ? "Continua" : "Ultima lezione"}: {c.last_lesson.title}
+      </span>
+      <Icon name="chevron-right" />
+    </a>
+  );
+}
+
 function CourseCard({ c, st, owner, admin, onChanged }: { c: Course; st: CourseState | undefined; owner: string | null; admin: boolean; onChanged: () => void }) {
   const state = courseStateText(st);
   const fix = fixHref(c, st);
@@ -197,15 +211,7 @@ function CourseCard({ c, st, owner, admin, onChanged }: { c: Course; st: CourseS
         )}
       </div>
       <OpenNotes course={c} />
-      {c.last_lesson && (
-        <a className="pg-continue" href={`/admin/courses/${c.id}/lessons/${c.last_lesson.number}`} data-testid="course-continue">
-          <Icon name="notebook" />
-          <span className="ellipsis">
-            {c.can_write && c.last_lesson.status !== "completed" ? "Continua" : "Ultima lezione"}: {c.last_lesson.title}
-          </span>
-          <Icon name="chevron-right" />
-        </a>
-      )}
+      <ContinueLink c={c} />
       {c.tags.length > 0 && (
         <div className="row pg-course-tags">
           {c.tags.map((t) => (
@@ -316,23 +322,26 @@ export default function CoursesBrowser({ role, userId }: { role?: Role; userId?:
               const st = stateOf(c.id);
               const state = courseStateText(st);
               return (
-                <a key={c.id} className="pg-course-row" href={`/admin/courses/${c.id}`}>
-                  <Dot tone={COURSE_TONE[st?.ai_running ? "working" : (st?.status ?? "ok")] ?? ""} />
-                  <div className="grow">
-                    <div className="pg-row-title">{c.name}</div>
-                    <div className="pg-row-sub">
-                      {otherOwner(c, userId) && <span data-testid="course-owner">di {otherOwner(c, userId)} · </span>}
-                      {state ? <span className={state.tone === "danger" ? "text-danger" : ""}>{state.text} · </span> : null}
-                      {metaLine(c, st)}
+                <div key={c.id} className="pg-course-item">
+                  <a className="pg-course-row" href={`/admin/courses/${c.id}`}>
+                    <Dot tone={COURSE_TONE[st?.ai_running ? "working" : (st?.status ?? "ok")] ?? ""} />
+                    <div className="grow">
+                      <div className="pg-row-title">{c.name}</div>
+                      <div className="pg-row-sub">
+                        {otherOwner(c, userId) && <span data-testid="course-owner">di {otherOwner(c, userId)} · </span>}
+                        {state ? <span className={state.tone === "danger" ? "text-danger" : ""}>{state.text} · </span> : null}
+                        {metaLine(c, st)}
+                      </div>
                     </div>
-                  </div>
-                  {!!c.open_notes && <span className="pill sm warn">{openNotesText(c.open_notes)}</span>}
-                  <span className="pg-row-flag hide-mobile">
-                    <PublishedFlag published={c.published} />
-                  </span>
-                  <span className="muted small show-mobile">{c.published ? "Pubblicata" : "Privata"}</span>
-                  <Icon name="chevron-right" className="faint" />
-                </a>
+                    {!!c.open_notes && <span className="pill sm warn">{openNotesText(c.open_notes)}</span>}
+                    <span className="pg-row-flag hide-mobile">
+                      <PublishedFlag published={c.published} />
+                    </span>
+                    <span className="muted small show-mobile">{c.published ? "Pubblicata" : "Privata"}</span>
+                    <Icon name="chevron-right" className="faint" />
+                  </a>
+                  <ContinueLink c={c} />
+                </div>
               );
             })}
           </div>
