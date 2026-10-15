@@ -368,7 +368,7 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
     conscious but never blocks; «ricorda» keeps them. They travel in the job's payload (so a run is
     reproducible) and fall back to the course's for imports that say nothing. An upload with no subject chosen
     cannot ask (the target is decided after the text is written).
-85. **The default writing style is fixed in the prompt, guidelines win over it.** Concise but clear text, tables
+85. **The default writing style is fixed in the prompt, guidelines win over it** (pictures amended by 139). Concise but clear text, tables
     (`tabular` + booktabs) for anything listing items with shared attributes or categories, and small pictures
     beside the text that explains them. One vocabulary of three picture commands, defined in the template and in
     `COMPAT_TAIL` (for courses with their own preamble): `\lectaimage[caption]{img}` (small, alone),
@@ -882,3 +882,15 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      after them. *Alternatives:* a separate «transfer» action (two steps where one is wanted, and a user without
      courses is only a step away from being deleted anyway); deleting the courses with the user (the material is
      the point of Lecta).
+139. **A course is a plain LaTeX project: the stored text uses no macro of Lecta's.** The text was full of commands
+     defined only in Lecta's preamble, so a downloaded project needed that preamble, and an offline editor or another
+     template showed errors or nothing. Now only standard commands and CTAN packages reach a course. Pictures: the
+     import's models still write the three shorthands (`\lectaimage`, `\lectaimagewithtext`, `\lectaimagepair`, short
+     and easy to check, with picture ids), but `latexmacros.expand_images` writes them out as `figure` + `minipage` +
+     `\includegraphics` with adjustbox's `max width`/`max height` (the same sizes the macros had) before the compile
+     check, so what is checked and stored is plain LaTeX. The assistant writes the same figures itself (its prompt
+     gives the three forms), and the import keeps `\includegraphics{images/…}`, the pictures of the previous version of
+     a lesson that it copies when generating the lesson again. A missing picture is now a compile error instead of
+     a box saying so. *Alternatives:* keeping the macros and shipping their definitions with every download (still
+     useless in another template, and any change to them changes old text); `wrapfig`/`subcaption` (closer to what an
+     author would write, but wrapfig floats badly next to lists and theorem boxes).

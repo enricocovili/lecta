@@ -46,7 +46,8 @@ the top left goes back to the course page.
 
 Each course is one LaTeX project: `main.tex` (layout + a managed `\include` block), `preamble.tex` (generated from the
 global template or the course's override), `chapters/NN-slug.tex`, `images/` and optionally `figures/*.tex` (TikZ
-pictures, just the picture code). Images are placed with `\lectaimage[caption]{images/name.png}`;
+pictures, just the picture code). It is plain LaTeX, with no macro of Lecta's (DECISIONS 139): images are
+`figure`s with `\includegraphics{images/name.png}` (small, often in a `minipage` beside the text that explains them);
 `\lectafigure[caption]{name}` includes `figures/name.tex`; `\review{...}` is a highlighted note that disappears in
 published builds. Chapters and positions are managed by the assistant and the outline (adding, renaming, moving and
 deleting keep `main.tex` in step).

@@ -32,7 +32,8 @@ def slugify(value: str, max_len: int = 60) -> str:
 
 
 _COMMENT_RE = re.compile(r"(?<!\\)%.*")
-_ENV_DROP_RE = re.compile(r"\\begin\{(tikzpicture|figure|table|circuitikz|forest|tikzcd)\}.*?\\end\{\1\}", re.S)
+# Drawings and tables go; a figure keeps its caption and the text beside its picture.
+_ENV_DROP_RE = re.compile(r"\\begin\{(tikzpicture|table|circuitikz|forest|tikzcd)\}.*?\\end\{\1\}", re.S)
 _HEADING_RE = re.compile(r"\\(chapter|section|subsection|subsubsection|paragraph)\*?\s*(\[[^\]]*\])?\s*\{([^{}]*)\}")
 _CMD_WITH_ARG_KEEP = re.compile(r"\\(textbf|textit|emph|underline|texttt|textsc|mathrm|mathbf|text|review)\s*\{([^{}]*)\}")
 _CMD_RE = re.compile(r"\\[a-zA-Z@]+\*?(\[[^\]]*\])?")
@@ -47,6 +48,7 @@ def latex_to_text(src: str) -> str:
     s = _HEADING_RE.sub(lambda m: "\n" + m.group(3) + "\n", s)
     for _ in range(3):
         s = _CMD_WITH_ARG_KEEP.sub(r"\2", s)
+    s = re.sub(r"\\begin\{minipage\}(\[[^\]]*\])*\{[^}]*\}", " ", s)
     s = re.sub(r"\\(begin|end)\{[^}]*\}(\[[^\]]*\])?", " ", s)
     s = re.sub(r"\\(label|ref|eqref|cite|includegraphics|lectafigure)\*?(\[[^\]]*\])?\{[^}]*\}", " ", s)
     s = _CMD_RE.sub(" ", s)

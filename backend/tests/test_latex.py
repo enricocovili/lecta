@@ -53,6 +53,8 @@ async def test_small_pictures_beside_their_text_compile_and_show_in_the_draft(ad
 
     from PIL import Image
 
+    from app.services import latexmacros
+
     buf = io.BytesIO()
     Image.new("RGB", (120, 80), (40, 90, 200)).save(buf, "PNG")
     c = await _course(admin, "Side figure", chapters=("Primo",))
@@ -66,7 +68,8 @@ async def test_small_pictures_beside_their_text_compile_and_show_in_the_draft(ad
         "\\lectaimagepair{Uno}{images/schema.png}{Due}{images/altro.png}\n\n"
         "\\lectaimage[Da sola]{images/altro.png}\n"
     )
-    await _put(admin, c["id"], ch["path"], body)
+    # Written out as the import stores them: plain figures.
+    await _put(admin, c["id"], ch["path"], latexmacros.expand_images(body))
     res = (await admin.post(f"/api/courses/{c['id']}/compile", json={"full": True})).json()
     assert res["status"] == "ok", res["diagnostics"]
     pdf = await admin.get(res["pdf_url"])

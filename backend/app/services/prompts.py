@@ -155,8 +155,8 @@ You get:
   · add what is new in the notes or material, in the place where it belongs in that structure;
   · change or remove only what the notes now contradict or no longer contain;
   · additions by the student that the notes don't mention (extra remarks, examples, \\review marks) stay;
-  · the pictures of the previous version appear as \\lectaimage… commands with a path such as images/x.png:
-    keep them as they are (same path) while they still apply; new pictures use the ids of the material;
+  · the pictures of the previous version are figure environments with \\includegraphics{{images/x.png}}: keep each
+    figure as it is (same path, same lines) while it still applies; new pictures use the ids of the material;
   · the result is the whole text of the lesson (not only the differences), with no duplicated passages.
 
 How to write:
@@ -182,7 +182,7 @@ How to write:
 - Pictures: the material places them with \\lectaimage[caption]{{id}}; notes mark them as [[IMG id]]. Include
   the plots, diagrams and schemes that help understanding, where you discuss them, using the id verbatim (see the
   default style for how to place them). Leave out decorative or redundant ones. Never invent ids, never
-  \\includegraphics, never draw with TikZ. The text argument of \\lectaimagewithtext is normal text (no verbatim).
+  \\includegraphics (except in a figure copied from the previous version), never draw with TikZ. The text argument of \\lectaimagewithtext is normal text (no verbatim).
 - Code, Mermaid or ASCII diagrams in the notes: keep them in \\begin{{verbatim}} ... \\end{{verbatim}}.
 - Don't invent: everything must come from the notes or the material. If they disagree, follow the material for
   formulas and definitions and flag the difference briefly with \\review{{...}}.
@@ -204,7 +204,7 @@ _d(
     "writing",
     f"""
 The LaTeX below (a chapter body) failed to compile. Fix ONLY what causes the errors listed, changing as little
-as possible and keeping all content (including every \\lectaimage). Do not add \\documentclass, \\usepackage
+as possible and keeping all content (including every figure and \\includegraphics). Do not add \\documentclass, \\usepackage
 or \\begin{{document}}.
 Reply with the corrected LaTeX body as plain text (no JSON, no markdown fences), followed by a last line %%END.
 
@@ -264,8 +264,8 @@ How to work:
 - A picture missing from the text (the import sometimes reads a slide only as text, or leaves a figure out together
   with logos and decorations) can be taken from the sources: find the page (read_source), look at it with
   view_source_page, which also lists the pictures on the page, save the one you need with extract_source_image (a
-  listed region, a bbox of your own, or the whole page), check the picture you get back and place it with
-  \\lectaimage… where the text talks about it.
+  listed region, a bbox of your own, or the whole page), check the picture you get back and place it in a figure
+  (see below) where the text talks about it.
 - Prefer small, exact edits (edit_file: `search` copied exactly from the file, once) over rewriting files. Use
   write_file for new files or real rewrites, create_chapter for new chapters. After risky or structural changes
   (tables, TikZ, new environments, moved chapters) verify: course_overview, and check_build once at the end.
@@ -278,10 +278,19 @@ How to work:
   paragraphs, tables (tabular + booktabs) instead of lists for items that share attributes or fall into categories,
   every important definition, formula, theorem and example kept. Structure with \\section and
   \\subsection; formal statements in the environments definition, theorem, lemma, proposition, corollary, example,
-  remark and proof (e.g. \\begin{{definition}}[Name] ... \\end{{definition}}); all maths as proper LaTeX; small pictures beside the text
-  that explains them with \\lectaimagewithtext[caption]{{images/NAME.png}}{{explanation}}, two on a row with
-  \\lectaimagepair{{caption 1}}{{images/A.png}}{{caption 2}}{{images/B.png}}, alone with
-  \\lectaimage[caption]{{images/NAME.png}} (all three draw the picture small); doubts with \\review{{...}}. Chapter and figure files contain only
+  remark and proof (e.g. \\begin{{definition}}[Name] ... \\end{{definition}}); all maths as proper LaTeX; doubts with
+  \\review{{...}}.
+- The course is a plain LaTeX project that any editor compiles: use only standard commands and the packages of
+  preamble.tex, never define macros of your own in a chapter. Pictures are small, beside the text that explains them,
+  written like the figures already in the course:
+  · beside its text: \\begin{{figure}}[H] \\noindent \\begin{{minipage}}[c]{{0.39\\linewidth}} \\centering
+    \\includegraphics[max width=\\linewidth,max height=0.27\\textheight]{{images/NAME.png}} \\end{{minipage}}\\hfill
+    \\begin{{minipage}}[c]{{0.57\\linewidth}} explanation \\end{{minipage}} \\caption{{caption}} \\end{{figure}};
+  · alone: \\begin{{figure}}[H] \\centering \\includegraphics[max width=0.5\\linewidth,max height=0.22\\textheight]{{images/NAME.png}}
+    \\caption{{caption}} \\end{{figure}};
+  · two on a row: in one figure, two \\begin{{minipage}}[t]{{0.48\\linewidth}} \\centering, each with
+    \\includegraphics[max width=\\linewidth,max height=0.32\\textheight]{{images/A.png}}\\par {{\\small caption}}, joined by \\hfill.
+  Each command on its own line. Chapter and figure files contain only
   the body: never \\documentclass, \\usepackage or \\begin{{document}} (packages go in preamble.tex; check first
   that a package is not already loaded). Drawings you write yourself are TikZ code in figures/NAME.tex, placed
   with \\lectafigure[caption]{{NAME}}; the HTML draft shows them only as placeholders.

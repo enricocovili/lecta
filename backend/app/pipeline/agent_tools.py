@@ -650,8 +650,8 @@ async def extract_source_image(ctx: ToolContext, args: dict[str, Any]) -> ToolRe
     what = f"la figura {region}" if region is not None else "il riquadro" if bbox else "la pagina intera"
     return ToolResult(
         f"Salvata {path} ({w}×{h} px): {what} della pagina {page} di {name}. Controlla l'immagine allegata (se il ritaglio è "
-        f"sbagliato, delete_file e riprova con un altro bbox), poi mettila nel testo dove se ne parla, ad es. "
-        f"\\lectaimage[didascalia]{{{path}}}.",
+        f"sbagliato, delete_file e riprova con un altro bbox), poi mettila nel testo dove se ne parla, "
+        f"in una figure con \\includegraphics[max width=0.5\\linewidth,max height=0.22\\textheight]{{{path}}}.",
         summary=path, wrote=True, images=[{"blob": blob, "mime": "image/png", "width": tw, "height": th, "label": path}])
 
 

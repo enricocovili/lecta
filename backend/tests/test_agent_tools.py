@@ -158,7 +158,7 @@ async def test_pictures_are_taken_from_a_slide(course, slides, admin):
     assert "extract_source_image" not in (await run_tool(ctx(course, "explain"), "view_source_page", {"source_file_id": slides, "page": 2})).text
 
     r = await run_tool(c, "extract_source_image", {"source_file_id": slides, "page": 2, "region": 2})
-    assert r.ok and r.wrote and r.images and "images/lezione-3-p2.png" in r.text and "\\lectaimage" in r.text
+    assert r.ok and r.wrote and r.images and "images/lezione-3-p2.png" in r.text and "\\includegraphics" in r.text
     files = {f["path"] for f in (await admin.get(f"/api/courses/{course['id']}/files")).json()["files"]}
     assert "images/lezione-3-p2.png" in files
     # The embedded picture itself, at its own size, not a render of the page.

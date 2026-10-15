@@ -16,14 +16,15 @@ The job runs to the end by itself (Estrazione › Lettura › Stesura › Inseri
    written, a section per slide; a page written by hand is a picture to read.
 2. **Grouping**: a lesson is one group: its notes with its slides.
 3. **Reading**: the material in units of ~10 pages of one file (Settings → AI e costi), all in parallel, converted
-   faithfully to LaTeX: math as LaTeX, every picture placed with `\lectaimage`, nothing left out (prompt `read.pages`).
+   faithfully to LaTeX: math as LaTeX, every picture placed with the `\lectaimage` shorthand, nothing left out (prompt `read.pages`).
    A reply cut off at the output limit splits the unit in two.
 4. **Writing** (prompt `notes.compose`): the study text of each chapter, in prose. It follows the order and points of
    the class notes and completes them with the material (definitions, formulas, derivations, examples, the useful plots
    and diagrams), compact but without losing concepts; without notes the material is summarised the same way. It is
    written in the course's language (or the notes'). A long text is written in parts in parallel (slices of the notes,
    each with the relevant material), and a reply cut off splits its part.
-5. **Placement** (see below) → **compile check** in a scratch project with at most one automatic AI fix (Settings →
+5. **Placement** (see below) → the picture shorthands written out as plain `figure`s (`\includegraphics`, DECISIONS
+   139) → **compile check** in a scratch project with at most one automatic AI fix (Settings →
    LaTeX) → **written into the course**: a new chapter, the lesson's own chapter, or appended to the chosen/matching
    chapter of the lesson's course. Nothing is ever left waiting for you to file it.
 

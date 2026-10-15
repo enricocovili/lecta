@@ -55,6 +55,29 @@ def test_picture_commands_are_parsed_in_one_place():
     assert lm.without_images(src).split() == ["x", "c", "y", "t", "testo", "{annidato}", "qui", "z", "1", "2"]
 
 
+def test_picture_shorthands_are_written_out_as_plain_latex():
+    from app.services import latexmacros as lm
+
+    out = lm.expand_images("Prima \\lectaimagewithtext[Schema]{images/a.png}{Spiega $x$.} dopo\n\n"
+                           "\\lectaimagewithtext{}{Solo testo.}\n\\lectaimagepair{Uno}{images/a.png}{Due}{}\n"
+                           "\\lectaimage[Sola]{images/b.png}\n\\lectaimage{}\n")
+    assert "\\lecta" not in out
+    assert out.startswith("Prima\n\\begin{figure}[H]\n\\noindent\n\\begin{minipage}[c]{0.39\\linewidth}\n\\centering\n"
+                          "\\includegraphics[max width=\\linewidth,max height=0.27\\textheight]{images/a.png}\n\\end{minipage}\\hfill\n"
+                          "\\begin{minipage}[c]{0.57\\linewidth}\nSpiega $x$.\n\\end{minipage}\n\\caption{Schema}\n\\end{figure}\ndopo\n")
+    assert "\nSolo testo.\n" in out  # no picture: only its text
+    assert "{\\small Uno}" in out and "Due" not in out  # a pair with one picture gone keeps the other
+    assert "\\includegraphics[max width=0.5\\linewidth,max height=0.22\\textheight]{images/b.png}\n\\caption{Sola}" in out
+    assert lm.image_names(out) == ["images/a.png", "images/a.png", "images/b.png"]
+    assert lm.expand_images("\\lectaimage{images/b.png}", (0.42, 0.16)).count("max width=0.42\\linewidth,max height=0.16\\textheight") == 1
+
+
+def test_stitch_keeps_the_courses_own_pictures():
+    parts = [{"unit": "u1", "body": "A \\includegraphics{images/old.png} B \\includegraphics[width=3cm]{inventata.png}\n", "drops": []}]
+    body, _status = read.stitch(parts, {}, "Capitolo")
+    assert "\\includegraphics{images/old.png}" in body and "inventata" not in body
+
+
 def test_units_respect_limits():
     class It:
         def __init__(self, key, kind="page", text="x" * 100, sf=1, image=None):

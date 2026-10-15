@@ -36,7 +36,9 @@ _DROP_RE = re.compile(r"^%%DROP\s+(\S+)\s*$")
 _TITLE_RE = re.compile(r"^%%TITLE:\s*(.*)$")
 _SECTION_RE = re.compile(r"^\\section\*?\{([^}]*)\}\s*$", re.M)
 _TIKZ_RE = re.compile(r"\\begin\{tikzpicture\}.*?\\end\{tikzpicture\}", re.S)
-_INCLUDEGRAPHICS_RE = re.compile(r"\\includegraphics\s*(\[[^\]]*\])?\s*\{[^}]*\}")
+# A picture the model would include by itself; the course's own pictures (images/…, copied from the previous version
+# of a lesson's text) stay.
+_INCLUDEGRAPHICS_RE = re.compile(r"\\includegraphics\s*(\[[^\]]*\])?\s*\{(?!\s*images/)[^}]*\}")
 
 
 # --------------------------------------------------------------------------- units

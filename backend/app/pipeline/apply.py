@@ -139,13 +139,14 @@ def temp_image_path(key: str, ext: str) -> str:
 
 
 def with_image_paths(body: str, images: dict[str, dict[str, Any]]) -> str:
-    """The picture keys of \\lectaimage, \\lectaimagewithtext and \\lectaimagepair → the paths of this job's pictures."""
+    """The text as it goes into the course: the picture keys of the shorthands (\\lectaimage, \\lectaimagewithtext,
+    \\lectaimagepair) → the paths of this job's pictures, and the shorthands written out as plain LaTeX."""
 
     def path(key: str) -> str | None:
         img = images.get(key)
         return temp_image_path(key, img["ext"]) if img else None
 
-    return latexmacros.map_images(body, path)
+    return latexmacros.expand_images(latexmacros.map_images(body, path))
 
 
 async def check_and_fix(

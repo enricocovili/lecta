@@ -1,6 +1,7 @@
 """Parsing the LaTeX macros of the text the import writes: brace matching, `\\name[opt]{a}{b}…`, and the three picture
-commands (`\\lectaimage`, `\\lectaimagewithtext`, `\\lectaimagepair`) that the import, the HTML draft and the
-plain-text extraction all have to understand in the same way."""
+shorthands the import's models write (`\\lectaimage`, `\\lectaimagewithtext`, `\\lectaimagepair`). They never reach a
+course: `expand_images` turns them into plain `figure`/`minipage`/`\\includegraphics` before the text is checked and
+written, so a course is a LaTeX project any editor compiles with the standard packages of its preamble."""
 
 from __future__ import annotations
 
@@ -125,9 +126,14 @@ def map_images(src: str, fn: Callable[[str], str | None]) -> str:
     return "".join(out)
 
 
+_INCLUDEGRAPHICS_RE = re.compile(r"\\includegraphics\s*(?:\[[^\]]*\])?\s*\{([^{}]+)\}")
+
+
 def image_names(src: str) -> list[str]:
-    """The pictures a text uses, in order (empty names left out)."""
-    return [args[i].strip() for _s, _e, name, _o, args in image_spans(src) for i in IMAGE_ARGS[name] if args[i].strip()]
+    """The pictures a text uses, in order (empty names left out): in the shorthands and in `\\includegraphics`."""
+    found = [(s, args[i].strip()) for s, _e, name, _o, args in image_spans(src) for i in IMAGE_ARGS[name] if args[i].strip()]
+    found += [(m.start(), m.group(1).strip()) for m in _INCLUDEGRAPHICS_RE.finditer(src)]
+    return [n for _s, n in sorted(found)]
 
 
 def without_images(src: str) -> str:
@@ -144,5 +150,73 @@ def without_images(src: str) -> str:
             keep = [args[0], args[2]]
         out.append(src[pos:start] + " ".join(k for k in keep if k.strip()))
         pos = end
+    out.append(src[pos:])
+    return "".join(out)
+
+
+# The size each shorthand draws its picture at, as the largest fraction of the line width and of the page height
+# (adjustbox's `max width`/`max height`: a picture is never enlarged, only made to fit). A lone picture is small;
+# beside its text the line is shared; two on a row each get half of it.
+IMAGE_SIZE = (0.5, 0.22)
+
+
+def _graphic(path: str, width: str, height: float) -> str:
+    return f"\\includegraphics[max width={width},max height={height:g}\\textheight]{{{path.strip()}}}"
+
+
+def _caption(caption: str | None) -> str:
+    return f"\\caption{{{caption.strip()}}}\n" if caption and caption.strip() else ""
+
+
+def _image_figure(path: str, caption: str | None, size: tuple[float, float]) -> str:
+    return ("\\begin{figure}[H]\n\\centering\n" + _graphic(path, f"{size[0]:g}\\linewidth", size[1]) + "\n"
+            + _caption(caption) + "\\end{figure}")
+
+
+def _expand(name: str, opt: str | None, args: list[str], size: tuple[float, float]) -> str:
+    if name == "lectaimage":
+        return _image_figure(args[0], opt, size) if args[0].strip() else ""
+    if name == "lectaimagewithtext":
+        path, text = args[0], args[1].strip()
+        if not path.strip():
+            return text
+        return ("\\begin{figure}[H]\n\\noindent\n"
+                "\\begin{minipage}[c]{0.39\\linewidth}\n\\centering\n" + _graphic(path, "\\linewidth", 0.27) + "\n"
+                "\\end{minipage}\\hfill\n"
+                "\\begin{minipage}[c]{0.57\\linewidth}\n" + text + "\n\\end{minipage}\n"
+                + _caption(opt) + "\\end{figure}")
+    pairs = [(args[0], args[1]), (args[2], args[3])]
+    kept = [(c.strip(), p) for c, p in pairs if p.strip()]
+    if not kept:
+        return "\n\n".join(c.strip() for c, _p in pairs if c.strip())
+
+    def cell(caption: str, path: str) -> str:
+        return (_graphic(path, "\\linewidth", 0.32) + "\\par\n" + (f"{{\\small {caption}}}\n" if caption else ""))
+
+    if len(kept) == 1:
+        return "\\begin{figure}[H]\n\\centering\n\\begin{minipage}[t]{0.48\\linewidth}\n\\centering\n" + cell(*kept[0]) + "\\end{minipage}\n\\end{figure}"
+    return ("\\begin{figure}[H]\n\\centering\n"
+            + "\\hfill\n".join("\\begin{minipage}[t]{0.48\\linewidth}\n\\centering\n" + cell(c, p) + "\\end{minipage}" for c, p in kept)
+            + "\n\\end{figure}")
+
+
+def expand_images(src: str, size: tuple[float, float] = IMAGE_SIZE) -> str:
+    """The text with every picture shorthand written out as plain LaTeX (`figure`, `minipage`, `\\includegraphics` with
+    adjustbox's limits), each on lines of its own. A shorthand whose picture is gone leaves its text and captions."""
+    out, pos = [], 0
+    for start, end, name, opt, args in image_spans(src):
+        if start < pos:
+            continue
+        before = src[pos:start]
+        new = _expand(name, opt, args, size)
+        if new and before and not before.endswith("\n"):
+            before = before.rstrip(" \t") + "\n"
+        out.append(before + new)
+        pos = end
+        if new:
+            while pos < len(src) and src[pos] in " \t":
+                pos += 1
+            if pos < len(src) and src[pos] != "\n":
+                out.append("\n")
     out.append(src[pos:])
     return "".join(out)
