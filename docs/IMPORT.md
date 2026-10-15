@@ -25,7 +25,7 @@ The job runs to the end by itself (Estrazione › Lettura › Stesura › Inseri
    each with the relevant material), and a reply cut off splits its part.
 5. **Placement** (see below) → the picture shorthands written out as plain `figure`s (`\includegraphics`, DECISIONS
    139) → **compile check** in a scratch project with at most one automatic AI fix (Settings →
-   LaTeX) → **written into the course**: a new chapter, the lesson's own chapter, or appended to the chosen/matching
+   LaTeX; lines that run past the margin are fixed like errors, DECISIONS 140) → **written into the course**: a new chapter, the lesson's own chapter, or appended to the chosen/matching
    chapter of the lesson's course. Nothing is ever left waiting for you to file it.
 
 Every step is memoised: a retried job never repeats finished work or re-sends anything, and writing into a course

@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import SessionLocal
 from ..egress.schemas import ToolSpec
 from ..models import Chapter, Course, IngestItem, ProjectFile, SourceFile, SourceLink
-from ..services import blobs, compile as compile_svc, latex, projects, retrieval, templates
+from ..services import blobs, compile as compile_svc, latex, projects, retrieval, templates, texlog
 from ..services.projects import ProjectError
 from . import apply as prop, pdfextract
 
@@ -559,11 +559,17 @@ async def check_build(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:
     diags = res.get("diagnostics") or []
     errors = [d for d in diags if d.get("level") == "error"]
     warns = [d for d in diags if d.get("level") == "warning"]
-    lines = [f"Esito: {res['status']} ({res.get('seconds', 0):.1f} s) — {len(errors)} errori, {len(warns)} avvisi"]
+    # (A chapter's last paragraph ends after \include returns: TeX blames main.tex for it.)
+    wide = [d for d in texlog.overfull(diags) if d.get("file") != "preamble.tex"]
+    lines = [f"Esito: {res['status']} ({res.get('seconds', 0):.1f} s) — {len(errors)} errori, {len(warns)} avvisi, "
+             f"{len(wide)} righe oltre il margine"]
     for d in (errors + warns)[:15]:
         where = f"{d.get('file') or '?'}:{d.get('line') or '?'}"
         lines.append(f"  [{d['level']}] {where}: {str(d.get('message'))[:200]}" + (f" (vicino a: {str(d['context'])[:100]})" if d.get("context") else ""))
-    return ToolResult("\n".join(lines), summary=f"{len(errors)} errori, {len(warns)} avvisi", ok=res["status"] == "ok" or not errors)
+    for d in wide[:15]:
+        lines.append(f"  [margine] {d.get('file')}:{d.get('line') or '?'}: {d['pt']:.0f}pt oltre il margine destro; {texlog.FIT_HINT}")
+    return ToolResult("\n".join(lines), summary=f"{len(errors)} errori, {len(warns)} avvisi, {len(wide)} oltre il margine",
+                      ok=(res["status"] == "ok" or not errors) and not wide)
 
 
 # --------------------------------------------------------------------------- write tools

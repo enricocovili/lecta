@@ -186,3 +186,14 @@ def block_diagram_size() -> tuple[int, int]:
     from tests.fixtures import block_diagram
 
     return block_diagram().size
+
+
+async def test_check_build_reports_lines_past_the_margin(course, admin):
+    path = course["chapters"][0]["path"]
+    ok = await run_tool(ctx(course), "check_build", {"path": path})
+    assert ok.ok and "0 righe oltre il margine" in ok.text
+    wide = "una frase che non può andare a capo perché è in una scatola " * 3
+    await admin.put(f"/api/courses/{course['id']}/files/content", json={"path": path, "content": CHAPTER + f"Poi \\underline{{{wide}}}.\n"})
+    r = await run_tool(ctx(course), "check_build", {"path": path})
+    # It compiles, but the line runs into the margin: not done yet.
+    assert not r.ok and "1 righe oltre il margine" in r.text and "[margine] " in r.text and "\\ul" in r.text

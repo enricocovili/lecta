@@ -25,7 +25,7 @@ from ..db import SessionLocal
 from ..egress import gate
 from ..egress.schemas import EgressRequest, EgressResult, Message, Part, ToolCall
 from ..models import Chapter, ChatMessage, ChatSession, Course, ProjectFile
-from ..services import blobs, projects, prompts
+from ..services import blobs, draft, latex, projects, prompts
 from ..services import settings as settings_svc
 from . import agent_tools as tools
 from . import apply as prop
@@ -242,6 +242,38 @@ def summarize(pre: dict[str, Any], cur: dict[str, Any]) -> dict[str, Any]:
     return {"files": files, "chapters": chapters}
 
 
+MAX_CHECKS = 2  # times a turn is sent back to fix what it wrote past the margin
+
+
+async def margin_check(course_id: int, pre: dict[str, Any] | None, cur: dict[str, Any] | None) -> str | None:
+    """The blocks of the draft that this turn wrote and that run past the page's right margin, as a note for the model;
+    None when everything it wrote fits (what was already too wide elsewhere is not its doing)."""
+    if pre is None or cur is None:
+        return None
+    found: list[str] = []
+    async with SessionLocal() as db:
+        course = await db.get(Course, course_id)
+        for f in summarize(pre, cur)["files"]:
+            if not f.get("chapter_id") or f["op"] not in ("modify", "create") or not f["hunks"]:
+                continue
+            chapter = await db.get(Chapter, f["chapter_id"])
+            if course is None or chapter is None:
+                continue
+            try:
+                res = await draft.render_chapter(db, course, chapter)
+            except latex.CompileServiceError:
+                continue
+            for b in res["blocks"]:
+                if b.get("overflow_mm") and any(h["from_line"] <= b["end"] and h["to_line"] >= b["start"] for h in f["hunks"]):
+                    found.append(f"- {chapter.path}, lines {b['start']}-{b['end']}: {b['overflow_mm']} mm past the margin")
+    if not found:
+        return None
+    return ("[automatic margin check] These blocks you wrote run past the right margin of the page (in the PDF and in the "
+            "draft):\n" + "\n".join(found[:12]) + "\nFix them now with edit_file: \\ul{...}/\\hl{...} instead of \\underline, "
+            "\\colorbox or \\mbox; split long formulas (align, multline); p{..} or X columns in tables; long names in \\url or "
+            "verbatim. Then answer the user as before.")
+
+
 async def undo_turn(db: AsyncSession, msg: ChatMessage) -> dict[str, Any]:
     """Restore what the turn changed. Refused (409) when those files changed again since."""
     from fastapi import HTTPException
@@ -439,6 +471,8 @@ class Bench:
     max_tokens: int
     # async () -> None, after the reply is saved
     on_changed: Any = None
+    # async () -> str | None, when the model wants to end its answer: what it still has to fix (it is sent back to it)
+    check: Any = None
 
 
 async def _prepare(turn: Turn, user_msg_id: int) -> Bench:
@@ -484,12 +518,15 @@ async def _prepare(turn: Turn, user_msg_id: int) -> Bench:
             focus = next((f["path"] for f in summarize(state["pre"], state["cur"])["files"] if f["path"].startswith("chapters/")), None)
             prop.recompile_later(course_id, focus)
 
+    async def check() -> str | None:
+        return await margin_check(course_id, state["pre"], state.get("cur"))
+
     ctx.before_write, ctx.after_write = before_write, after_write
     return Bench(
         system=system, messages=messages, meta=meta, mode=mode, specs=tools.specs_for(mode),
         run_tool=lambda name, args: tools.run_tool(ctx, name, args), label_for=tools.label_for,
         gctx=gate.GateContext(chat_session_id=session_id, course_id=course_id, title="Assistente"),
-        max_steps=ai.agent_max_steps, max_tokens=ai.max_output_tokens, on_changed=on_changed,
+        max_steps=ai.agent_max_steps, max_tokens=ai.max_output_tokens, on_changed=on_changed, check=check,
     )
 
 
@@ -508,6 +545,7 @@ async def _drive(turn: Turn, prepare: Any) -> None:
         bench: Bench = await prepare()
         messages, meta, mode, max_steps = bench.messages, bench.meta, bench.mode, bench.max_steps
         finished_cleanly = False
+        checks = 0
 
         for step in range(max_steps):
             if turn.cancel:
@@ -548,6 +586,18 @@ async def _drive(turn: Turn, prepare: Any) -> None:
             if not calls:
                 if not step_text.strip() and result.finish_reason == "length":
                     raise gate.GateSendError("risposta interrotta dal limite di output prima di scrivere qualcosa", kind="truncated")
+                # What it wrote must fit the page: if not, it is sent back to fix it before the answer ends.
+                note = await bench.check() if bench.check is not None and checks < MAX_CHECKS and step_text.strip() and not turn.cancel else None
+                if note:
+                    checks += 1
+                    sid = f"{step}-margins"
+                    steps.append({"id": sid, "name": "margin_check", "label": "Controllo dei margini", "status": "error",
+                                  "summary": "testo oltre il margine: lo correggo"})
+                    await turn.emit("tool", {"id": sid, "name": "margin_check", "label": "Controllo dei margini", "status": "running"})
+                    await turn.emit("tool_done", {"id": sid, "ok": False, "summary": "testo oltre il margine: lo correggo"})
+                    messages.append(Message(role="assistant", parts=[Part(type="text", text=step_text)]))
+                    messages.append(Message(role="user", parts=[Part(type="text", text=note)]))
+                    continue
                 finished_cleanly = True
                 break
             # The model asked for tools: run them, then let it continue.

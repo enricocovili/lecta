@@ -65,7 +65,9 @@ The panel on the right of a course is an **agent with tools**. Per turn it decid
   as they are.
 * **Changes everything**: `edit_file` (exact search/replace), `write_file`, `create_chapter`, `rename_chapter`,
   `move_chapter`, `delete_chapter`, `delete_file`, `rename_file`, the preamble and `main.tex` (its chapter list stays
-  managed); and verifies with `check_build` (real compile, errors with file and line).
+  managed); and verifies with `check_build` (real compile, errors with file and line, and the lines that run past the
+  margin). Before it ends an answer, the blocks it wrote are checked in the draft: one that runs past the margin is
+  sent back to it to fix (twice at most), shown as «Controllo dei margini» among its steps.
 * **Applied immediately.** The first write of a turn snapshots the course; the change card under the answer lists the
   files (+/− lines) and has **Annulla**, which restores the whole turn (refused if those files changed again since:
   undo the newer ones first).

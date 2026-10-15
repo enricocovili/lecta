@@ -182,7 +182,13 @@ async def check_and_fix(
         diagnostics = texlog.parse(res.get("log", ""))
         status = res.get("status", "error")
         errors = [d for d in diagnostics if d["level"] == "error" and (d.get("file") or "").startswith("chapters/")]
-        if status == "ok" or not errors or attempt >= autofix:
+        # A line past the margin is fixed like an error (the text is still written if it stays).
+        # The scratch project holds only this chapter: whatever runs past the margin is in it (its last paragraph ends
+        # after \include returns, so TeX names main.tex for that one).
+        wide = [{**d, "file": f"chapters/01-{slug}.tex", "message": f"{d['message']}: {texlog.FIT_HINT}"}
+                for d in texlog.overfull(diagnostics) if d.get("file") != "preamble.tex"]
+        errors += wide
+        if (status == "ok" and not wide) or not errors or attempt >= autofix:
             break
         await ctx.log(f"compile errors in “{title}”: " + "; ".join(e["message"] for e in errors[:3]), "warn",
                       stage="compile", item=title, kind="compile_error", attempt=attempt + 1)
@@ -202,6 +208,9 @@ async def check_and_fix(
         if new_body.strip() == body.strip():
             break
         body = new_body
+    if wide:
+        await ctx.log(f"“{title}”: {len(wide)} righe escono dal margine della pagina, correggile nel testo", "warn",
+                      stage="compile", item=title, kind="overfull")
     return {"status": status, "diagnostics": diagnostics[:200], "body": body}
 
 

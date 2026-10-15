@@ -87,6 +87,22 @@ async def test_turn_reads_edits_and_the_change_is_applied_at_once(admin):
     assert [e for e, _ in await _events(admin, reply["id"], after=len(kinds) - 1)] == ["done"]
 
 
+async def test_text_written_past_the_margin_is_sent_back_to_be_fixed(admin):
+    await setup_fake(admin)
+    c, ch, s = await _course(admin)
+    reply, events = await _ask(admin, s, ch, "Aggiungi un esempio FAKE:WIDE")
+    tools = [d["name"] for e, d in events if e == "tool"]
+    # The underline it wrote cannot break: before ending, the turn is told and fixes it.
+    assert tools == ["read_file", "edit_file", "margin_check", "edit_file"], tools
+    assert [d["ok"] for e, d in events if e == "tool_done"] == [True, True, False, True]
+    text = await _content(admin, c, ch)
+    assert "\\ul{una frase" in text and "\\underline" not in text
+    final = next(d for e, d in events if e == "done")["reply"]
+    assert final["status"] == "done" and [st["name"] for st in final["steps"]] == tools
+    blocks = (await admin.get(f"/api/courses/{c['id']}/chapters/{ch['id']}/draft")).json()["blocks"]
+    assert not any(b.get("overflow_mm") for b in blocks)
+
+
 async def test_undo_restores_the_turn_and_only_once(admin):
     await setup_fake(admin)
     c, ch, s = await _course(admin, "Algebra undo")

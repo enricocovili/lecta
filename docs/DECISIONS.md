@@ -927,3 +927,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      (`e2e/tests/11-draft-margins.spec.ts`). Whoever may change the course sees «Esce dal margine di X mm» under it;
      readers only see it fit. *Alternatives:* cropping the picture to the text width (hides text); a horizontal
      scrollbar per block (the reader has to notice it, and it still looks broken).
+     The writers must fix it. When the assistant would end an answer, the chapters it changed are typeset in the draft
+     and the blocks on changed lines with `overflow_mm` go back to it as a note (`agent.margin_check`, at most twice
+     per turn, a «Controllo dei margini» step for the user); what was already too wide elsewhere is not its doing and
+     is left alone. `check_build` lists the lines more than 3 pt too wide (`texlog.overfull`) and is not ok while
+     there are any. The import's compile check treats them as errors for its automatic fix (the text is still written
+     if they stay, with a warning in the job's log). A block written by hand is saved as written and only marked.

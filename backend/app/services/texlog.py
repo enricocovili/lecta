@@ -136,3 +136,20 @@ def parse(log: str) -> list[dict]:
 
 def summary(diags: list[dict]) -> dict:
     return {lvl: sum(1 for d in diags if d["level"] == lvl) for lvl in ("error", "warning", "badbox", "info")}
+
+
+_OVERFULL_RE = re.compile(r"^Overfull \\hbox \(([\d.]+)pt too wide\)")
+# How far (pt) a line may pass the margin unnoticed: TeX's slack and italic overhangs stay under it.
+OVERFULL_TOL = 3.0
+FIT_HINT = ("it runs past the right margin: make it break (\\ul/\\hl instead of \\underline/\\colorbox/\\mbox, split the "
+            "formula, p{..} or X columns in the table, long names in \\url or verbatim)")
+
+
+def overfull(diags: list[dict], tol: float = OVERFULL_TOL) -> list[dict]:
+    """The lines that run past the right margin by more than `tol` pt, each with its `pt`."""
+    out = []
+    for d in diags:
+        m = _OVERFULL_RE.match(d.get("message") or "") if d.get("level") == "badbox" else None
+        if m and float(m.group(1)) > tol:
+            out.append({**d, "pt": float(m.group(1))})
+    return out

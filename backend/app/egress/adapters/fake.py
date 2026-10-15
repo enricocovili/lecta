@@ -127,6 +127,8 @@ class FakeAdapter(Adapter):
         body = "\n\n".join(out)
         if "FAKE:BADLATEX" in text:
             body += "\n\n\\undefinedmacro{}"
+        if "FAKE:WIDE" in text:  # a line LaTeX cannot break
+            body += "\n\nSi noti \\underline{" + "una frase che non può andare a capo perché è in una scatola " * 3 + "} bene.\n\nFine."
         return body
 
     def _read_pages(self, m: dict[str, Any]) -> str:
@@ -201,7 +203,7 @@ class FakeAdapter(Adapter):
         bad = set(m.get("error_lines") or [])
         lines = latex.split("\n")
         fixed = [("% removed by auto-fix: " + ln) if (i + 1) in bad else ln for i, ln in enumerate(lines)]
-        out = "\n".join(fixed).replace("\\undefinedmacro{}", "")
+        out = "\n".join(fixed).replace("\\undefinedmacro{}", "").replace("\\underline{", "\\ul{")
         return out + "\n%%END\n"
 
     def _place(self, m: dict[str, Any]) -> dict[str, Any]:
@@ -256,6 +258,9 @@ class FakeAdapter(Adapter):
         path = m.get("chapter_path") or m.get("first_chapter_path")
         chap_match = re.search(r"nuovo capitolo:\s*(.+)", msg, re.I)
         img_match = re.search(r"FAKE:IMAGE (\d+) (\d+) (\d+)", msg)
+        # Sent back by the margin check: the wide underline becomes one that breaks across lines.
+        if any("[automatic margin check]" in (p.text or "") for p in parts if p.type == "text"):
+            return done("Correggo il testo oltre il margine. ", [call("edit_file", path=path, search="\\underline{", replace="\\ul{", replace_all=True)])
         if not results:
             if img_match and mode not in ("explain", "review"):
                 sid, page, region = (int(g) for g in img_match.groups())
@@ -287,6 +292,8 @@ class FakeAdapter(Adapter):
                 (ln for ln in reversed(source.split("\n")) if ln.strip()), "")
             if anchor:
                 block = "\\begin{example}\nSia $x = 1$: allora $x^2 = 1$.\n\\end{example}"
+                if "FAKE:WIDE" in msg:  # test hook: a line LaTeX cannot break
+                    block = "Si noti \\underline{" + "una frase che non può andare a capo perché è in una scatola " * 3 + "} bene."
                 return done("Aggiungo un esempio. ", [call("edit_file", path=path, search=anchor, replace=anchor + "\n\n" + block)])
         if last.tool_name == "edit_file":
             if last.is_error:

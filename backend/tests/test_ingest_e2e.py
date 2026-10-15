@@ -131,6 +131,18 @@ async def test_bad_latex_gets_one_automatic_fix(admin, worker):
     assert "\\undefinedmacro" not in text
 
 
+async def test_a_line_past_the_margin_is_fixed_like_an_error(admin, worker):
+    await setup_fake(admin)
+    course = (await admin.post("/api/courses", json={"name": "Margini", "language": "it"})).json()
+    job_id = await lesson(admin, course["id"], _slides(["Testo con una riga troppo larga FAKE:WIDE"]))
+    j = await _done(admin, job_id)
+    assert (await _tasks(job_id)).count("notes.fix") == 1
+    ch = (await admin.get(f"/api/courses/{course['id']}")).json()["chapters"][0]
+    text = (await admin.get(f"/api/courses/{course['id']}/files/content", params={"path": ch["path"]})).json()["content"]
+    assert "\\ul{una frase" in text and "\\underline" not in text
+    assert not any(x.get("kind") == "overfull" for x in j["logs"])
+
+
 async def test_truncated_reply_splits_the_unit(admin, worker):
     await setup_fake(admin)
     course = (await admin.post("/api/courses", json={"name": "Tagli", "language": "it"})).json()
