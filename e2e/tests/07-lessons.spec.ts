@@ -389,6 +389,13 @@ test.describe.serial("Lezioni", () => {
     await expect(page.getByTestId("overview-lesson").getByRole("switch", { name: "Completata" })).toBeChecked();
     await page.goto("/admin");
     await expect(card.getByTestId("course-continue")).toHaveText("Ultima lezione: Lezione 1 - Sistemi LTI");
+    // The list view is remembered, and after a reload the switch highlights it, not the server's default.
+    const views = page.locator(".pg-toolbar [role=tablist]");
+    await views.getByRole("tab", { name: "Elenco" }).click();
+    await page.reload();
+    await expect(page.locator(".pg-course-row").first()).toBeVisible();
+    await expect(views.getByRole("tab", { name: "Elenco" })).toHaveAttribute("aria-selected", "true");
+    await expect(views.getByRole("tab", { name: "Griglia" })).toHaveAttribute("aria-selected", "false");
 
     // In the editor's top bar the same switch puts it back in progress.
     await page.goto(href);

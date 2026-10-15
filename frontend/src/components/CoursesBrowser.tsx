@@ -240,7 +240,12 @@ export default function CoursesBrowser({ role, userId }: { role?: Role; userId?:
   // While something runs (an import, a compile, the assistant) the cards follow it.
   const busy = (states.data ?? []).some((s) => s.status === "working" || s.ai_running);
   usePoll(states.reload, busy ? 4000 : 20000);
-  const [view, setView] = useLocalStorage<"grid" | "list">("lecta.courses.view", "grid");
+  const [saved, setView] = useLocalStorage<"grid" | "list">("lecta.courses.view", "grid");
+  // The page is rendered on the server with the default view: the saved one is shown once hydrated, or React would
+  // keep the server's «Griglia» highlighted over the list.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  const view = hydrated ? saved : "grid";
   const [showNew, setShowNew] = useState(false);
   const [filter, setFilter] = useState("");
 
