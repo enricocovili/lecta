@@ -15,12 +15,13 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, text, update
+from sqlalchemy import delete, func, select, text, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import config
 from ..db import get_db
-from ..models import Chapter, ChatSession, Course, Job, Lab, Lesson, LessonPage, LessonShare, Upload
+from ..models import Chapter, ChatSession, Course, Job, Lab, Lesson, LessonMark, LessonPage, LessonPlace, LessonShare, Upload
 from ..security.access import Access, can_write, check, private_access, readable
 from ..security.auth import require_admin
 from ..services import blobs
@@ -47,14 +48,15 @@ def _now() -> datetime:
 # --------------------------------------------------------------------------- output
 
 
-def page_out(p: LessonPage, owner: bool = True) -> dict[str, Any]:
-    """A page as the editor gets it; the «non capita» mark is the owner's alone (a share link does not see it)."""
+def page_out(p: LessonPage, marks: set[int] | None = None) -> dict[str, Any]:
+    """A page as the editor gets it; `marks`: the pages the signed-in user marked «non capita» (each user has their own;
+    a share link, without them, sees none)."""
     out = {
         "id": p.id, "position": p.position, "kind": p.kind, "slide_page": p.slide_page, "ratio": p.ratio,
         "notes": p.notes, "ink": p.ink, "version": p.version,
     }
-    if owner:
-        out["unclear"] = p.unclear
+    if marks is not None:
+        out["unclear"] = p.id in marks
     return out
 
 
@@ -62,7 +64,7 @@ def lesson_out(lesson: Lesson, course_name: str | None = None, stats: dict[str, 
     out: dict[str, Any] = {
         "id": lesson.id, "course_id": lesson.course_id, "number": lesson.number, "title": lesson.title, "status": lesson.status, "has_pdf": bool(lesson.pdf_blob),
         "pdf_name": lesson.pdf_name, "pdf_pages": lesson.pdf_pages, "generated_at": lesson.generated_at,
-        "last_result": lesson.last_result, "chapter_id": lesson.chapter_id, "last_page_id": lesson.last_page_id, "created_at": lesson.created_at, "updated_at": lesson.updated_at,
+        "last_result": lesson.last_result, "chapter_id": lesson.chapter_id, "created_at": lesson.created_at, "updated_at": lesson.updated_at,
     }
     if course_name is not None:
         out["course_name"] = course_name
@@ -84,6 +86,12 @@ async def _next_number(db: AsyncSession, course_id: int) -> int:
 
 async def _pages(db: AsyncSession, lesson_id: int) -> list[LessonPage]:
     return list((await db.execute(select(LessonPage).where(LessonPage.lesson_id == lesson_id).order_by(LessonPage.position, LessonPage.id))).scalars())
+
+
+async def _marks(db: AsyncSession, lesson_id: int, user_id: int) -> set[int]:
+    """The pages of the lesson that the user marked «non capita»."""
+    q = select(LessonMark.page_id).join(LessonPage, LessonPage.id == LessonMark.page_id).where(LessonPage.lesson_id == lesson_id, LessonMark.user_id == user_id)
+    return set((await db.execute(q)).scalars())
 
 
 async def _course(db: AsyncSession, course_id: int, acc: Access) -> Course:
@@ -160,8 +168,10 @@ async def get_lesson(lesson_id: int, pages: bool = True, acc: Access = Depends(p
     chapter = await db.get(Chapter, lesson.chapter_id) if lesson.chapter_id else None
     out["chapter"] = {"id": chapter.id, "title": chapter.title, "position": chapter.position} if chapter else None
     out["lab"] = (await labs.lab_counts(db, [lesson.id])).get(lesson.id)
+    out["last_page_id"] = (await db.execute(select(LessonPlace.page_id).where(LessonPlace.lesson_id == lesson.id, LessonPlace.user_id == acc.user.id))).scalar_one_or_none()
     if pages:
-        out["pages"] = [page_out(p) for p in await _pages(db, lesson.id)]
+        marks = await _marks(db, lesson.id, acc.user.id)
+        out["pages"] = [page_out(p, marks) for p in await _pages(db, lesson.id)]
     return out
 
 
@@ -305,12 +315,15 @@ class Unclear(BaseModel):
 
 
 @router.put("/lessons/{lesson_id}/pages/{page_id}/unclear")
-async def mark_unclear(lesson_id: int, page_id: int, body: Unclear, db: AsyncSession = Depends(get_db)) -> dict:
-    """Mark a page «non capita» (or take the mark away). Not a change of the notes: the version stays."""
+async def mark_unclear(lesson_id: int, page_id: int, body: Unclear, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
+    """Mark a page «non capita» for oneself (or take the mark away). Not a change of the notes: the version stays."""
     p = await _page(db, lesson_id, page_id)
-    p.unclear = body.unclear
+    if body.unclear:
+        await db.execute(insert(LessonMark).values(page_id=p.id, user_id=acc.user.id).on_conflict_do_nothing())
+    else:
+        await db.execute(delete(LessonMark).where(LessonMark.page_id == p.id, LessonMark.user_id == acc.user.id))
     await db.commit()
-    return {"unclear": p.unclear}
+    return {"unclear": body.unclear}
 
 
 class Bookmark(BaseModel):
@@ -318,10 +331,11 @@ class Bookmark(BaseModel):
 
 
 @router.put("/lessons/{lesson_id}/last-page")
-async def set_last_page(lesson_id: int, body: Bookmark, db: AsyncSession = Depends(get_db)) -> dict:
-    """Remember the page being looked at (opening the lesson again goes there). Doesn't count as a change of the lesson."""
+async def set_last_page(lesson_id: int, body: Bookmark, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
+    """Remember the page the user is looking at (opening the lesson again takes them there). Doesn't count as a change of the lesson."""
     await _page(db, lesson_id, body.page_id)
-    await db.execute(update(Lesson).where(Lesson.id == lesson_id).values(last_page_id=body.page_id))
+    stmt = insert(LessonPlace).values(lesson_id=lesson_id, user_id=acc.user.id, page_id=body.page_id)
+    await db.execute(stmt.on_conflict_do_update(index_elements=[LessonPlace.lesson_id, LessonPlace.user_id], set_={"page_id": stmt.excluded.page_id}))
     await db.commit()
     return {"ok": True}
 
@@ -371,12 +385,17 @@ class PageRestore(BaseModel):
     position: int = Field(ge=1)
     notes: str = Field("", max_length=ls.MAX_NOTES_CHARS)
     ink: list[dict[str, Any]] = Field(default_factory=list)
-    unclear: bool = False  # the owner's mark (a share link's restore leaves it off)
+    unclear: bool = False  # the mark of the user who brings it back (a share link has none)
 
 
 @router.post("/lessons/{lesson_id}/pages/restore", status_code=201)
-async def restore_page(lesson_id: int, body: PageRestore, db: AsyncSession = Depends(get_db)) -> dict:
-    """Undo of a page removal: the page comes back with its own id, notes and strokes, at its place in the lesson."""
+async def restore_page(lesson_id: int, body: PageRestore, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
+    return await restore(db, lesson_id, body, acc.user.id)
+
+
+async def restore(db: AsyncSession, lesson_id: int, body: PageRestore, user_id: int | None) -> dict:
+    """Undo of a page removal: the page comes back with its own id, notes and strokes, at its place in the lesson, and
+    with the «non capita» mark of `user_id` (none for a share link)."""
     lesson = await _lesson(db, lesson_id)
     pages = await _pages(db, lesson.id)
     if len(pages) >= ls.MAX_PAGES:
@@ -400,28 +419,34 @@ async def restore_page(lesson_id: int, body: PageRestore, db: AsyncSession = Dep
     await db.execute(update(LessonPage).where(LessonPage.lesson_id == lesson.id, LessonPage.position >= pos).values(position=LessonPage.position + 1))
     page = LessonPage(
         id=body.id, lesson_id=lesson.id, position=pos, kind=body.kind, slide_page=body.slide_page if body.kind == "slide" else None,
-        ratio=body.ratio, notes=body.notes.replace("\x00", ""), ink=ink, unclear=body.unclear,
+        ratio=body.ratio, notes=body.notes.replace("\x00", ""), ink=ink,
     )
     db.add(page)
+    marked = user_id is not None and body.unclear
+    if marked:
+        await db.flush()
+        db.add(LessonMark(page_id=page.id, user_id=user_id))
     lesson.updated_at = _now()
     await db.commit()
-    return page_out(page)
+    return page_out(page, None if user_id is None else ({page.id} if marked else set()))
 
 
 class SyncIn(BaseModel):
     known: dict[int, int] = Field(default_factory=dict)  # page id -> the version the caller has
 
 
-async def sync_out(db: AsyncSession, lesson: Lesson, known: dict[int, int], owner: bool = True) -> dict[str, Any]:
-    """What changed since the caller last looked: the order of the pages and the pages it doesn't have (or has another version of).
-    Used by the shared views and by an editor that has share links, to follow what others write."""
+async def sync_out(db: AsyncSession, lesson: Lesson, known: dict[int, int], user_id: int | None = None) -> dict[str, Any]:
+    """What changed since the caller last looked: the order of the pages and the pages it doesn't have (or has another version of),
+    with the marks of `user_id` (none for a share link). Used by the shared views and by an editor that has share links,
+    to follow what others write."""
     pages = await _pages(db, lesson.id)
-    return {"title": lesson.title, "order": [p.id for p in pages], "pages": [page_out(p, owner) for p in pages if known.get(p.id) != p.version]}
+    marks = None if user_id is None else await _marks(db, lesson.id, user_id)
+    return {"title": lesson.title, "order": [p.id for p in pages], "pages": [page_out(p, marks) for p in pages if known.get(p.id) != p.version]}
 
 
 @router.post("/lessons/{lesson_id}/sync")
-async def sync_lesson(lesson_id: int, body: SyncIn, db: AsyncSession = Depends(get_db)) -> dict:
-    return await sync_out(db, await _lesson(db, lesson_id), body.known)
+async def sync_lesson(lesson_id: int, body: SyncIn, acc: Access = Depends(private_access), db: AsyncSession = Depends(get_db)) -> dict:
+    return await sync_out(db, await _lesson(db, lesson_id), body.known, acc.user.id)
 
 
 # --------------------------------------------------------------------------- share links

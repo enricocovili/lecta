@@ -16,7 +16,7 @@ export interface PageState {
   notes: string;
   ink: Stroke[];
   version: number;
-  /** marked «non capita» (the owner's editor only) */
+  /** marked «non capita» by the signed-in user (each user has their own; a share link sees none) */
   unclear?: boolean;
 }
 
@@ -401,7 +401,7 @@ export function useLessonPages(src: LessonSource, initial: PageState[], poll: nu
 
   // ------------------------------------------------------------------ structure
 
-  /** Mark a page «non capita», or take the mark away (the owner's): saved at once, not a step of the history. */
+  /** Mark a page «non capita» for oneself, or take the mark away: saved at once, not a step of the history. */
   const setUnclear = useCallback(
     (pid: number, on: boolean) => {
       patchPage(pid, (p) => ({ ...p, unclear: on }));

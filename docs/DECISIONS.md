@@ -635,7 +635,7 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      Asking the assistant needs the right to change the course (a viewer or another editor gets 403), so an editor's
      assistant never works on someone else's text. `audit_log.user_id` is taken, when the call starts, from the
      conversation or the job the call is for; the costs page adds a «Per utente» split when more than one user spent.
-     «Non capita» marks and the last open page stay shared per lesson for now (#87). *Alternative:* conversations shared
+     «Non capita» marks and the last open page are each user's too (137). *Alternative:* conversations shared
      by everybody who can read the course (one user's questions are not another's business).
 120. **New accounts come only from invite links, and an invited account has only passkeys (#76).** An admin creates
      an invite with a role and an optional note (`POST /api/invites`); the link `/invito/<token>` is shown once (only
@@ -863,4 +863,10 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      only reads it, one click from the lesson. *Why:* going back to the lesson in progress was the one use of the list
      of all lessons (135). *Alternative:* the lesson the user last opened (one more thing to store per user, and the
      one written in is almost always the same).
-
+137. **«Non capita» marks and the last open page are each user's (#87).** `lesson_marks` (page, user) holds a mark,
+     `lesson_places` (lesson, user → page) the page a user had open last; both go with the page, the lesson or the user.
+     The lesson and its sync give each user only their own marks and place, an undo brings a page back with the mark of
+     whoever undoes it, and share links still see none. The marks and places there were went to the course's owner.
+     Who may set them is unchanged (whoever may change the lesson). *Why:* with several users on one lesson (its owner
+     and an admin), one user's mark or reading position showed up for the other. *Alternative:* keeping them on the
+     page and the lesson, seen by everybody (a mark is a note to oneself, not part of the notes).

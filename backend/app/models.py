@@ -239,8 +239,6 @@ class Lesson(Base):
     generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The chapter holding this lesson's text (its section is between «lezione N» markers): generating again updates it there.
     chapter_id: Mapped[int | None] = mapped_column(ForeignKey("chapters.id", ondelete="SET NULL"))
-    # The page that was open last: the editor scrolls there when the lesson is opened again.
-    last_page_id: Mapped[int | None] = mapped_column(ForeignKey("lesson_pages.id", ondelete="SET NULL", use_alter=True, name="fk_lessons_last_page"))
     created_at: Mapped[datetime] = _now()
     updated_at: Mapped[datetime] = _now()
 
@@ -261,9 +259,27 @@ class LessonPage(Base):
     # [{t: pen|hl, c: "#rrggbb", w: stroke width / page width, p: [x, y, pressure, …]}], x and y in page widths
     ink: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default="[]")
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
-    # marked «non capita» by the owner during the lecture, to ask the assistant about later (not part of the notes)
-    unclear: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     updated_at: Mapped[datetime] = _now()
+
+
+class LessonMark(Base):
+    """A page a user marked «non capita» during the lecture, to ask the assistant about later (not part of the notes).
+    Each user has their own marks."""
+
+    __tablename__ = "lesson_marks"
+
+    page_id: Mapped[int] = mapped_column(ForeignKey("lesson_pages.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+
+
+class LessonPlace(Base):
+    """The page of a lesson a user had open last: their editor scrolls there when they open the lesson again."""
+
+    __tablename__ = "lesson_places"
+
+    lesson_id: Mapped[int] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("lesson_pages.id", ondelete="CASCADE"))
 
 
 class LessonShare(Base):

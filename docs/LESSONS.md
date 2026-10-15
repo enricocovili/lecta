@@ -60,8 +60,8 @@ the model gets it as a sharp cut (from a 2400 px picture of the page, 0.01 page 
 of the pages.
 
 **«Non capita»**: during the lecture there is no time to ask, so the «?» button beside the ✦ one marks the slide as not
-understood (`lesson_pages.unclear`, saved at once, not a step of the history; the owner's alone: share links neither see nor
-set it). A marked slide shows the button in orange at all times. Opening the popup on it asks for the explanation of the
+understood (`lesson_marks`, saved at once, not a step of the history; each user's own: another user of the lesson doesn't
+see it, and share links neither see nor set it). A marked slide shows the button in orange at all times. Opening the popup on it asks for the explanation of the
 slide by itself; bringing an answer into the notes takes the mark away, and the button takes it away by hand.
 
 Every question is sent with the **whole lesson** in the prompt (every page: the text printed on its slide, the typed notes, whether
@@ -117,8 +117,8 @@ points per page, sane coordinates, colour and width.
 | `POST /api/lessons/{id}/slides?name=` | raw PDF body: adds the slides (only once; untouched blank pages are replaced) |
 | `GET /api/courses/{course_id}/lessons/{n}` · `GET /api/lessons/{id}?pages=false` | the lesson (+ pages with notes and ink), `course_guidelines` |
 | `PATCH /api/lessons/{id}` `{title?, course_id?, status?}` · `DELETE` | `status`: `working` \| `completed` |
-| `PUT /api/lessons/{id}/pages/{pid}/unclear` `{unclear}` | mark a page «non capita», or take the mark away (pages carry `unclear` for the owner only) |
-| `PUT /api/lessons/{id}/last-page` `{page_id}` | the page being looked at (the editor sends it a moment after the page settles); opening the lesson scrolls there |
+| `PUT /api/lessons/{id}/pages/{pid}/unclear` `{unclear}` | mark a page «non capita» for oneself, or take the mark away (pages carry the user's own `unclear`; share links none) |
+| `PUT /api/lessons/{id}/last-page` `{page_id}` | the page the user is looking at (the editor sends it a moment after the page settles; `lesson_places`, one per user); the lesson's `last_page_id` is the user's own, and opening it scrolls there |
 | `PUT /api/lessons/{id}/pages/{pid}` `{notes?, ink?}` | what is sent replaces what is stored, the rest is untouched → `{version}` |
 | `POST /api/lessons/{id}/pages` `{after_page_id?}` · `DELETE …/pages/{pid}` | add a blank page · remove any page, slides included (the last one stays); a removed slide leaves the lesson but not the stored PDF |
 | `POST /api/lessons/{id}/pages/restore` `{id, kind, slide_page, ratio, position, notes, ink}` | undo of a removal: the page comes back **with its own id** (only an id that was already handed out, and not taken), notes and strokes, at its place |

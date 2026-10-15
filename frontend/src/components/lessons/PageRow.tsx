@@ -34,7 +34,7 @@ export interface Actions {
   visible: (index: number) => void;
   /** open the assistant's popup on this page, or close it when it is open there and `open` is not set (the owner only) */
   ask?: (pid: number, open?: boolean) => void;
-  /** mark the page «non capita», or take the mark away (the owner only) */
+  /** mark the page «non capita» for oneself, or take the mark away (whoever may change the lesson) */
   mark?: (pid: number) => void;
   /** a rectangle drawn with the select tool on this page is an area to ask about (null: let go); the owner only */
   area?: (pid: number, r: Rect | null) => void;

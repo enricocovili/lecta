@@ -42,3 +42,21 @@ def test_the_admin_becomes_the_first_user_with_the_admin_role(scratch_db):  # no
     assert [r["username"] for r in run(dsn, "SELECT username FROM admin_user")] == ["me"]
     upgrade_to("head")
     assert run(dsn, "SELECT role FROM users")[0]["role"] == "admin"
+
+
+def test_marks_and_the_last_open_page_go_to_the_course_owner(scratch_db):  # noqa: F811
+    dsn, upgrade_to = scratch_db
+    upgrade_to("0032")
+    (user,) = run(dsn, "INSERT INTO users (username, role) VALUES ('me', 'editor') RETURNING id")
+    (course,) = run(dsn, "INSERT INTO courses (name, slug, owner_id) VALUES ('Segnali', 'segnali', $1) RETURNING id", user["id"])
+    (lesson,) = run(dsn, "INSERT INTO lessons (course_id, number, title) VALUES ($1, 1, 'Lezione 1') RETURNING id", course["id"])
+    pages = [r["id"] for r in run(dsn, """INSERT INTO lesson_pages (lesson_id, position, kind, unclear)
+        VALUES ($1, 1, 'blank', false), ($1, 2, 'blank', true) RETURNING id""", lesson["id"])]
+    run(dsn, "UPDATE lessons SET last_page_id = $1", pages[0])
+    upgrade_to("0033")
+    assert [(r["page_id"], r["user_id"]) for r in run(dsn, "SELECT * FROM lesson_marks")] == [(pages[1], user["id"])]
+    assert [(r["lesson_id"], r["user_id"], r["page_id"]) for r in run(dsn, "SELECT * FROM lesson_places")] == [(lesson["id"], user["id"], pages[0])]
+    command.downgrade(AlembicConfig(ALEMBIC_INI), "0032")
+    assert [r["unclear"] for r in run(dsn, "SELECT unclear FROM lesson_pages ORDER BY position")] == [False, True]
+    assert run(dsn, "SELECT last_page_id FROM lessons")[0]["last_page_id"] == pages[0]
+    upgrade_to("head")
