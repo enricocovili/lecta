@@ -205,3 +205,16 @@ async def test_a_block_written_in_place_replaces_its_lines_and_comes_back_typese
     gone = {"start": 5, "end": 5, "src": "Scritto a mano.", "text": "  \n"}
     assert (await admin.put(url, json=gone)).status_code == 200
     assert await source() == CHAPTER.replace("Un paragrafo con $x^2$.\n\n", "E un altro paragrafo.\n\n")
+
+
+async def test_a_block_past_the_margin_says_by_how_much(admin):
+    c = await _course(admin)
+    cid, ch = c["id"], c["chapters"][0]
+    long = "una frase che non può andare a capo perché è chiusa in una scatola " * 2
+    await _put(admin, cid, ch["path"], "\\chapter{Margini}\n\n" + "Un paragrafo normale che va a capo da solo. " * 3
+               + f"\n\nPoi \\underline{{{long}}} fine.\n\nPoi \\ul{{{long}}} fine.\n\n\\begin{{theorem}}\nNel riquadro.\n\\end{{theorem}}\n")
+    blocks = (await admin.get(f"/api/courses/{cid}/chapters/{ch['id']}/draft")).json()["blocks"]
+    assert all(b["pages"] and not b["error"] for b in blocks)
+    # Only the \underline (one box LaTeX cannot break) runs past the margin, by many mm.
+    assert [i for i, b in enumerate(blocks) if b.get("overflow_mm")] == [len(blocks) - 3]
+    assert blocks[-3]["overflow_mm"] > 20

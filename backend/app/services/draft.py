@@ -43,6 +43,10 @@ from .texttools import latex_to_text
 
 PT_TO_BP = 72 / 72.27
 PAD = 1.5  # around a picture, in bp
+# How far (bp) a block's ink may pass the text width before it runs into the margin: frame strokes and italic
+# overhangs stay under ~2 bp, a line LaTeX could not break goes well past it.
+OVERFLOW_TOL = 3.0
+BP_TO_MM = 25.4 / 72
 MAX_VARIANTS = 3  # kept per content key
 PRUNE_ABOVE = 4000  # files in a course's cache before stale variants are removed
 PRUNE_AGE_S = 30 * 86400
@@ -177,6 +181,12 @@ def _crop(svg: str, box: tuple[float, float, float, float], left: float, width: 
     if not n:
         return None
     return cropped, {"w": round(w, 2), "h": round(h, 2), "x": round(vx0 - left, 2)}
+
+
+def overflow_mm(pages: list[dict[str, Any]], width: float) -> float | None:
+    """How far (mm) the widest of a block's pictures runs past the text area on either side, or None when it fits."""
+    over = max((max(p["x"] + p["w"] - width - PAD, -p["x"] - PAD) for p in pages), default=0.0)
+    return round(over * BP_TO_MM, 1) if over > OVERFLOW_TOL else None
 
 
 class Inputs:
@@ -448,6 +458,10 @@ class ChapterRender:
                          "raster": p.get("raster", False)}
                         for p in v["pages"]
                     ]
+                    # Wider than the page: the PDF prints into the margin (the draft shrinks it to fit and says so).
+                    over = overflow_mm(v["pages"], meta.get("width", 451.0))
+                    if over:
+                        item["overflow_mm"] = over
             else:
                 item["error"] = "non composto"
             item["src"] = b.src[:SRC_LIMIT]  # what a selection of the block sends to the assistant
@@ -479,7 +493,8 @@ async def inputs_for(db: AsyncSession, course: Course) -> Inputs:
 
 
 async def render_chapter(db: AsyncSession, course: Course, chapter: Chapter, inputs: Inputs | None = None) -> dict[str, Any]:
-    """The chapter as typeset blocks: {chapter, width, blocks: [{start, end, pages: [{url, w, h, x}], error, heading?, id?, src?}],
+    """The chapter as typeset blocks: {chapter, width, blocks: [{start, end, pages: [{url, w, h, x}], error, heading?, id?, src?,
+    overflow_mm?}],
     toc, warnings, typeset, took_ms}. Sizes are in bp; `x` is where a picture starts relative to the text's left edge."""
     t0 = time.monotonic()
     inputs = inputs or await inputs_for(db, course)

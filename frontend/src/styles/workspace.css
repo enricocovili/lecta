@@ -496,7 +496,7 @@ body.ws-page {
 }
 .doc-block img {
   display: block;
-  max-width: none;
+  max-width: none; /* sized by DocView against the text width, never wider than the page */
   height: auto;
 }
 .doc-block:hover {
@@ -524,6 +524,15 @@ body.ws-page {
   background: var(--danger-soft);
   color: var(--danger-fg);
   font-family: var(--font);
+}
+/* A block that runs past the margin (an overfull line in the PDF): drawn shrunk to fit, and said so. */
+.doc-block-overflow {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.2rem 0 0;
+  color: var(--danger-fg);
+  font: 600 0.75rem var(--font);
 }
 .doc-block-error pre {
   margin: 0.4rem 0 0;

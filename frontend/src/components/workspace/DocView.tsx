@@ -35,6 +35,19 @@ const NOTE_ACTIONS: ToolbarAction<NoteKind>[] = [
   { key: "suggestion", label: "Suggerisci modifica", title: "Riscrivi il testo di questo blocco: chi scrive la materia accetta o rifiuta la modifica" },
 ];
 
+/** Space a picture keeps around the ink, in bp (as the backend crops it). */
+const PAD = 1.5;
+
+/** Where each picture of a block goes, in % of the text width: as typeset, or shrunk as a whole so that a block that
+ * runs past the margin (an overfull line) still fits the page. */
+function layout(pages: DraftBlock["pages"], width: number): { width: string; marginLeft: string }[] {
+  const x0 = Math.min(...pages.map((p) => p.x));
+  const x1 = Math.max(...pages.map((p) => p.x + p.w));
+  const fit = Math.min(1, (width + 2 * PAD) / (x1 - x0));
+  const shift = fit < 1 ? -PAD - x0 * fit : 0;
+  return pages.map((p) => ({ width: `${((p.w * fit) / width) * 100}%`, marginLeft: `${((p.x * fit + shift) / width) * 100}%` }));
+}
+
 const Block = memo(function Block({
   b,
   index,
@@ -44,6 +57,7 @@ const Block = memo(function Block({
   notes = 0,
   notesOpen = false,
   theirs = false,
+  writer = false,
 }: {
   b: DraftBlock;
   index: number;
@@ -55,8 +69,11 @@ const Block = memo(function Block({
   notesOpen?: boolean;
   /** The notes are the readers', shown to whoever writes the course. */
   theirs?: boolean;
+  /** Whoever may change the course: told when the block runs past the margin. */
+  writer?: boolean;
 }) {
   const failed = !!b.error;
+  const boxes = b.pages.length ? layout(b.pages, width) : [];
   return (
     <div
       className={`doc-block${b.heading ? " doc-heading" : ""}${picked ? " picked" : ""}${failed ? " failed" : ""}${notes ? " noted" : ""}`}
@@ -66,7 +83,7 @@ const Block = memo(function Block({
       id={b.id}
       tabIndex={still ? undefined : b.pages.length || failed ? 0 : -1}
     >
-      {b.pages.map((p) => (
+      {b.pages.map((p, k) => (
         <img
           key={p.url}
           src={p.url}
@@ -75,9 +92,14 @@ const Block = memo(function Block({
           draggable={false}
           loading="lazy"
           decoding="async"
-          style={{ width: `${(p.w / width) * 100}%`, marginLeft: `${(p.x / width) * 100}%`, aspectRatio: `${p.w} / ${p.h}` }}
+          style={{ ...boxes[k], aspectRatio: `${p.w} / ${p.h}` }}
         />
       ))}
+      {writer && b.overflow_mm && (
+        <div className="doc-block-overflow" data-testid="block-overflow" title="Nel PDF questa parte supera il margine destro: qui è rimpicciolita per stare nella pagina. Chiedi all’assistente di sistemarla, o modificala con un doppio clic.">
+          <Icon name="alert-triangle" /> Esce dal margine di {b.overflow_mm.toLocaleString("it-IT")} mm
+        </div>
+      )}
       {failed && (
         <div className="doc-block-error">
           <span className="small">
@@ -518,7 +540,7 @@ export default function DocView({
                 const open = !!here && shown?.chapterId === c.chapter.id && shown.index === k;
                 return (
                   <Fragment key={`${b.start}:${b.pages[0]?.url ?? b.error ?? ""}`}>
-                    <Block b={b} index={k} width={c.width} picked={(!!pick && pick.chapterId === c.chapter.id && k >= pick.from && k <= pick.to) || composing?.chapterId === c.chapter.id && composing.index === k} still={still} notes={here?.length} notesOpen={open} theirs={writer} />
+                    <Block b={b} index={k} width={c.width} picked={(!!pick && pick.chapterId === c.chapter.id && k >= pick.from && k <= pick.to) || composing?.chapterId === c.chapter.id && composing.index === k} still={still} notes={here?.length} notesOpen={open} theirs={writer} writer={writer} />
                     {writer && k === 0 && b.heading === "chapter" && chapterNotes(c.chapter.id)}
                     {composing && composing.chapterId === c.chapter.id && composing.index === k && composing.block.start === b.start && (
                       <NoteComposer kind={composing.kind} src={b.src ?? ""} onSend={sendNote} onCancel={() => setComposing(null)} />

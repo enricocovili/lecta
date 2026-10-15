@@ -32,7 +32,9 @@ All endpoints below are admin-only (`/api`, cookie + CSRF like the rest) unless 
 * Each block is typeset by the real LaTeX with the course's own preamble (`services/draft.py`), one page or more per
   block, cropped to the ink: `pages` are SVG pictures, sizes in bp; `width` is the text width, `x` where the picture
   starts relative to the text's left edge (negative when it reaches into the margin). Show a picture at
-  `w / width` of the column, shifted by `x / width`.
+  `w / width` of the column, shifted by `x / width`. A block whose ink passes the text width by more than ~1 mm (a
+  line LaTeX could not break) has `overflow_mm`; the draft then shrinks the block's pictures together to the page width
+  and tells whoever may change the course (DECISIONS 140).
 * Typeset blocks are cached by their text, what they include and the counters they start from: only the blocks that
   changed (and the numbered ones they renumber) are typeset again; `typeset` says how many. A block that failed has
   `error` (with the source line); the other blocks are still shown. `src` is the block's LaTeX (what a selection

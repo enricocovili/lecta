@@ -921,3 +921,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      Every prompt that writes LaTeX (`FIT_RULE`) says to use them and to split formulas, size table columns and keep
      identifiers in `\url` or verbatim. *Alternatives:* `ulem`'s `\uline` (no highlight); redefining `\underline`
      (a macro of our own again, and wrong in maths); `lua-ul` (LuaLaTeX only).
+     What still overflows is caught where it shows. The draft gives a block `overflow_mm` when its ink passes the
+     text width by more than 3 bp (about 1 mm: frame strokes and italics stay under 2), and `DocView` scales such a
+     block as a whole so that it spans exactly the page: the draft never runs off the page, on a phone either
+     (`e2e/tests/11-draft-margins.spec.ts`). Whoever may change the course sees «Esce dal margine di X mm» under it;
+     readers only see it fit. *Alternatives:* cropping the picture to the text width (hides text); a horizontal
+     scrollbar per block (the reader has to notice it, and it still looks broken).

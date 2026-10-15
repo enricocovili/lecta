@@ -26,6 +26,8 @@ export interface DraftBlock {
   heading?: string;
   id?: string;
   src?: string;
+  /** mm the block runs past the text width (into the PDF's margin), when it does */
+  overflow_mm?: number;
 }
 
 export interface DraftChapter {
