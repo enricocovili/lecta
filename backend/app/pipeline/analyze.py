@@ -168,7 +168,8 @@ def pandoc_to_latex(md: str, timeout: int = 60) -> str:
     )
     if proc.returncode != 0:
         raise RuntimeError("pandoc failed: " + proc.stderr.decode("utf-8", "replace")[:500])
-    return proc.stdout.decode("utf-8")
+    # pandoc's \tightlist is a macro of its own template: the course's preamble doesn't have it.
+    return re.sub(r"[ \t]*\\tightlist\b[ \t]*\n?", "", proc.stdout.decode("utf-8"))
 
 
 def analyze_markdown(data: bytes) -> dict[str, Any]:

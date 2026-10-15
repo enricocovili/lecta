@@ -195,7 +195,7 @@ async def do_compile(req: dict) -> dict:
         for p in only:
             if not _REL_RE.match(p) or ".." in p:
                 raise BadRequest("bad includeonly entry")
-        pre.append("\\def\\lectaincludeonly{" + ",".join(p.removesuffix(".tex") for p in only) + "}")
+        pre.append("\\includeonly{" + ",".join(p.removesuffix(".tex") for p in only) + "}")
     root = "_root.tex"
     (work / root).write_text("".join(pre) + "\\input{" + main.removesuffix(".tex") + "}\n")
     jobname = main.removesuffix(".tex")

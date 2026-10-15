@@ -32,3 +32,9 @@ def test_markdown_extraction_and_pandoc(fx):
 def test_pandoc_sandbox_cannot_read_files():
     out = analyze.pandoc_to_latex("![x](/etc/passwd)\n\n```{.include}\n/etc/passwd\n```\n")
     assert "root:" not in out
+
+
+def test_pandoc_lists_use_no_macro_of_pandocs_template():
+    out = analyze.pandoc_to_latex("- uno\n- due\n\n1. tre\n2. quattro\n")
+    assert "\\begin{itemize}" in out and "\\begin{enumerate}" in out and "quattro" in out
+    assert "tightlist" not in out

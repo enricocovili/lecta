@@ -61,8 +61,8 @@ Format: **decision** — reason. *Alternative:* main alternative considered.
     `latex-work/<course>/draft` dir (so latexmk is incremental); every run gets a
     fresh temporary HOME/TMPDIR/TEXMFVAR. Publishing uses a fresh dir (clean build).
     *Alternative:* copy everything into a temp dir per job (no incremental builds).
-16. **Draft/publish flags through a generated root file**: `_root.tex` defines
-    `\lectaincludeonly` / `\lectapublish` and then `\input{main}` (with
+16. **Draft/publish flags through a generated root file**: `_root.tex` says `\includeonly{…}` (the chapter being
+    edited) and, when publishing, `\PassOptionsToPackage{disable}{todonotes}`, then `\input{main}` (with
     `-jobname=main`). No `-usepretex` or shell tricks. *Alternative:* rewrite main.tex per build.
 17. **Figures are body-only files** (precompiling replaced by `\input`, 139) (`figures/x.tex` holds just the tikzpicture etc.),
     wrapped at build time in `standalone[varwidth]` with the course preamble, and
@@ -900,6 +900,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      and the compile service's precompiled standalone figures (`figures-cache/`, `/figure`) are gone: a drawing is
      TikZ code in `figures/NAME.tex` pulled into a `figure` with `\input` (inside `\adjustbox{max width=\linewidth}`),
      so it compiles in any editor; the draft's cache key follows the files a block `\input`s, and editing a figure
-     compiles the chapters that `\input` it. An error in a drawing now stops the chapter, as in any LaTeX project. *Alternatives:* keeping the macros and shipping their definitions with every download (still
+     compiles the chapters that `\input` it. An error in a drawing now stops the chapter, as in any LaTeX project.
+     `main.tex` carries no hook either: the build's root file issues `\includeonly` itself (a kernel command that
+     works before `\documentclass`), and a new course's `main.tex` no longer defines `\lectalang`. pandoc's
+     `\tightlist` (a macro of pandoc's own template) is removed from the converted Markdown notes. *Alternatives:* keeping the macros and shipping their definitions with every download (still
      useless in another template, and any change to them changes old text); `wrapfig`/`subcaption` (closer to what an
      author would write, but wrapfig floats badly next to lists and theorem boxes).

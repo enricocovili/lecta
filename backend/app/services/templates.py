@@ -68,9 +68,6 @@ _DEFAULT_PREAMBLE = r"""% Lecta default preamble.
 \usepackage{forest}
 \usepackage{chemfig}
 
-% pandoc compatibility (Markdown notes are converted with pandoc)
-\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
-
 % ---- theorem-like environments (amsthm + tcolorbox) -----------------------
 % Numbered within chapters when the class has them; the names are in the course's language.
 \makeatletter
@@ -170,7 +167,6 @@ def default_preamble(language: str | None) -> str:
 # the packages the stored text relies on (figures with adjustbox's limits, review notes).
 COMPAT_TAIL = r"""
 % ---- added by Lecta at build time ------------------------------------------
-\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \makeatletter
 \@ifpackageloaded{graphicx}{}{\RequirePackage{graphicx}}
 \@ifpackageloaded{adjustbox}{}{\RequirePackage[export]{adjustbox}}
@@ -233,9 +229,7 @@ def chapter_block(chapter_paths: list[str]) -> str:
 
 def main_tex(name: str, year: str | None, language: str, chapter_paths: list[str]) -> str:
     babel = BABEL.get(language, "english")
-    lecta_lang = "italian" if language == "it" else "english"
     return rf"""\documentclass[11pt,a4paper,oneside]{{report}}
-\def\lectalang{{{lecta_lang}}}
 \input{{preamble}}
 \usepackage[{babel}]{{babel}}
 \usepackage[a4paper,margin=2.5cm]{{geometry}}
@@ -244,9 +238,6 @@ def main_tex(name: str, year: str | None, language: str, chapter_paths: list[str
 \title{{{_tex_escape(name)}}}
 \author{{}}
 \date{{{_tex_escape(year or "")}}}
-
-% The editor compiles only the chapter being edited.
-\ifdefined\lectaincludeonly\includeonly{{\lectaincludeonly}}\fi
 
 \begin{{document}}
 \maketitle
