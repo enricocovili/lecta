@@ -726,6 +726,61 @@ a.pg-row-title:hover {
   flex: none;
   text-align: right;
 }
+.co-review {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 44rem;
+  margin-bottom: 1.25rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  min-width: 0;
+}
+.co-review:hover {
+  text-decoration: none;
+  border-color: var(--border-strong);
+}
+.co-review.none {
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+  border-style: dashed;
+}
+.co-review.stale .co-score {
+  opacity: 0.55;
+}
+.co-score {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2.5px solid var(--warn);
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.co-score.ok {
+  border-color: var(--ok);
+}
+.co-score.danger {
+  border-color: var(--danger);
+}
+.co-review-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.co-review-verdict {
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 @media (max-width: 900px) {
   .co-grid {
     grid-template-columns: minmax(0, 1fr);

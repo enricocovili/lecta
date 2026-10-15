@@ -191,7 +191,7 @@ Format: **decision** — reason. *Alternative:* main alternative considered.
     per browser (`public/theme.js`, a blocking script in `<head>` so the page never flashes).
 53. **Course status (Completata / In lavorazione / Errore) is derived, not stored**
     (`services/overview.py`): the latest draft/publish build, the latest finished job and
-    active jobs. A failed compile shows up in the Home activity list even without a job.
+    active jobs. A failed compile shows up on the course's card even without a job (134).
 54. *(Removed by 133.)* **Mappa collegamenti is computed on request** (`services/concepts.py`) from section
     titles (normalised lexical match, always) plus stored embeddings when they are enabled
     (averaged per section, compared in SQL; the backend never loads the model), cached until
@@ -327,7 +327,7 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
     (explain → mode `explain`, no writing tools).
 76. **Document feedback is a structured review.** Mode `review` (read-only tools) ends with a
     `review` block (verdict, score, strengths, issues with a ready-made `fix` prompt);
-    the Home and the course show the latest one, marked stale when the course changed since.
+    the course page shows the latest one (134), marked stale when the course changed since.
 77. **The LaTeX source is downloadable in both views.** Working version: `source.zip` built on
     demand. Public: the publish job stores the zip of the published project
     (`\lectapublish` set, so review notes stay hidden) next to the PDF; courses published
@@ -462,7 +462,7 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 
 ## A simpler interface (#17)
 
-95. **Every place is reached one way.** The sidebar lists only the places of work (Materie, Lezioni, Mappa; see 133) and the
+95. **Every place is reached one way.** The sidebar lists only the places of work (Materie, Lezioni, Mappa; see 133–134) and the
     subjects; the Home opens from the «Lecta» title like on most sites, search is the bar at the top (on a phone, the
     lens in the top bar), Attività and Impostazioni are in the user menu. The phone's bottom bar has no Home either.
     *Why:* the same link in two places made the sidebar long and the app harder to read.
@@ -833,3 +833,17 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      stay for search and the assistant's retrieval. *Alternatives:* a stricter centred threshold (tuned on a few pairs,
      wrong again with the next course); a larger embedding model (the forced best match stays); candidate pairs
      confirmed by the AI provider and shown beside a section while reading (worth it only if the need shows up).
+134. **The home page is the list of subjects.** `/admin` shows what the courses page showed (grid or list, the filter,
+     «Nuova materia»), and `/admin/courses` redirects there with its query, so `?new=1` and old bookmarks keep working.
+     Each card says which subject, whether it is fine (the state pill; «In lavorazione» while an import, a compile or the
+     assistant runs, followed every 4 seconds; a failed compile adds «Correggi», which opens the text at the broken
+     chapter with the assistant asked to fix it) and whether it is published (the switch for admins, the flag for the
+     others), plus the readers' open notes. The activity list with its filters, the assistant's latest turns and the
+     stat tiles are gone from it: the jobs are in Attività (user menu), the turns in the assistant's panel, and the
+     latest AI review is a line on the course page (`GET /api/courses/{id}/review/latest`), only for whoever may change
+     the course. `/api/dashboard` returns only `courses` (no `activity`, `ai_activity`, `recent_documents`,
+     `recent_courses`, `jobs` or per-course `review`). *Why:* the home showed four lists at once, and the one to act on
+     (the subjects) shared the screen with three that repeated other pages. *Alternatives:* keeping the home and
+     trimming it to the cards (two pages with the same list); keeping a short error list above the cards (the card
+     already says it).
+

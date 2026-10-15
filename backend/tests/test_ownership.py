@@ -200,7 +200,6 @@ async def test_lists_search_and_export_show_only_what_one_may_read(editor, other
         assert any(j["id"] == ids["job_id"] for j in (await client.get("/api/jobs")).json()) is sees
         home = (await client.get("/api/dashboard")).json()
         assert any(c["id"] == course["id"] for c in home["courses"]) is sees
-        assert any(d["course_id"] == course["id"] for d in home["recent_documents"]) is sees
         export = await client.get("/api/export")
         assert (f"{slug}/".encode() in export.content) is sees
     # Bulk deleting the finished jobs deletes only one's own.

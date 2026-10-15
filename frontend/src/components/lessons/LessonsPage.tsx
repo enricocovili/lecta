@@ -181,7 +181,7 @@ function NewLesson({ courses, initialCourse, onClose }: { courses: TreeCourse[];
           <div className="alert warn small">
             <Icon name="alert-triangle" />
             <span className="grow">
-              Non c’è ancora nessuna materia. <a href="/admin/courses?new=1">Creane una</a>.
+              Non c’è ancora nessuna materia. <a href="/admin?new=1">Creane una</a>.
             </span>
           </div>
         )}

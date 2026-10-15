@@ -161,7 +161,7 @@ export default function CourseSettings({ course, onSaved }: { course: Course; on
           }
           onConfirm={async () => {
             await post(`/api/courses/${course.id}/delete`, { confirm_slug: confirmSlug });
-            location.href = "/admin/courses";
+            location.href = "/admin";
           }}
           onClose={() => setConfirmDelete(false)}
         />

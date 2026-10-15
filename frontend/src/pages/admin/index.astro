@@ -1,14 +1,7 @@
 ---
 import Admin from "../../layouts/Admin.astro";
-import Dashboard from "../../components/Dashboard";
-import { Icon } from "../../components/icons";
-import { canCreate } from "../../lib/roles";
-const role = Astro.locals.auth.role;
+import CoursesBrowser from "../../components/CoursesBrowser";
 ---
-<Admin title="Home" active="home">
-  <div class="page-head">
-    <h1>Home</h1>
-    {canCreate(role) && <a class="btn" href="/admin/lessons?new=1"><Icon name="notebook" />Prendi appunti a lezione</a>}
-  </div>
-  <Dashboard client:load role={role} userId={Astro.locals.auth.user_id} />
+<Admin title="Materie">
+  <CoursesBrowser client:load role={Astro.locals.auth.role} userId={Astro.locals.auth.user_id} />
 </Admin>

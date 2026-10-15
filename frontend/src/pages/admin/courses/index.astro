@@ -1,8 +1,4 @@
 ---
-import Admin from "../../../layouts/Admin.astro";
-import CoursesBrowser from "../../../components/CoursesBrowser";
-const role = Astro.locals.auth.role;
+// The subjects are the home page now (decision 134); old links and bookmarks land there.
+return Astro.redirect(`/admin${Astro.url.search}`);
 ---
-<Admin title="Materie">
-  <CoursesBrowser client:load role={role} userId={Astro.locals.auth.user_id} />
-</Admin>

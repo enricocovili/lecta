@@ -1,10 +1,12 @@
+// The home page: the user's subjects, each with its state and whether it is published (decision 134).
 import { useEffect, useState } from "react";
 import { get, post } from "../lib/api";
-import { canCreate, otherOwner, type Role } from "../lib/roles";
+import { courseText } from "../lib/links";
+import { canCreate, isAdmin, otherOwner, type Role } from "../lib/roles";
 import { Icon } from "./icons";
 import { COURSE_TONE, CoursePill, courseStateText, fmtUpdated, OpenNotes, openNotesText, PublishedFlag, useCourseStates, type CourseState } from "./pagekit";
 import type { Course } from "./types";
-import { Dot, Empty, ErrorBox, Loading, Modal, Seg, toastError, useApi, useLocalStorage } from "./ui";
+import { Confirm, Dot, Empty, ErrorBox, Loading, Modal, Seg, Switch, toast, toastError, useApi, useLocalStorage, usePoll } from "./ui";
 
 export const LANGUAGES = [
   { code: "it", label: "Italiano" },
@@ -115,13 +117,69 @@ function metaLine(c: Course, st: CourseState | undefined) {
   return `${c.academic_year ? `${c.academic_year} · ` : ""}${chapterCount(c, st)} · aggiornata ${fmtUpdated(c.updated_at)}`;
 }
 
-function CourseCard({ c, st, owner }: { c: Course; st: CourseState | undefined; owner: string | null }) {
+/** Where «Correggi» leads when the latest compile failed: the text at the broken chapter, the assistant asked to fix it. */
+function fixHref(c: Course, st: CourseState | undefined): string | null {
+  if (st?.status !== "error" || st.reason !== "compile" || !c.can_write) return null;
+  const fe = st.last_build?.first_error;
+  const where = fe?.line ? ` alla riga ${fe.line}` : "";
+  return courseText(c.id, { chapter: fe?.chapter_id, ask: `L'ultima compilazione è fallita${where}${fe?.message ? `: ${fe.message}` : ""}. Puoi correggere?` });
+}
+
+/** Publishing is ON/OFF: while ON the site always shows the latest version (rebuilt automatically). */
+function PublishSwitch({ course, updating, onChanged }: { course: Course; updating: boolean; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+
+  const publish = async () => {
+    setBusy(true);
+    try {
+      await post(`/api/courses/${course.id}/publish`);
+      toast("La materia è pubblica: il PDF si sta preparando");
+      onChanged();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Switch
+        label={course.published ? (updating ? "Aggiornamento…" : "Pubblicata") : "Privata"}
+        checked={course.published}
+        disabled={busy}
+        onChange={(v) => (v ? publish() : setConfirm(true))}
+      />
+      {confirm && (
+        <Confirm
+          title="Rendere privata?"
+          message={
+            <>
+              <strong>{course.name}</strong> sparirà dal sito pubblico e il PDF non sarà più scaricabile. Puoi ripubblicarla quando vuoi.
+            </>
+          }
+          confirmLabel="Rendi privata"
+          danger
+          onConfirm={async () => {
+            await post(`/api/courses/${course.id}/unpublish`);
+            onChanged();
+          }}
+          onClose={() => setConfirm(false)}
+        />
+      )}
+    </>
+  );
+}
+
+function CourseCard({ c, st, owner, admin, onChanged }: { c: Course; st: CourseState | undefined; owner: string | null; admin: boolean; onChanged: () => void }) {
   const state = courseStateText(st);
+  const fix = fixHref(c, st);
   return (
     <div className="card pg-course-card">
       <div className="row between pg-nw">
-        <CoursePill status={st?.status} />
-        <PublishedFlag published={c.published} />
+        <CoursePill status={st?.ai_running ? "working" : st?.status} />
+        {admin ? <PublishSwitch course={c} updating={st?.active_job?.kind === "publish"} onChanged={onChanged} /> : <PublishedFlag published={c.published} />}
       </div>
       <a className="card-link pg-course-name" href={`/admin/courses/${c.id}`}>
         {c.name}
@@ -148,6 +206,11 @@ function CourseCard({ c, st, owner }: { c: Course; st: CourseState | undefined; 
         </div>
       )}
       <div className="row pg-course-actions">
+        {fix && (
+          <a className="btn primary" href={fix}>
+            Correggi
+          </a>
+        )}
         <a className="btn" href={`/admin/courses/${c.id}`}>
           <Icon name="sparkles" />
           Apri
@@ -162,8 +225,11 @@ function CourseCard({ c, st, owner }: { c: Course; st: CourseState | undefined; 
 }
 
 export default function CoursesBrowser({ role, userId }: { role?: Role; userId?: number }) {
-  const { data, error, loading } = useApi(() => get<Course[]>("/api/courses"));
+  const { data, error, loading, reload } = useApi(() => get<Course[]>("/api/courses"));
   const states = useCourseStates();
+  // While something runs (an import, a compile, the assistant) the cards follow it.
+  const busy = (states.data ?? []).some((s) => s.status === "working" || s.ai_running);
+  usePoll(states.reload, busy ? 4000 : 20000);
   const [view, setView] = useLocalStorage<"grid" | "list">("lecta.courses.view", "grid");
   const [showNew, setShowNew] = useState(false);
   const [filter, setFilter] = useState("");
@@ -173,6 +239,11 @@ export default function CoursesBrowser({ role, userId }: { role?: Role; userId?:
   }, []);
 
   const stateOf = (id: number) => (states.data ?? []).find((s) => s.id === id);
+  const changed = () => {
+    void reload();
+    void states.reload();
+    window.dispatchEvent(new Event("lecta:tree-changed"));
+  };
   const courses = (data ?? []).filter((c) =>
     `${c.name} ${c.academic_year ?? ""} ${c.tags.join(" ")}`.toLowerCase().includes(filter.toLowerCase()),
   );
@@ -184,10 +255,16 @@ export default function CoursesBrowser({ role, userId }: { role?: Role; userId?:
           <h1>Materie</h1>
         </div>
         {canCreate(role) && (
-          <button className="btn primary" onClick={() => setShowNew(true)}>
-            <Icon name="plus" />
-            Nuova materia
-          </button>
+          <div className="row">
+            <button className="btn" onClick={() => setShowNew(true)}>
+              <Icon name="plus" />
+              Nuova materia
+            </button>
+            <a className="btn primary" href="/admin/lessons?new=1">
+              <Icon name="notebook" />
+              Prendi appunti a lezione
+            </a>
+          </div>
         )}
       </div>
       <div className="pg-toolbar">
@@ -214,7 +291,7 @@ export default function CoursesBrowser({ role, userId }: { role?: Role; userId?:
       ) : view === "grid" ? (
         <div className="pg-course-grid">
           {courses.map((c) => (
-            <CourseCard key={c.id} c={c} st={stateOf(c.id)} owner={otherOwner(c, userId)} />
+            <CourseCard key={c.id} c={c} st={stateOf(c.id)} owner={otherOwner(c, userId)} admin={isAdmin(role)} onChanged={changed} />
           ))}
         </div>
       ) : (
@@ -225,7 +302,7 @@ export default function CoursesBrowser({ role, userId }: { role?: Role; userId?:
               const state = courseStateText(st);
               return (
                 <a key={c.id} className="pg-course-row" href={`/admin/courses/${c.id}`}>
-                  <Dot tone={COURSE_TONE[st?.status ?? "ok"] ?? ""} />
+                  <Dot tone={COURSE_TONE[st?.ai_running ? "working" : (st?.status ?? "ok")] ?? ""} />
                   <div className="grow">
                     <div className="pg-row-title">{c.name}</div>
                     <div className="pg-row-sub">

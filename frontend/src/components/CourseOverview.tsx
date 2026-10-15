@@ -8,7 +8,7 @@ import { Icon } from "./icons";
 import LessonStatusPill, { type LessonStatus } from "./lessons/LessonStatus";
 import { CoursePill, PublishedFlag } from "./pagekit";
 import type { Course, TreeCourse } from "./types";
-import { Empty, ErrorBox, Loading, Modal, toast, useApi } from "./ui";
+import { Empty, ErrorBox, fmtWhen, Loading, Modal, toast, useApi } from "./ui";
 import { compileFull, latestPdf } from "./workspace/compile";
 import CourseSettings from "./workspace/CourseSettings";
 import PublishControl from "./workspace/PublishControl";
@@ -26,12 +26,46 @@ interface LessonRow {
   lab: { files: number; comments: number } | null;
 }
 
+/** The newest review of the course's text among the user's conversations (`/api/courses/{id}/review/latest`). */
+interface LatestReview {
+  review: { score: number; verdict: string } | null;
+  at: string | null;
+  stale?: boolean;
+}
+
+/** The latest AI review of the course as one line, or an invitation to ask for one; both open the assistant. */
+function ReviewLine({ courseId, latest }: { courseId: number; latest: LatestReview }) {
+  const r = latest.review;
+  if (!r) {
+    return (
+      <a className="co-review none" href={courseText(courseId, { ask: "Fai una revisione completa del corso." })}>
+        <Icon name="sparkles" />
+        Nessuna revisione: chiedi un giudizio sul corso
+      </a>
+    );
+  }
+  const tone = r.score >= 8 ? "ok" : r.score >= 6 ? "warn" : "danger";
+  return (
+    <a className={`co-review ${latest.stale ? "stale" : ""}`} href={courseText(courseId, { chat: true })} title={r.verdict} data-testid="overview-review">
+      <span className={`co-score ${tone}`}>{r.score}</span>
+      <span className="co-review-text">
+        <span className="co-review-verdict">{r.verdict}</span>
+        <span className="tiny muted">
+          Revisione AI{latest.at && ` · ${fmtWhen(latest.at)}`}
+          {latest.stale && " · il corso è cambiato da allora"}
+        </span>
+      </span>
+    </a>
+  );
+}
+
 // Someone who may only read the course (a viewer, an editor on someone else's published course) gets no control that
 // changes it; an editor doesn't see the lessons and labs of others' courses at all (decision 125).
 export default function CourseOverview({ courseId, role, userId }: { courseId: number; role?: Role; userId?: number }) {
   const course = useApi(() => get<Course>(`/api/courses/${courseId}`), [courseId]);
   const status = useApi(() => get<TreeCourse[]>("/api/tree").then((t) => t.find((c) => c.id === courseId)?.status), [courseId]);
   const lessons = useApi(() => get<LessonRow[]>(`/api/lessons?course_id=${courseId}`), [courseId]);
+  const review = useApi(() => get<LatestReview>(`/api/courses/${courseId}/review/latest`).catch(() => null), [courseId]);
   const [settings, setSettings] = useState(false);
   const [compiling, setCompiling] = useState(false);
 
@@ -108,6 +142,8 @@ export default function CourseOverview({ courseId, role, userId }: { courseId: n
           </a>
         </div>
       </div>
+
+      {canWrite && review.data && <ReviewLine courseId={c.id} latest={review.data} />}
 
       <div className={`co-grid${showLessons ? "" : " one"}`}>
         {showLessons && (

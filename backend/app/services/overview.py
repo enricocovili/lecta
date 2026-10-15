@@ -1,4 +1,4 @@
-"""Workspace overview: per-course state (done / working / error) and the activity feed.
+"""Workspace overview: per-course state (done / working / error).
 
 Used by the admin Home and the sidebar tree. Everything is derived from existing
 rows (jobs, builds, source links); nothing is stored.
@@ -9,13 +9,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Build, Chapter, Course, Job, SourceFile, SourceLink, Upload
+from ..models import Build, Chapter, Course, Job, SourceLink
 from . import jobs as jobs_svc
 
-# Internal/maintenance jobs that don't belong in the activity feed.
+# Internal/maintenance jobs that don't make a course's state.
 HIDDEN_KINDS = ("embeddings.benchmark", "index.rebuild", "demo.sleep")
 
 
@@ -105,68 +105,3 @@ async def course_states(db: AsyncSession) -> dict[int, dict[str, Any]]:
         elif st["active_job"]:
             st["status"] = "working"
     return out
-
-
-async def activity(db: AsyncSession, visible: ColumnElement[bool], limit: int = 30) -> list[dict[str, Any]]:
-    """Recent top-level jobs (of those `visible` selects) with what the Home needs to render them."""
-    rows = (
-        await db.execute(
-            select(Job, Course.name)
-            .outerjoin(Course, Course.id == Job.course_id)
-            .where(Job.parent_id.is_(None), Job.kind.not_in(HIDDEN_KINDS), visible)
-            .order_by(Job.id.desc())
-            .limit(limit)
-        )
-    ).all()
-    ids = [j.id for j, _ in rows]
-    uploads: dict[int, dict[str, Any]] = {}
-    if ids:
-        ups = (await db.execute(select(Upload).where(Upload.job_id.in_(ids)))).scalars().all()
-        names: dict[int, list[tuple[str, str]]] = {}
-        if ups:
-            for up_id, name, kind in (
-                await db.execute(
-                    select(SourceFile.upload_id, SourceFile.name, SourceFile.kind)
-                    .where(SourceFile.upload_id.in_([u.id for u in ups]))
-                    .order_by(SourceFile.id)
-                )
-            ).all():
-                names.setdefault(up_id, []).append((name, kind))
-        for u in ups:
-            files = names.get(u.id, [])
-            uploads[u.job_id] = {  # type: ignore[index]
-                "via": u.via,
-                "file_count": u.file_count,
-                "names": [n for n, _ in files[:3]],
-                "images": sum(1 for _, k in files if k == "image"),
-            }
-    out = []
-    for j, course_name in rows:
-        result = j.result if isinstance(j.result, dict) else {}
-        summary = result.get("summary") if isinstance(result.get("summary"), dict) else None
-        out.append(
-            {
-                "id": j.id,
-                "kind": j.kind,
-                "title": j.title,
-                "status": j.status,
-                "progress": j.progress,
-                "progress_text": j.progress_text,
-                "error": _first_line(j.error),
-                "course_id": j.course_id,
-                "course_name": course_name,
-                "created_at": j.created_at,
-                "updated_at": j.updated_at,
-                "finished_at": j.finished_at,
-                "upload": uploads.get(j.id),
-                "summary": summary,
-                "results": [_result_out(g) for g in (result.get("groups") or []) if isinstance(g, dict)],
-            }
-        )
-    return out
-
-
-def _result_out(g: dict[str, Any]) -> dict[str, Any]:
-    """Where an import put one group of material (for the Home and the job page)."""
-    keys = ("type", "title", "group", "course_id", "course_name", "chapter_id", "chapter_title", "path", "compile")
-    return {k: g.get(k) for k in keys}

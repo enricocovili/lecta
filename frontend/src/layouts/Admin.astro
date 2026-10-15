@@ -24,7 +24,7 @@ const initials =
     .map((w: string) => w[0]!.toUpperCase())
     .join("") || "A";
 const is = (p: string) => path === p || path.startsWith(p + "/");
-const tab = is("/admin/lessons") ? "lessons" : is("/admin/courses") ? "courses" : "";
+const tab = is("/admin/lessons") ? "lessons" : path === "/admin" || is("/admin/courses") ? "courses" : "";
 ---
 <Base title={`${title} · ${site.title}`}>
   <header class="topbar">
@@ -40,7 +40,7 @@ const tab = is("/admin/lessons") ? "lessons" : is("/admin/courses") ? "courses" 
         <summary class="avatar" aria-label="Account" title={username}>{initials}</summary>
         <div class="menu-pop">
           <div class="head">Connesso come <strong>{username}</strong></div>
-          <a href="/admin/courses" class="show-mobile"><Icon name="folder" />Materie</a>
+          <a href="/admin" class="show-mobile"><Icon name="folder" />Materie</a>
           <a href="/admin/lessons" class="show-mobile"><Icon name="notebook" />Lezioni</a>
           <a href="/admin/settings"><Icon name="sliders" />Impostazioni</a>
           <a href="/admin/jobs"><Icon name="activity" />Attività</a>
@@ -73,7 +73,7 @@ const tab = is("/admin/lessons") ? "lessons" : is("/admin/courses") ? "courses" 
     </main>
   </div>
   <nav class="bottom-nav" aria-label="Navigazione rapida">
-    <a href="/admin/courses" class={tab === "courses" ? "active" : ""}><Icon name="folder" />Materie</a>
+    <a href="/admin" class={tab === "courses" ? "active" : ""}><Icon name="folder" />Materie</a>
     <a href="/admin/lessons" class={tab === "lessons" ? "active" : ""}><Icon name="notebook" />Lezioni</a>
   </nav>
   <Toasts client:load />

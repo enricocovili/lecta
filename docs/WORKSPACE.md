@@ -38,7 +38,7 @@ the top left goes back to the course page.
   with the count on the block, who wrote each note, a suggestion as the block's text with what goes struck out and what
   comes underlined. «Accetta» puts the suggestion in the text, «Rifiuta» drops it, «Risolvi» closes a comment. «N note
   aperte» at the top of a chapter lists them all, those on text changed since included (rejected or resolved, not
-  accepted). The home and the courses page say how many notes wait on each course.
+  accepted). The home page (the subjects) says how many notes wait on each course.
 * There is no revision history: edits and imports write straight into the files; the only safety net is **Annulla** on
   the assistant's last answers.
 
@@ -72,8 +72,8 @@ The panel on the right of a course is an **agent with tools**. Per turn it decid
   buttons. *Rimuovi* takes that passage out at once (the assistant also makes small formatting fixes around it, nothing
   else; mode `edit`). *Spiega* and *Correggi* open the chat with the passage as context and wait for what you want to
   know (mode `explain`, the answer never touches the document) or what to correct (mode `edit`).
-* **Document feedback**: an earlier review (score, strengths, issues with a *Correggi* button) still shows in the chat
-  and on the home page; the top bar no longer has a *Revisione AI* button.
+* **Document feedback**: an earlier review (score, strengths, issues with a *Correggi* button) still shows in the chat,
+  and its score and verdict on the course page; the top bar no longer has a *Revisione AI* button.
 * Turns run in the background (closing the tab doesn't stop them; reopen and the panel reattaches), one per course at a
   time, up to `agent_max_steps` model rounds (Settings → AI e costi, default 40). Uploaded material and course text
   reach the model fenced as untrusted data.

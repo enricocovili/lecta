@@ -1,4 +1,4 @@
-"""Workspace overview: course states, activity feed, nav counts, tree status."""
+"""Workspace overview: course states, nav counts, tree status."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ async def _course(admin, name: str) -> dict:
     return r.json()
 
 
-async def test_course_states_and_activity(admin, db):
+async def test_course_states(admin, db):
     ok = await _course(admin, "Corso Sano")
     broken = await _course(admin, "Corso Rotto")
     busy = await _course(admin, "Corso Occupato")
@@ -35,8 +35,6 @@ async def test_course_states_and_activity(admin, db):
     assert fe["line"] == 12 and fe["chapter_title"] == "Due"
     assert states[busy["id"]]["status"] == "working"
     assert states[busy["id"]]["active_job"]["title"] == "Lezione 6"
-    kinds = [a["kind"] for a in d["activity"]]
-    assert "index.rebuild" not in kinds and {"ingest", "publish"} <= set(kinds)
 
     tree = {c["id"]: c for c in (await admin.get("/api/tree")).json()}
     assert tree[broken["id"]]["status"] == "error" and tree[busy["id"]]["status"] == "working"

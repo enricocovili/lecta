@@ -184,13 +184,11 @@ test.describe("Passkey", () => {
 
     const { context: rc, p: reader } = await join("viewer", "lettore");
     const con = watchConsole(reader);
-    // No create actions: not on the home page, in the sidebar, among the courses or the lessons.
+    // No create actions: not on the home page (the subjects), in the sidebar or the lessons.
     await reader.reload();
-    await expect(reader.getByRole("heading", { name: "Home" })).toBeVisible();
+    await expect(reader.getByRole("heading", { name: "Materie" })).toBeVisible();
     await expect(reader.getByRole("link", { name: "Prendi appunti a lezione" })).toHaveCount(0);
     await expect(reader.getByRole("link", { name: "Nuova materia" })).toHaveCount(0);
-    await reader.goto("/admin/courses");
-    await expect(reader.getByRole("heading", { name: "Materie" })).toBeVisible();
     await expect(reader.getByRole("button", { name: "Nuova materia" })).toHaveCount(0);
     await reader.goto("/admin/lessons?new=1");
     await expect(reader.getByRole("heading", { name: "Lezioni" })).toBeVisible();
@@ -426,7 +424,7 @@ test.describe("Passkey", () => {
     // The admin's home says how many notes wait on the course, and leads to its draft.
     const con = watchConsole(page);
     await page.goto("/admin");
-    const card = page.locator(".home-course", { hasText: "Algebra Lineare" });
+    const card = page.locator(".pg-course-card", { hasText: "Algebra Lineare" });
     await expect(card.getByTestId("course-open-notes")).toHaveText(noted(before + 2));
     await card.getByTestId("course-open-notes").click();
     await page.waitForURL(/\/admin\/courses\/\d+\/testo$/);

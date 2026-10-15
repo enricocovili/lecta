@@ -58,14 +58,14 @@ export default function Sidebar({ currentPath, role, userId }: { currentPath: st
   return (
     <nav className="sidebar-nav" aria-label="Navigazione" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div className="nav">
-        <NavItem href="/admin/courses" icon="folder" label="Materie" active={is("/admin/courses")} />
+        <NavItem href="/admin" icon="folder" label="Materie" active={currentPath === "/admin" || is("/admin/courses")} />
         <NavItem href="/admin/lessons" icon="notebook" label="Lezioni" active={is("/admin/lessons")} />
       </div>
 
       <div className="nav-group-title">
         <span>{canCreate(role) ? "Le tue materie" : "Materie"}</span>
         {canCreate(role) && (
-          <a href="/admin/courses?new=1" title="Nuova materia" aria-label="Nuova materia">
+          <a href="/admin?new=1" title="Nuova materia" aria-label="Nuova materia">
             <Icon name="plus" />
           </a>
         )}
@@ -78,7 +78,7 @@ export default function Sidebar({ currentPath, role, userId }: { currentPath: st
           </div>
         ) : tree.length === 0 ? (
           <div className="small muted" style={{ padding: "0 .75rem" }}>
-            Nessuna materia.{canCreate(role) && <> <a href="/admin/courses?new=1">Creane una</a>.</>}
+            Nessuna materia.{canCreate(role) && <> <a href="/admin?new=1">Creane una</a>.</>}
           </div>
         ) : (
           tree.map((c) => {

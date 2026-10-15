@@ -20,6 +20,10 @@ export interface CourseState {
   last_build: { id: number; status: string; at: string; errors: number; first_error: { file: string | null; line: number | null; message: string; chapter_id?: number; chapter_title?: string } | null } | null;
   failed_job?: { id: number; title: string; error: string | null };
   sources: number;
+  /** whether the user may change the course (its owner, an admin) */
+  can_write?: boolean;
+  /** the assistant is working on the course right now */
+  ai_running?: boolean;
 }
 
 export function useCourseStates() {

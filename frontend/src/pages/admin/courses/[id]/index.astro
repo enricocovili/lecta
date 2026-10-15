@@ -8,6 +8,6 @@ if (!r.data) return Astro.rewrite("/404");
 // Links made before the overview existed (?chapter, ?chat, ?ask) wanted the text.
 if (Astro.url.search) return Astro.redirect(`/admin/courses/${id}/testo${Astro.url.search}`);
 ---
-<Admin title={r.data.name} crumbs={[{ label: "Materie", href: "/admin/courses" }, { label: r.data.name }]}>
+<Admin title={r.data.name} crumbs={[{ label: "Materie", href: "/admin" }, { label: r.data.name }]}>
   <CourseOverview client:load courseId={id} role={Astro.locals.auth.role} userId={Astro.locals.auth.user_id} />
 </Admin>

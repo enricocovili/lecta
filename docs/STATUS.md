@@ -145,6 +145,12 @@ deleted with the last step).
 * **Tests**: `tests/test_access.py` (every route's level), `tests/test_ownership.py` (cross-user sweep), browser spec
   `e2e/tests/08-passkeys.spec.ts`. Ideas left out of the plan are on the board (💡 Idea, P2).
 
+## A simpler app
+
+* **No map** (DECISIONS 133): `/admin/map` and `GET /api/concepts` are gone; the embeddings stay for search and retrieval.
+* **Home = the subjects** (DECISIONS 134): `/admin` lists the subjects with their state and publishing; `/admin/courses`
+  redirects there. The job list is in Attività, the assistant's turns in its panel, the AI review on the course page.
+
 ## Definition of done: how each point is verified
 
 | Requirement | Evidence |

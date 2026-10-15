@@ -16,7 +16,7 @@ test.describe.serial("workspace", () => {
     await page.getByLabel("Ripeti la password").fill(PASSWORD);
     await page.getByRole("button", { name: "Crea account amministratore" }).click();
     await page.waitForURL("**/admin");
-    await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Materie" })).toBeVisible();
     con.assertClean(EXPECTED);
   });
 
