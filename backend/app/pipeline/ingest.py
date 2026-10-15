@@ -347,7 +347,7 @@ async def place_bundle(ctx: JobContext, gkey: str, bundle: dict[str, Any], outco
     """Check and write one bundle where placement decided."""
     async with SessionLocal() as db:
         c = await db.get(Course, outcome["course_id"]) if outcome.get("course_id") else None
-        preamble = await projects.preamble_for(db, c) if c else ((await settings_svc.get_section(db, "template")).preamble or templates.DEFAULT_PREAMBLE)
+        preamble = await projects.preamble_for(db, c) if c else ((await settings_svc.get_section(db, "template")).preamble or templates.default_preamble(bundle.get("language")))
         engine = await projects.engine_for(db, c) if c else (await settings_svc.get_section(db, "latex")).engine
         lset = await settings_svc.get_section(db, "latex")
     images = bundle.get("images") or {}

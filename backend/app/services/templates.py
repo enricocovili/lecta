@@ -39,7 +39,7 @@ def ts_config(lang: str | None) -> str:
     return TS_CONFIG.get((lang or "").lower(), "simple")
 
 
-DEFAULT_PREAMBLE = r"""% Lecta default preamble.
+_DEFAULT_PREAMBLE = r"""% Lecta default preamble.
 % Shared by the notes and by the standalone figure builds: keep layout packages
 % (geometry, hyperref, ...) in main.tex, not here.
 \usepackage{iftex}
@@ -73,41 +73,19 @@ DEFAULT_PREAMBLE = r"""% Lecta default preamble.
 % pandoc compatibility (Markdown notes are converted with pandoc)
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 
-% ---- localised names ------------------------------------------------------
-\providecommand{\lectalang}{english}
-\makeatletter
-\def\lecta@name@italian@definition{Definizione}
-\def\lecta@name@italian@theorem{Teorema}
-\def\lecta@name@italian@lemma{Lemma}
-\def\lecta@name@italian@proposition{Proposizione}
-\def\lecta@name@italian@corollary{Corollario}
-\def\lecta@name@italian@example{Esempio}
-\def\lecta@name@italian@remark{Osservazione}
-\def\lecta@name@english@definition{Definition}
-\def\lecta@name@english@theorem{Theorem}
-\def\lecta@name@english@lemma{Lemma}
-\def\lecta@name@english@proposition{Proposition}
-\def\lecta@name@english@corollary{Corollary}
-\def\lecta@name@english@example{Example}
-\def\lecta@name@english@remark{Remark}
-\newcommand{\lectaname}[1]{%
-  \@ifundefined{lecta@name@\lectalang @#1}%
-    {\csname lecta@name@english@#1\endcsname}%
-    {\csname lecta@name@\lectalang @#1\endcsname}}
-
 % ---- theorem-like environments (amsthm + tcolorbox) -----------------------
-\@ifundefined{c@chapter}%
-  {\newtheorem{theorem}{\lectaname{theorem}}}%
-  {\newtheorem{theorem}{\lectaname{theorem}}[chapter]}
+% Numbered within chapters when the class has them; the names are in the course's language.
+\makeatletter
+\@ifundefined{c@chapter}{\newtheorem{theorem}{@@theorem@@}}{\newtheorem{theorem}{@@theorem@@}[chapter]}
 \makeatother
-\newtheorem{lemma}[theorem]{\lectaname{lemma}}
-\newtheorem{proposition}[theorem]{\lectaname{proposition}}
-\newtheorem{corollary}[theorem]{\lectaname{corollary}}
+\newtheorem{lemma}[theorem]{@@lemma@@}
+\newtheorem{proposition}[theorem]{@@proposition@@}
+\newtheorem{corollary}[theorem]{@@corollary@@}
 \theoremstyle{definition}
-\newtheorem{definition}[theorem]{\lectaname{definition}}
-\newtheorem{example}[theorem]{\lectaname{example}}
+\newtheorem{definition}[theorem]{@@definition@@}
+\newtheorem{example}[theorem]{@@example@@}
 \theoremstyle{remark}
-\newtheorem{remark}[theorem]{\lectaname{remark}}
+\newtheorem{remark}[theorem]{@@remark@@}
 \tcolorboxenvironment{definition}{enhanced jigsaw,breakable,colback=blue!3,colframe=blue!45!black,boxrule=0.5pt,left=4pt,right=4pt}
 \tcolorboxenvironment{theorem}{enhanced jigsaw,breakable,colback=red!3,colframe=red!50!black,boxrule=0.5pt,left=4pt,right=4pt}
 \tcolorboxenvironment{lemma}{enhanced jigsaw,breakable,colback=red!2,colframe=red!35!black,boxrule=0.4pt,left=4pt,right=4pt}
@@ -176,12 +154,38 @@ DEFAULT_PREAMBLE = r"""% Lecta default preamble.
   \end{figure}}
 """
 
+# The names of the theorem-like environments, per course language (the others get the English ones).
+THEOREM_NAMES = {
+    "it": ("Teorema", "Lemma", "Proposizione", "Corollario", "Definizione", "Esempio", "Osservazione"),
+    "en": ("Theorem", "Lemma", "Proposition", "Corollary", "Definition", "Example", "Remark"),
+    "fr": ("Théorème", "Lemme", "Proposition", "Corollaire", "Définition", "Exemple", "Remarque"),
+    "de": ("Satz", "Lemma", "Proposition", "Korollar", "Definition", "Beispiel", "Bemerkung"),
+    "es": ("Teorema", "Lema", "Proposición", "Corolario", "Definición", "Ejemplo", "Observación"),
+    "pt": ("Teorema", "Lema", "Proposição", "Corolário", "Definição", "Exemplo", "Observação"),
+}
+_THEOREMS = ("theorem", "lemma", "proposition", "corollary", "definition", "example", "remark")
+
+
+def default_preamble(language: str | None) -> str:
+    """The default preamble of a course in `language`: the theorem names are written in it, so the preamble needs no
+    macro to pick them (and stays correct when copied into another project)."""
+    names = THEOREM_NAMES.get((language or "").lower(), THEOREM_NAMES["en"])
+    out = _DEFAULT_PREAMBLE
+    for key, name in zip(_THEOREMS, names, strict=True):
+        out = out.replace(f"@@{key}@@", name)
+    return out
+
+
 # Appended to every preamble at build time: courses with their own preamble (written before
-# \lectaimage existed, or before review notes were todonotes) still compile chapters that use them.
+# \lectaimage existed, or before review notes were todonotes) still compile chapters that use them, and get
+# the packages the stored text relies on (figures with adjustbox's limits, review notes).
 COMPAT_TAIL = r"""
 % ---- added by Lecta at build time ------------------------------------------
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \makeatletter
+\@ifpackageloaded{graphicx}{}{\RequirePackage{graphicx}}
+\@ifpackageloaded{adjustbox}{}{\RequirePackage[export]{adjustbox}}
+\@ifpackageloaded{float}{}{\RequirePackage{float}}
 \@ifpackageloaded{todonotes}{}{\RequirePackage{todonotes}}
 \@ifundefined{lectaimage}{%
   \@ifpackageloaded{graphicx}{}{\RequirePackage{graphicx}}%

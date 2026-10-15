@@ -97,7 +97,7 @@ export default function LatexSettings() {
       >
         <p className="set-help">
           È condiviso dagli appunti e dalle compilazioni delle singole figure, quindi tieni fuori i pacchetti di impaginazione (geometry, hyperref): stanno nel{" "}
-          <code>main.tex</code> di ogni materia. Deve definire <code>\review</code>, <code>\lectafigure</code> e <code>\lectaimage[didascalia]{"{images/…}"}</code> (le immagini copiate dalle sorgenti; se manca, l'app ne aggiunge una versione semplice). Ogni materia può sostituirlo nelle sue impostazioni.
+          <code>main.tex</code> di ogni materia. Il testo delle materie usa solo comandi standard: il preambolo carica i pacchetti e definisce gli ambienti <code>definition</code>, <code>theorem</code>, <code>example</code>… (quello predefinito ne scrive i nomi nella lingua di ogni materia). Se mancano, l'app aggiunge i pacchetti che il testo usa (graphicx, adjustbox, float, todonotes). Ogni materia può sostituirlo nelle sue impostazioni.
         </p>
         <textarea className="set-code" rows={24} aria-label="Preambolo globale" value={preamble} onChange={(e) => setPreamble(e.target.value)} spellCheck={false} />
       </SetCard>

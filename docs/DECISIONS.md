@@ -893,6 +893,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      a lesson that it copies when generating the lesson again. A missing picture is now a compile error instead of
      a box saying so. Review notes (a doubt, a picture the notes cite but nobody uploaded) are todonotes'
      `\todo[inline]{…}` instead of `\review{…}`; a published build (and the public source download) hides them by
-     passing `disable` to the package with `\PassOptionsToPackage`, a kernel command, before the preamble. *Alternatives:* keeping the macros and shipping their definitions with every download (still
+     passing `disable` to the package with `\PassOptionsToPackage`, a kernel command, before the preamble. The default
+     preamble writes the theorem names in the course's language (`templates.default_preamble`, it/en/fr/de/es/pt)
+     instead of choosing them with `\lectaname`/`\lectalang` at compile time; the build-time tail loads graphicx,
+     adjustbox, float and todonotes when a course's own preamble lacks them. *Alternatives:* keeping the macros and shipping their definitions with every download (still
      useless in another template, and any change to them changes old text); `wrapfig`/`subcaption` (closer to what an
      author would write, but wrapfig floats badly next to lists and theorem boxes).

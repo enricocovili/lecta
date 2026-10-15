@@ -25,7 +25,7 @@ export default function CourseSettings({ course, onSaved }: { course: Course; on
   const [busy, setBusy] = useState(false);
 
   const loadGlobal = async () => {
-    const t = await get<{ preamble: string }>("/api/settings/template/effective").catch(() => null);
+    const t = await get<{ preamble: string }>(`/api/settings/template/effective?language=${encodeURIComponent(form.language ?? "it")}`).catch(() => null);
     if (t) setOverride(t.preamble);
   };
 

@@ -31,15 +31,16 @@ async def all_settings(db: AsyncSession = Depends(get_db)) -> dict:
 
 
 @template_router.get("/settings/template/effective")
-async def effective_template(db: AsyncSession = Depends(get_db)) -> dict:
+async def effective_template(language: str = "it", db: AsyncSession = Depends(get_db)) -> dict:
+    """The global template, or the default one with the theorem names in `language`."""
     tpl = await settings_svc.get_section(db, "template")
-    return {"preamble": tpl.preamble or templates.DEFAULT_PREAMBLE, "is_default": tpl.preamble is None}
+    return {"preamble": tpl.preamble or templates.default_preamble(language), "is_default": tpl.preamble is None}
 
 
 @router.post("/settings/template/reset")
 async def reset_template(db: AsyncSession = Depends(get_db)) -> dict:
     await settings_svc.set_section(db, "template", {"preamble": None})
-    return {"preamble": templates.DEFAULT_PREAMBLE, "is_default": True}
+    return {"preamble": templates.default_preamble("it"), "is_default": True}
 
 
 @router.get("/settings/{section}")

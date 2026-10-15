@@ -321,7 +321,7 @@ async def preamble_for(db: AsyncSession, course: Course) -> str:
     if course.preamble_override:
         return course.preamble_override
     tpl = await get_section(db, "template")
-    return tpl.preamble or templates.DEFAULT_PREAMBLE
+    return tpl.preamble or templates.default_preamble(course.language)
 
 
 async def engine_for(db: AsyncSession, course: Course) -> str:

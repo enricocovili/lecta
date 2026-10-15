@@ -5,7 +5,7 @@ from __future__ import annotations
 import fitz
 import pytest
 
-from app.services import texlog
+from app.services import templates, texlog
 
 from .conftest import wait_job
 
@@ -22,6 +22,13 @@ async def _put(admin, cid, path, content):
     return r.json()
 
 
+def test_default_preamble_names_theorems_in_the_course_language():
+    it, en, other = templates.default_preamble("it"), templates.default_preamble("en"), templates.default_preamble("xx")
+    assert "\\newtheorem{definition}[theorem]{Definizione}" in it and "{Osservazione}" in it
+    assert "{Definition}" in en and other == en
+    assert "lectaname" not in it and "lectalang" not in it and "@@" not in it
+
+
 async def test_compile_ok_and_incremental_includeonly(admin):
     c = await _course(admin)
     ch1, ch2 = c["chapters"]
@@ -36,6 +43,7 @@ async def test_compile_ok_and_incremental_includeonly(admin):
     text = "".join(p.get_text() for p in fitz.open(stream=pdf.content, filetype="pdf"))
     assert "Primo" in text and "Secondo capitolo" in text
     assert "controllare" in text  # draft builds show review notes
+    assert "Definizione 1.1" in text  # the default preamble names the environments in the course's language
 
     # Editing a chapter compiles only that chapter.
     r = await admin.post(f"/api/courses/{c['id']}/compile", json={"file": ch2["path"]})
