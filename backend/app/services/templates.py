@@ -87,57 +87,6 @@ _DEFAULT_PREAMBLE = r"""% Lecta default preamble.
 \tcolorboxenvironment{proposition}{enhanced jigsaw,breakable,colback=red!2,colframe=red!35!black,boxrule=0.4pt,left=4pt,right=4pt}
 \tcolorboxenvironment{corollary}{enhanced jigsaw,breakable,colback=red!2,colframe=red!35!black,boxrule=0.4pt,left=4pt,right=4pt}
 \tcolorboxenvironment{example}{enhanced jigsaw,breakable,colback=green!3,colframe=green!40!black,boxrule=0.4pt,left=4pt,right=4pt}
-
-% ---- review marker ----------------------------------------------------------
-% Draft builds show a highlighted note; published builds (\lectapublish) drop it.
-\ifdefined\lectapublish
-  \newcommand{\review}[1]{\ignorespaces}
-\else
-  \newcommand{\review}[1]{%
-    \begin{tcolorbox}[enhanced jigsaw,breakable,colback=yellow!20,colframe=orange!85!black,
-      boxrule=0.6pt,size=small,title={\small\bfseries Review},fonttitle=\small]#1\end{tcolorbox}}
-\fi
-
-% ---- pictures (legacy) ------------------------------------------------------
-% \lectaimage[caption]{images/name.png} places an image copied from the sources, small (at most half the line wide).
-\newcommand{\lectaimage}[2][]{%
-  \begin{figure}[H]\centering
-  \IfFileExists{#2}%
-    {\includegraphics[max width=0.5\linewidth,max height=0.22\textheight]{#2}}%
-    {\PackageWarning{lecta}{image #2 not found}%
-     \fbox{\parbox{0.8\linewidth}{\centering\ttfamily image not available}}}%
-  \if\relax\detokenize{#1}\relax\else\caption{#1}\fi
-  \end{figure}}
-% \lectaimagewithtext[caption]{images/name.png}{text}: a small image with the text that explains it beside it.
-% An empty image name leaves the text alone.
-\newcommand{\lectaimagewithtext}[3][]{%
-  \begin{figure}[H]\noindent
-  \if\relax\detokenize{#2}\relax
-    \begin{minipage}[c]{\linewidth}#3\end{minipage}%
-  \else
-    \begin{minipage}[c]{0.39\linewidth}\centering
-      \IfFileExists{#2}%
-        {\includegraphics[max width=\linewidth,max height=0.27\textheight]{#2}}%
-        {\PackageWarning{lecta}{image #2 not found}\fbox{\parbox{0.9\linewidth}{\centering\ttfamily image not available}}}%
-    \end{minipage}\hfill
-    \begin{minipage}[c]{0.57\linewidth}#3\end{minipage}%
-  \fi
-  \if\relax\detokenize{#1}\relax\else\caption{#1}\fi
-  \end{figure}}
-% \lectaimagepair{caption 1}{image 1}{caption 2}{image 2}: two small images on one row, each with its caption.
-\newcommand{\lectaimagepair}[4]{%
-  \begin{figure}[H]\centering
-  \begin{minipage}[t]{0.48\linewidth}\centering
-    \IfFileExists{#2}{\includegraphics[max width=\linewidth,max height=0.32\textheight]{#2}}%
-      {\fbox{\parbox{0.9\linewidth}{\centering\ttfamily image not available}}}\par
-    {\small #1}
-  \end{minipage}\hfill
-  \begin{minipage}[t]{0.48\linewidth}\centering
-    \IfFileExists{#4}{\includegraphics[max width=\linewidth,max height=0.32\textheight]{#4}}%
-      {\fbox{\parbox{0.9\linewidth}{\centering\ttfamily image not available}}}\par
-    {\small #3}
-  \end{minipage}
-  \end{figure}}
 """
 
 # The names of the theorem-like environments, per course language (the others get the English ones).
@@ -162,32 +111,15 @@ def default_preamble(language: str | None) -> str:
     return out
 
 
-# Appended to every preamble at build time: courses with their own preamble (written before
-# \lectaimage existed, or before review notes were todonotes) still compile chapters that use them, and get
-# the packages the stored text relies on (figures with adjustbox's limits, review notes).
+# Appended to every preamble at build time: a course with its own preamble gets the packages the text the app writes
+# relies on (figures with adjustbox's limits, review notes).
 COMPAT_TAIL = r"""
-% ---- added by Lecta at build time ------------------------------------------
+% ---- added by Lecta at build time: packages the text relies on --------------
 \makeatletter
 \@ifpackageloaded{graphicx}{}{\RequirePackage{graphicx}}
 \@ifpackageloaded{adjustbox}{}{\RequirePackage[export]{adjustbox}}
 \@ifpackageloaded{float}{}{\RequirePackage{float}}
 \@ifpackageloaded{todonotes}{}{\RequirePackage{todonotes}}
-\@ifundefined{lectaimage}{%
-  \@ifpackageloaded{graphicx}{}{\RequirePackage{graphicx}}%
-  \newcommand{\lectaimage}[2][]{\par\begin{center}\IfFileExists{#2}{\includegraphics[width=.85\linewidth,height=.6\textheight,keepaspectratio]{#2}}{\fbox{image not available}}%
-    \if\relax\detokenize{#1}\relax\else\par{\small #1}\fi\end{center}\par}}{}
-\@ifundefined{lectaimagewithtext}{%
-  \@ifpackageloaded{graphicx}{}{\RequirePackage{graphicx}}%
-  \newcommand{\lectaimagewithtext}[3][]{\par\medskip\noindent
-    \if\relax\detokenize{#2}\relax\begin{minipage}[c]{\linewidth}#3\end{minipage}\else
-    \begin{minipage}[c]{0.39\linewidth}\centering\IfFileExists{#2}{\includegraphics[width=\linewidth,height=0.27\textheight,keepaspectratio]{#2}}{\fbox{image not available}}\end{minipage}\hfill
-    \begin{minipage}[c]{0.57\linewidth}#3\end{minipage}\fi
-    \if\relax\detokenize{#1}\relax\else\par{\small #1}\fi\par\medskip}}{}
-\@ifundefined{lectaimagepair}{%
-  \@ifpackageloaded{graphicx}{}{\RequirePackage{graphicx}}%
-  \newcommand{\lectaimagepair}[4]{\par\medskip\noindent
-    \begin{minipage}[t]{0.48\linewidth}\centering\IfFileExists{#2}{\includegraphics[width=\linewidth,height=0.32\textheight,keepaspectratio]{#2}}{\fbox{image not available}}\par{\small #1}\end{minipage}\hfill
-    \begin{minipage}[t]{0.48\linewidth}\centering\IfFileExists{#4}{\includegraphics[width=\linewidth,height=0.32\textheight,keepaspectratio]{#4}}{\fbox{image not available}}\par{\small #3}\end{minipage}\par\medskip}}{}
 \makeatother
 """
 

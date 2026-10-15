@@ -903,6 +903,12 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      compiles the chapters that `\input` it. An error in a drawing now stops the chapter, as in any LaTeX project.
      `main.tex` carries no hook either: the build's root file issues `\includeonly` itself (a kernel command that
      works before `\documentclass`), and a new course's `main.tex` no longer defines `\lectalang`. pandoc's
-     `\tightlist` (a macro of pandoc's own template) is removed from the converted Markdown notes. *Alternatives:* keeping the macros and shipping their definitions with every download (still
+     `\tightlist` (a macro of pandoc's own template) is removed from the converted Markdown notes.
+     Migration `0034` carries the existing courses over, like `0017`: every text file is rewritten into a new blob
+     (picture commands written out at the sizes the course's own definitions had, `\review` → `\todo[inline]`,
+     the `main.tex` hooks dropped), the undo snapshots and the chapter index follow the new hashes, draft notes are
+     rewritten, and a preamble loses the macro definitions (theorem names written in the course's language); one that
+     was a copy of the old default is dropped, so the course follows the new default. Nothing in the preamble or the
+     build defines a Lecta macro any more. *Alternatives:* keeping the macros and shipping their definitions with every download (still
      useless in another template, and any change to them changes old text); `wrapfig`/`subcaption` (closer to what an
      author would write, but wrapfig floats badly next to lists and theorem boxes).
