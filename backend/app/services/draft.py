@@ -52,7 +52,7 @@ _LEVELS = {"section": 1, "subsection": 2, "subsubsection": 3, "paragraph": 4}
 _HEADING_RE = re.compile(r"\\(part|chapter|section|subsection|subsubsection|paragraph)\*?\s*(?:\[[^\]]*\])?\s*\{")
 _REF_RE = re.compile(r"\\(?:ref|eqref|pageref|autoref|cref|Cref|nameref|vref)\*?\s*\{([^{}]*)\}")
 _FILE_RE = re.compile(r"images/[A-Za-z0-9._+/-]+")
-_FIGURE_RE = re.compile(r"\\lectafigure\s*(?:\[[^\]]*\])?\s*\{([^{}]+)\}")
+_INPUT_RE = re.compile(r"\\input\s*\{\s*([^{}]+?)\s*\}")
 _NEWLABEL_RE = re.compile(r"^\\newlabel\{([^{}]+)\}")
 _ERROR_RE = re.compile(r"^\./_b\d+/(\d+)\.tex:(\d+): (.*)$", re.M)
 _ANY_ERROR_RE = re.compile(r"^(?:\./)?([^:\n]+\.tex):(\d+): (.*)$", re.M)
@@ -196,8 +196,9 @@ class Inputs:
         parts = [self.prehash, b.src]
         for ref in sorted(set(_FILE_RE.findall(b.src))):
             parts.append(ref + "=" + self.manifest.get(ref, "-"))
-        for name in sorted(set(_FIGURE_RE.findall(b.src))):
-            parts.append(name + "=" + self.manifest.get(f"figures/{name.strip()}.tex", "-"))
+        for name in sorted(set(_INPUT_RE.findall(b.src))):
+            path = name if name.endswith(".tex") else name + ".tex"
+            parts.append(path + "=" + self.manifest.get(path, "-"))
         for group in _REF_RE.findall(b.src):
             for name in group.split(","):
                 parts.append("ref:" + name.strip() + "=" + self.labels.get(name.strip(), "-"))
@@ -318,7 +319,7 @@ class ChapterRender:
         lset = await get_section(db, "latex")
         res = await latex.blocks({
             "key": f"course-{self.course.id}", "workdir": latex.rel(wd), "job": job, "engine": self.inputs.engine,
-            "figure_cache": latex.rel(projects.work_dir(self.course.id, "figcache")), "timeout": lset.timeout_s, "format": fmt,
+            "timeout": lset.timeout_s, "format": fmt,
         })
         if res.get("status") == "superseded":
             raise Superseded()
@@ -344,9 +345,6 @@ class ChapterRender:
         elif not marks["D"] and not warnings:
             tail = [ln for ln in log.strip().splitlines() if ln.startswith("!")][-2:] or log.strip().splitlines()[-2:]
             warnings.append("La composizione LaTeX si è fermata: " + " / ".join(tail))
-        for f in res.get("figures") or []:
-            if f.get("status") in ("error", "timeout"):
-                warnings.append(f"La figura {f.get('name')} non si compila.")
 
         index = self.index()
         if marks["B"] and marks["G"]:

@@ -18,10 +18,6 @@ from .settings import get_section
 KEEP_BUILDS = 20
 
 
-def figure_cache_dir(course_id: int) -> Path:
-    return projects.work_dir(course_id, "figcache")
-
-
 def _chapter_for(path: str | None, files: dict[str, str | None]) -> list[str] | None:
     """Which chapters to \\includeonly when editing `path` (None = full build)."""
     if not path:
@@ -29,25 +25,11 @@ def _chapter_for(path: str | None, files: dict[str, str | None]) -> list[str] | 
     if path.startswith("chapters/") and path.endswith(".tex"):
         return [path]
     if path.startswith("figures/") and path.endswith(".tex"):
-        name = path.rsplit("/", 1)[-1].removesuffix(".tex")
-        pat = re.compile(r"\\lectafigure\s*(\[[^\]]*\])?\s*\{" + re.escape(name) + r"\}")
+        name = path.removesuffix(".tex")
+        pat = re.compile(r"\\input\s*\{\s*" + re.escape(name) + r"(?:\.tex)?\s*\}")
         users = [p for p, src in files.items() if p.startswith("chapters/") and src and pat.search(src)]
         return users or None
     return None
-
-
-def figure_diagnostics(figures: list[dict]) -> list[dict]:
-    out = []
-    for f in figures:
-        if f.get("status") in ("error", "timeout"):
-            parsed = [d for d in texlog.parse(f.get("log", "")) if d["level"] == "error"]
-            if not parsed:
-                parsed = [{"level": "error", "file": None, "line": None, "message": f"figure {f['name']} failed", "context": None}]
-            for d in parsed[:5]:
-                d["file"] = d["file"] if d["file"] and d["file"].startswith("figures/") else f"figures/{f['name']}.tex"
-                d["message"] = f"[figure {f['name']}] {d['message']}"
-                out.append(d)
-    return out
 
 
 async def run_build(
@@ -77,7 +59,6 @@ async def run_build(
     body = {
         "key": f"course-{course.id}-{workdir_name}",
         "workdir": latex.rel(wd),
-        "figure_cache": latex.rel(figure_cache_dir(course.id)),
         "engine": engine,
         "mode": mode,
         "includeonly": includeonly,
@@ -88,7 +69,7 @@ async def run_build(
     status = res.get("status", "error")
     diagnostics: list[dict] = []
     if status != "superseded":
-        diagnostics = figure_diagnostics(res.get("figures", [])) + texlog.parse(res.get("log", ""))
+        diagnostics = texlog.parse(res.get("log", ""))
         if status != "ok" and not any(d["level"] == "error" for d in diagnostics):
             tail = (res.get("latexmk_output") or res.get("log") or "").strip().splitlines()[-3:]
             diagnostics.insert(0, {"level": "error", "file": None, "line": None, "message": " / ".join(tail) or status, "context": None})
@@ -99,7 +80,6 @@ async def run_build(
         "seconds": res.get("seconds", 0),
         "diagnostics": diagnostics,
         "summary": texlog.summary(diagnostics),
-        "figures": [{k: f.get(k) for k in ("name", "status", "seconds")} for f in res.get("figures", [])],
         "pdf": res.get("pdf"),
         "log": (res.get("log") or "")[-400_000:],
         "workdir": str(wd),
@@ -113,7 +93,6 @@ async def run_build(
             includeonly=includeonly or [],
             seconds=float(res.get("seconds") or 0),
             diagnostics=diagnostics,
-            figures=out["figures"],
             log=out["log"],
             pdf_path=res.get("pdf"),
         )

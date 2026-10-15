@@ -89,7 +89,7 @@ async def test_a_lesson_into_a_new_course_writes_a_compiling_chapter(admin, work
     assert len(detail["chapters"]) == 1
     ch = detail["chapters"][0]
     text = (await admin.get(f"/api/courses/{course['id']}/files/content", params={"path": ch["path"]})).json()["content"]
-    assert "\\chapter{" in text and "\\lectafigure" not in text and "tikzpicture" not in text
+    assert "\\chapter{" in text and "tikzpicture" not in text
     assert "\\int_{-\\infty}^{+\\infty}" in text  # the Markdown math survived
     assert "\\begin{verbatim}" in text  # ASCII diagrams are kept as code
     sources = (await admin.get(f"/api/courses/{course['id']}/chapters/{ch['id']}/sources")).json()

@@ -64,7 +64,7 @@ Format: **decision** — reason. *Alternative:* main alternative considered.
 16. **Draft/publish flags through a generated root file**: `_root.tex` defines
     `\lectaincludeonly` / `\lectapublish` and then `\input{main}` (with
     `-jobname=main`). No `-usepretex` or shell tricks. *Alternative:* rewrite main.tex per build.
-17. **Figures are body-only files** (`figures/x.tex` holds just the tikzpicture etc.),
+17. **Figures are body-only files** (precompiling replaced by `\input`, 139) (`figures/x.tex` holds just the tikzpicture etc.),
     wrapped at build time in `standalone[varwidth]` with the course preamble, and
     included via `\lectafigure`. Cache key: figure source + preamble + engine +
     referenced images. *Alternative:* full standalone documents per figure.
@@ -896,6 +896,10 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      passing `disable` to the package with `\PassOptionsToPackage`, a kernel command, before the preamble. The default
      preamble writes the theorem names in the course's language (`templates.default_preamble`, it/en/fr/de/es/pt)
      instead of choosing them with `\lectaname`/`\lectalang` at compile time; the build-time tail loads graphicx,
-     adjustbox, float and todonotes when a course's own preamble lacks them. *Alternatives:* keeping the macros and shipping their definitions with every download (still
+     adjustbox, float and todonotes when a course's own preamble lacks them. `\lectafigure` (which no course used)
+     and the compile service's precompiled standalone figures (`figures-cache/`, `/figure`) are gone: a drawing is
+     TikZ code in `figures/NAME.tex` pulled into a `figure` with `\input` (inside `\adjustbox{max width=\linewidth}`),
+     so it compiles in any editor; the draft's cache key follows the files a block `\input`s, and editing a figure
+     compiles the chapters that `\input` it. An error in a drawing now stops the chapter, as in any LaTeX project. *Alternatives:* keeping the macros and shipping their definitions with every download (still
      useless in another template, and any change to them changes old text); `wrapfig`/`subcaption` (closer to what an
      author would write, but wrapfig floats badly next to lists and theorem boxes).

@@ -5,11 +5,10 @@ Layout of a course project:
     main.tex              document class, layout, \\input{preamble}, managed \\include block
     preamble.tex          generated at build time from the course override or global template
     chapters/NN-slug.tex  one file per chapter, pulled in with \\include
-    figures/*.tex         one diagram per file (just the picture code); precompiled standalone
+    figures/*.tex         one diagram per file (just the picture code), pulled in with \\input
     images/               raster images
 
-The preamble is shared by the full document and the standalone figure builds, so
-it must not load layout packages (geometry, hyperref): those live in main.tex.
+Layout packages (geometry, hyperref) live in main.tex, not in the preamble.
 """
 
 from __future__ import annotations
@@ -40,8 +39,7 @@ def ts_config(lang: str | None) -> str:
 
 
 _DEFAULT_PREAMBLE = r"""% Lecta default preamble.
-% Shared by the notes and by the standalone figure builds: keep layout packages
-% (geometry, hyperref, ...) in main.tex, not here.
+% Layout packages (geometry, hyperref, ...) live in main.tex, not here.
 \usepackage{iftex}
 \ifPDFTeX
   \usepackage[T1]{fontenc}
@@ -103,16 +101,7 @@ _DEFAULT_PREAMBLE = r"""% Lecta default preamble.
       boxrule=0.6pt,size=small,title={\small\bfseries Review},fonttitle=\small]#1\end{tcolorbox}}
 \fi
 
-% ---- figures ----------------------------------------------------------------
-% \lectafigure[caption]{name} includes figures/name.tex, precompiled to PDF.
-\newcommand{\lectafigure}[2][]{%
-  \begin{figure}[H]\centering
-  \IfFileExists{figures-cache/#2.pdf}%
-    {\includegraphics[max width=\linewidth,max height=0.7\textheight]{figures-cache/#2.pdf}}%
-    {\PackageWarning{lecta}{figure #2 is not available (figures/#2.tex did not compile)}%
-     \fbox{\parbox{0.8\linewidth}{\centering\ttfamily figure #2 not available}}}%
-  \if\relax\detokenize{#1}\relax\else\caption{#1}\fi
-  \end{figure}}
+% ---- pictures (legacy) ------------------------------------------------------
 % \lectaimage[caption]{images/name.png} places an image copied from the sources, small (at most half the line wide).
 \newcommand{\lectaimage}[2][]{%
   \begin{figure}[H]\centering
@@ -285,12 +274,3 @@ def replace_chapter_block(main: str, chapter_paths: list[str]) -> str:
     if idx < 0:
         return main.rstrip() + "\n" + block + "\n"
     return main[:idx] + block + "\n\n" + main[idx:]
-
-
-FIGURE_WRAPPER = r"""\documentclass[border=3pt,varwidth]{standalone}
-\def\lectastandalone{1}
-\input{preamble}
-\begin{document}
-\input{figures/%s}
-\end{document}
-"""

@@ -5,8 +5,7 @@ Runs in a container with no network, as an unprivileged user, and serves a tiny
 JSON-over-HTTP/1.1 API on a unix socket in a shared volume. Standard library only.
 
 Endpoints (POST, JSON body):
-  /compile   build a project work dir (figures first, then latexmk)
-  /figure    compile one standalone figure (diagram self-correction loop)
+  /compile   build a project work dir (latexmk)
   /synctex   map a PDF position to a source file/line (best effort)
   /blocks    typeset a draft chapter block by block: one engine run of the wrapper the
              backend wrote (each typeset block on pages of its own), then every page to
@@ -29,7 +28,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import hashlib
 import json
 import os
 import re
@@ -172,101 +170,11 @@ def read_log(path: Path) -> str:
         return ""
 
 
-# --------------------------------------------------------------------------- figures
-
-
-def _sha(*parts: bytes) -> str:
-    h = hashlib.sha256()
-    for p in parts:
-        h.update(hashlib.sha256(p).digest())
-    return h.hexdigest()
-
-
-_IMG_REF_RE = re.compile(r"images/[A-Za-z0-9._+/-]+")
-
-
-def figure_hash(work: Path, name: str, engine: str) -> str:
-    src = (work / "figures" / f"{name}.tex").read_bytes()
-    preamble = (work / "preamble.tex").read_bytes() if (work / "preamble.tex").exists() else b""
-    parts = [src, preamble, engine.encode()]
-    for ref in sorted(set(_IMG_REF_RE.findall(src.decode("utf-8", "replace")))):
-        p = work / ref
-        if p.is_file() and not p.is_symlink():
-            parts.append(ref.encode() + p.read_bytes())
-    return _sha(*parts)
-
-
-FIG_WRAPPER = (
-    "\\documentclass[border=3pt,varwidth]{standalone}\n"
-    "\\def\\lectastandalone{1}\n"
-    "\\input{preamble}\n"
-    "\\begin{document}\n"
-    "\\input{figures/%s}\n"
-    "\\end{document}\n"
-)
-
-
-async def compile_figure(work: Path, cache: Path, name: str, engine: str, timeout: int, background: bool) -> dict:
-    if not _NAME_RE.match(name):
-        return {"name": name, "status": "error", "log": "bad figure name"}
-    h = figure_hash(work, name, engine)
-    cached = cache / f"{h}.pdf"
-    target_dir = work / "figures-cache"
-    target_dir.mkdir(exist_ok=True)
-    target = target_dir / f"{name}.pdf"
-    if cached.is_file():
-        _place(cached, target)
-        return {"name": name, "status": "cached", "hash": h}
-    build = work / "_figbuild"
-    build.mkdir(exist_ok=True)
-    wrapper = f"_fig-{name}.tex"
-    (work / wrapper).write_text(FIG_WRAPPER % name)
-    argv = latexmk_argv(engine, wrapper, f"fig-{name}", outdir="_figbuild")
-    t0 = time.monotonic()
-    code, out, timed_out = await run_sandboxed(argv, work, timeout, background)
-    log = read_log(build / f"fig-{name}.log") or out
-    pdf = build / f"fig-{name}.pdf"
-    (work / wrapper).unlink(missing_ok=True)
-    if code == 0 and pdf.is_file() and not pdf.is_symlink():
-        cache.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(pdf, cached)
-        _place(cached, target)
-        return {"name": name, "status": "ok", "hash": h, "seconds": round(time.monotonic() - t0, 2), "log": log[-20000:]}
-    target.unlink(missing_ok=True)
-    return {
-        "name": name,
-        "status": "timeout" if timed_out else "error",
-        "hash": h,
-        "log": log[-60000:],
-        "seconds": round(time.monotonic() - t0, 2),
-    }
-
-
-def _place(src: Path, dst: Path) -> None:
-    if dst.is_symlink():
-        dst.unlink()
-    tmp = dst.with_name(dst.name + ".tmp")
-    shutil.copyfile(src, tmp)
-    os.replace(tmp, dst)
-
-
 # --------------------------------------------------------------------------- compile
-
-
-async def compile_figures(work: Path, cache: Path, engine: str, timeout: int, background: bool) -> list[dict]:
-    figures = []
-    fig_dir = work / "figures"
-    if fig_dir.is_dir():
-        for f in sorted(fig_dir.glob("*.tex")):
-            if f.is_symlink():
-                continue
-            figures.append(await compile_figure(work, cache, f.stem, engine, max(30, timeout // 2), background))
-    return figures
 
 
 async def do_compile(req: dict) -> dict:
     work = resolve_workdir(req["workdir"])
-    cache = resolve_workdir(req.get("figure_cache") or f"{req['workdir']}-figcache")
     engine = req.get("engine", "pdflatex")
     if engine not in ENGINES:
         raise BadRequest("bad engine")
@@ -275,11 +183,9 @@ async def do_compile(req: dict) -> dict:
     mode = req.get("mode", "draft")
     t0 = time.monotonic()
 
-    figures = await compile_figures(work, cache, engine, timeout, background) if req.get("figures", True) else []
-
     main = req.get("main", "main.tex")
     if not _NAME_RE.match(main) or not (work / main).is_file():
-        return {"status": "error", "log": f"{main} not found", "figures": figures}
+        return {"status": "error", "log": f"{main} not found"}
     pre = []
     if mode == "publish":
         # Review notes (todonotes) are hidden in the published PDF.
@@ -304,7 +210,6 @@ async def do_compile(req: dict) -> dict:
         "pdf_mtime": pdf.stat().st_mtime if pdf.is_file() else None,
         "log": log,
         "latexmk_output": out[-20000:],
-        "figures": [{k: v for k, v in f.items() if k != "log" or f["status"] in ("error", "timeout")} for f in figures],
         "seconds": round(time.monotonic() - t0, 2),
         "returncode": code,
     }
@@ -344,7 +249,6 @@ async def do_blocks(req: dict) -> dict:
     ink box of each page. The wrapper reports what it did in `<job>.lecta` (which block went to which page).
     `format` (pdflatex): the name of a preamble to precompile and start from (see ensure_format)."""
     work = resolve_workdir(req["workdir"])
-    cache = resolve_workdir(req.get("figure_cache") or f"{req['workdir']}-figcache")
     engine = req.get("engine", "pdflatex")
     if engine not in ENGINES:
         raise BadRequest("bad engine")
@@ -356,7 +260,6 @@ async def do_blocks(req: dict) -> dict:
     t0 = time.monotonic()
     if not (work / f"{job}.tex").is_file():
         return {"status": "error", "log": f"{job}.tex not found"}
-    figures = await compile_figures(work, cache, engine, timeout, background)
     for ext in ("pdf", "lecta"):
         (work / f"{job}.{ext}").unlink(missing_ok=True)
     out_dir = work / f"{job}-svg"
@@ -400,24 +303,8 @@ async def do_blocks(req: dict) -> dict:
         "svg_dir": str(out_dir.relative_to(WORK_ROOT)),
         "format": fmt_status,
         "log": log[-400_000:],
-        "figures": [{k: v for k, v in f.items() if k != "log" or f["status"] in ("error", "timeout")} for f in figures],
         "seconds": round(time.monotonic() - t0, 2),
     }
-
-
-async def do_figure(req: dict) -> dict:
-    work = resolve_workdir(req["workdir"])
-    cache = resolve_workdir(req.get("figure_cache") or f"{req['workdir']}-figcache")
-    engine = req.get("engine", "pdflatex")
-    if engine not in ENGINES:
-        raise BadRequest("bad engine")
-    res = await compile_figure(
-        work, cache, req["name"], engine, int(req.get("timeout", 60)), req.get("priority") == "background"
-    )
-    target = work / "figures-cache" / f"{req['name']}.pdf"
-    if res["status"] in ("ok", "cached"):
-        res["pdf"] = str(target.relative_to(WORK_ROOT))
-    return res
 
 
 async def do_synctex(req: dict) -> dict:
@@ -544,9 +431,6 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
         elif method == "POST" and path == "/compile":
             key = str(req.get("key") or req["workdir"])
             body = await SCHED.submit(key, req, do_compile)
-        elif method == "POST" and path == "/figure":
-            key = "fig:" + str(req.get("key") or req["workdir"]) + ":" + str(req.get("name"))
-            body = await SCHED.submit(key, req, do_figure)
         elif method == "POST" and path == "/blocks":
             key = "blk:" + str(req.get("key") or req["workdir"]) + ":" + str(req.get("job"))
             body = await SCHED.submit(key, req, do_blocks)

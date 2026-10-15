@@ -50,7 +50,7 @@ def latex_to_text(src: str) -> str:
         s = _CMD_WITH_ARG_KEEP.sub(r"\2", s)
     s = re.sub(r"\\begin\{minipage\}(\[[^\]]*\])*\{[^}]*\}", " ", s)
     s = re.sub(r"\\(begin|end)\{[^}]*\}(\[[^\]]*\])?", " ", s)
-    s = re.sub(r"\\(label|ref|eqref|cite|includegraphics|lectafigure)\*?(\[[^\]]*\])?\{[^}]*\}", " ", s)
+    s = re.sub(r"\\(label|ref|eqref|cite|includegraphics|input)\*?(\[[^\]]*\])?\{[^}]*\}", " ", s)
     s = _CMD_RE.sub(" ", s)
     s = _BRACES_RE.sub("", s)
     s = s.replace("~", " ").replace("$", " ")

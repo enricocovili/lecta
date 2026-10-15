@@ -21,7 +21,7 @@ LaTeX project exported from Lecta on {date}.
   preamble.tex    packages and the environments used by the chapters
   chapters/       one file per chapter
   images/         pictures
-  figures/        TikZ drawings (\\lectafigure)
+  figures/        TikZ drawings, pulled into the chapters with \\input
 
 Build:  pdflatex main.tex   (twice, for the table of contents)   — or latexmk -pdf main.tex
 Needs a full TeX Live (tikz, pgfplots, tcolorbox, circuitikz, ...).{public}

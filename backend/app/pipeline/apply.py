@@ -173,14 +173,13 @@ async def check_and_fix(
             {
                 "key": f"job-{ctx.job_id}-{group_key}",
                 "workdir": latex.rel(wd),
-                "figure_cache": latex.rel(job_dir(ctx.job_id, "figcache")),
                 "engine": engine,
                 "mode": "draft",
                 "priority": "background",
                 "timeout": timeout,
             }
         )
-        diagnostics = compile_svc.figure_diagnostics(res.get("figures", [])) + texlog.parse(res.get("log", ""))
+        diagnostics = texlog.parse(res.get("log", ""))
         status = res.get("status", "error")
         errors = [d for d in diagnostics if d["level"] == "error" and (d.get("file") or "").startswith("chapters/")]
         if status == "ok" or not errors or attempt >= autofix:

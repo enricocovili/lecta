@@ -122,27 +122,32 @@ async def test_errors_are_parsed_with_file_and_line(admin):
     assert "Undefined control sequence" in errors[0]["message"]
 
 
-async def test_figures_precompiled_and_cached(admin):
+async def test_figures_are_tikz_files_pulled_in_with_input(admin):
     c = await _course(admin, "Figures")
     cid = c["id"]
     fig = "\\begin{tikzpicture}\\draw[->] (0,0) -- (2,1) node[right]{$x$};\\end{tikzpicture}\n"
     r = await admin.post(f"/api/courses/{cid}/files", json={"path": "figures/freccia.tex", "content": fig})
     assert r.status_code == 201, r.text
     ch = c["chapters"][0]
-    await _put(admin, cid, ch["path"], "\\chapter{Primo}\n\\lectafigure[Una freccia]{freccia}\n")
+    await _put(admin, cid, ch["path"], "\\chapter{Primo}\n\\begin{figure}[H]\n\\centering\n"
+               "\\adjustbox{max width=\\linewidth}{\\input{figures/freccia}}\n\\caption{Una freccia}\n\\end{figure}\n")
     res = (await admin.post(f"/api/courses/{cid}/compile", json={"file": ch["path"]})).json()
     assert res["status"] == "ok", res
-    assert res["figures"][0]["name"] == "freccia" and res["figures"][0]["status"] == "ok"
-    res = (await admin.post(f"/api/courses/{cid}/compile", json={"file": ch["path"]})).json()
-    assert res["figures"][0]["status"] == "cached"
-    # Editing a figure recompiles it and targets the chapter that uses it.
+    # Editing a figure targets the chapter that uses it.
     await _put(admin, cid, "figures/freccia.tex", fig.replace("(2,1)", "(3,1)"))
     res = (await admin.post(f"/api/courses/{cid}/compile", json={"file": "figures/freccia.tex"})).json()
-    assert res["figures"][0]["status"] == "ok" and res["includeonly"] == [ch["path"]]
+    assert res["status"] == "ok" and res["includeonly"] == [ch["path"]]
     # A broken figure is reported against its own file.
-    await _put(admin, cid, "figures/freccia.tex", "\\begin{tikzpicture}\\draw (0,0) -- ;\\end{tikzpicture}")
+    await _put(admin, cid, "figures/freccia.tex", "\\begin{tikzpicture}\n\\draw (0,0) -- ;\n\\end{tikzpicture}")
     res = (await admin.post(f"/api/courses/{cid}/compile", json={"file": ch["path"]})).json()
     assert any(d["file"] == "figures/freccia.tex" and d["level"] == "error" for d in res["diagnostics"]), res["diagnostics"]
+    # The draft typesets it too, and typesets the block again when the figure changes.
+    await _put(admin, cid, "figures/freccia.tex", fig)
+    before = (await admin.get(f"/api/courses/{cid}/chapters/{ch['id']}/draft")).json()["blocks"][-1]
+    assert before["pages"] and not before["error"]
+    await _put(admin, cid, "figures/freccia.tex", fig.replace("(2,1)", "(1,2)"))
+    after = (await admin.get(f"/api/courses/{cid}/chapters/{ch['id']}/draft")).json()["blocks"][-1]
+    assert after["pages"] and after["pages"][0]["url"] != before["pages"][0]["url"]
 
 
 @pytest.mark.parametrize(
