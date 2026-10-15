@@ -31,6 +31,8 @@ export interface Course {
   chapter_count?: number;
   /** The readers' notes waiting for whoever writes it (0 on someone else's course). */
   open_notes?: number;
+  /** The lesson last written in (`/api/courses`), when the user may see the course's lessons. */
+  last_lesson?: { number: number; title: string; status: string } | null;
   chapters?: Chapter[];
   publication?: { id: number; created_at: string; pdf_size: number };
 }

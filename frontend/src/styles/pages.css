@@ -140,6 +140,25 @@ a.pg-row-title:hover {
 
 /* ------------------------------------------------------------------ courses */
 
+.pg-continue {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  min-width: 0;
+  color: var(--fg);
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+.pg-continue .icon {
+  flex: none;
+  color: var(--fg-muted);
+}
+.pg-continue:hover {
+  text-decoration: none;
+  color: var(--accent);
+}
+
 .pg-course-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

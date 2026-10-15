@@ -856,4 +856,11 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      menu has «Materie». *Why:* a list of every lesson of every subject was never where a lesson was looked for, and it
      was the page the installed app opened on. *Alternatives:* keeping the list filtered on one subject (the course page
      is that list); a bottom bar with a single tab.
+136. **A subject's card leads back into its lesson.** `/api/courses` gives each course its `last_lesson` (`number`,
+     `title`, `status`): the lesson most recently written in (`lessons.updated_at`, moved by every page saved), only on
+     the courses whose lessons the user may see (their own; everything for admins and viewers), `null` otherwise. The
+     card on the home page shows it as «Continua: <title>», or «Ultima lezione: <title>» once completed or for whoever
+     only reads it, one click from the lesson. *Why:* going back to the lesson in progress was the one use of the list
+     of all lessons (135). *Alternative:* the lesson the user last opened (one more thing to store per user, and the
+     one written in is almost always the same).
 

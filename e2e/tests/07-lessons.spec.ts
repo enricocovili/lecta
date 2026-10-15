@@ -372,6 +372,10 @@ test.describe.serial("Lezioni", () => {
   test("the «Completata» switch marks a lesson completed by hand, in the list and in the editor", async ({ page }) => {
     const con = watchConsole(page);
     await login(page);
+    // The subject's card on the home page leads back into the lesson in progress.
+    const card = page.locator(".pg-course-card").filter({ has: page.locator(`a.card-link[href="/admin/courses/${courseId}"]`) });
+    await expect(card.getByTestId("course-continue")).toHaveText("Continua: Lezione 1 - Sistemi LTI");
+    await expect(card.getByTestId("course-continue")).toHaveAttribute("href", `/admin/courses/${courseId}/lessons/1`);
     await page.goto(`/admin/courses/${courseId}`);
     const row = page.getByTestId("overview-lesson");
     const href = (await row.locator("a.pg-row-title").getAttribute("href"))!;
@@ -383,6 +387,8 @@ test.describe.serial("Lezioni", () => {
     await expect.poll(async () => (await stored(page, href)).status).toBe("completed");
     await page.reload();
     await expect(page.getByTestId("overview-lesson").getByRole("switch", { name: "Completata" })).toBeChecked();
+    await page.goto("/admin");
+    await expect(card.getByTestId("course-continue")).toHaveText("Ultima lezione: Lezione 1 - Sistemi LTI");
 
     // In the editor's top bar the same switch puts it back in progress.
     await page.goto(href);

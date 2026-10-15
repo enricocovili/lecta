@@ -197,6 +197,15 @@ function CourseCard({ c, st, owner, admin, onChanged }: { c: Course; st: CourseS
         )}
       </div>
       <OpenNotes course={c} />
+      {c.last_lesson && (
+        <a className="pg-continue" href={`/admin/courses/${c.id}/lessons/${c.last_lesson.number}`} data-testid="course-continue">
+          <Icon name="notebook" />
+          <span className="ellipsis">
+            {c.can_write && c.last_lesson.status !== "completed" ? "Continua" : "Ultima lezione"}: {c.last_lesson.title}
+          </span>
+          <Icon name="chevron-right" />
+        </a>
+      )}
       {c.tags.length > 0 && (
         <div className="row pg-course-tags">
           {c.tags.map((t) => (

@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..models import Chapter, Course, DraftNote, ProjectFile, Publication, User
+from ..models import Chapter, Course, DraftNote, Lesson, ProjectFile, Publication, User
 from ..security.access import Access, access, can_write, check, readable
 from ..services import overview, projects
 from ..services.texttools import slugify
@@ -134,11 +134,25 @@ async def list_courses(acc: Access = Depends(access), db: AsyncSession = Depends
     )
     names = await usernames(db)
     notes = await open_notes(db, acc, courses)
+    # The lesson last written in, per course, among those whose lessons the user may see (decision 136).
+    last = {
+        r.course_id: {"number": r.number, "title": r.title, "status": r.status}
+        for r in (
+            await db.execute(
+                select(Lesson.course_id, Lesson.number, Lesson.title, Lesson.status)
+                .join(Course, Course.id == Lesson.course_id)
+                .where(readable(acc.user, private=True))
+                .distinct(Lesson.course_id)
+                .order_by(Lesson.course_id, Lesson.updated_at.desc(), Lesson.id.desc())
+            )
+        ).all()
+    }
     out = []
     for c in courses:
         d = course_out(c, acc, names.get(c.owner_id))
         d["chapter_count"] = counts.get(c.id, 0)
         d["open_notes"] = notes.get(c.id, 0)
+        d["last_lesson"] = last.get(c.id)
         out.append(d)
     return out
 

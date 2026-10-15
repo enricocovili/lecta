@@ -347,6 +347,26 @@ async def test_a_lesson_is_working_until_set_completed(admin):
     assert (await admin.patch(f"/api/lessons/{lesson['id']}", json={"status": "done"})).status_code == 422
 
 
+async def test_the_courses_list_names_the_lesson_last_written_in(admin, other_editor):
+    course, first = await new_lesson(admin, title="Prima", n=0)
+    await admin.post("/api/lessons", json={"course_id": course["id"], "title": "Seconda"})
+
+    async def last(client, cid=course["id"]) -> dict | None:  # noqa: ANN001
+        return next(c for c in (await client.get("/api/courses")).json() if c["id"] == cid)["last_lesson"]
+
+    assert await last(admin) == {"number": 2, "title": "Seconda", "status": "working"}
+    # Writing in the first lesson makes it the one to continue.
+    pid = (await admin.get(f"/api/lessons/{first['id']}")).json()["pages"][0]["id"]
+    await admin.put(f"/api/lessons/{first['id']}/pages/{pid}", json={"notes": "ancora"})
+    assert (await last(admin))["number"] == 1
+    # A course without lessons has none.
+    empty = (await admin.post("/api/courses", json={"name": "Senza lezioni"})).json()
+    assert await last(admin, empty["id"]) is None
+    # Another editor reading the published course never sees its lessons (decision 125).
+    assert (await admin.post(f"/api/courses/{course['id']}/publish")).status_code == 200
+    assert await last(other_editor) is None
+
+
 async def test_the_last_open_page_is_remembered(admin):
     _, lesson = await new_lesson(admin, n=3)
     lid, pages = lesson["id"], lesson["pages"]
