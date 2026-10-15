@@ -8,7 +8,7 @@ Self-hosted platform for university notes, worked on with an AI assistant.
 * **Study text**: «Integra appunti» turns a lesson into the study text of its course, typeset by LaTeX. You read it as a
   draft, and an **AI assistant** that reads and changes everything in the course does the editing (one click undoes an
   answer); a double click on a passage lets you write it yourself, in place. The LaTeX project can be downloaded
-  whenever you want.
+  whenever you want: plain LaTeX with standard packages, so it compiles in any editor.
 * **Public site**: only the courses you switch ON, always in their latest version (PDF and LaTeX source).
 * **People**: no sign-ups. An admin invites others with a link and they sign in with a password or a passkey, as readers (everything,
   read-only) or authors (their own courses, and the published ones of others). Reading someone else's published course,

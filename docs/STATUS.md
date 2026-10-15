@@ -37,8 +37,8 @@ Imports run by themselves and the platform has fewer moving parts (DECISIONS 57â
 
 * **Import**: local extraction of text (with sub/superscripts), embedded images and
   vector drawings; pages go to a vision model only when text isn't enough; one
-  parallel reading step writes the LaTeX (math included, pictures as images via
-  `\lectaimage`); one compile check with at most one AI fix; written straight
+  parallel reading step writes the LaTeX (math included, pictures as plain
+  figures); one compile check with at most one AI fix; written straight
   into the course (new chapter / appended) or to *Da smistare* when unsure. On the
   55-slide deck already on this server, extraction takes ~2.4 s: 12 overlay steps
   skipped, 28 pages read from text, 15 (display math) with their picture, 12 pictures.
