@@ -104,7 +104,7 @@ export default function AdminSearch() {
       {!res && (
       <p className="sch-hint">
         Ricerca full-text su tutti i sorgenti LaTeX, sui titoli di materie e capitoli e sui nomi dei file caricati. Prova per esempio{" "}
-        <code>teorema di Lagrange</code>, <code>"risposta all'impulso"</code> o <code>\review</code>.
+        <code>teorema di Lagrange</code>, <code>"risposta all'impulso"</code> o <code>\todo</code>.
       </p>
       )}
       <ErrorBox error={error} />

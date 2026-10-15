@@ -62,7 +62,7 @@ LaTeX body rules:
 - Completeness and fidelity: keep ALL content, in the original order and language. Do not summarise, do not
   translate, do not add explanations that are not in the source (a later step writes the study text from your
   conversion: what matters here is that nothing is lost and every formula is exact). The text may start or end
-  mid-sentence (the material is split into parts): just continue it. Use \review{...} only for something you
+  mid-sentence (the material is split into parts): just continue it. Use \todo[inline]{...} only for something you
   really cannot read.
 """.strip()
 
@@ -154,7 +154,7 @@ You get:
     are, character for character;
   · add what is new in the notes or material, in the place where it belongs in that structure;
   · change or remove only what the notes now contradict or no longer contain;
-  · additions by the student that the notes don't mention (extra remarks, examples, \\review marks) stay;
+  · additions by the student that the notes don't mention (extra remarks, examples, \\todo notes) stay;
   · the pictures of the previous version are figure environments with \\includegraphics{{images/x.png}}: keep each
     figure as it is (same path, same lines) while it still applies; new pictures use the ids of the material;
   · the result is the whole text of the lesson (not only the differences), with no duplicated passages.
@@ -185,7 +185,7 @@ How to write:
   \\includegraphics (except in a figure copied from the previous version), never draw with TikZ. The text argument of \\lectaimagewithtext is normal text (no verbatim).
 - Code, Mermaid or ASCII diagrams in the notes: keep them in \\begin{{verbatim}} ... \\end{{verbatim}}.
 - Don't invent: everything must come from the notes or the material. If they disagree, follow the material for
-  formulas and definitions and flag the difference briefly with \\review{{...}}.
+  formulas and definitions and flag the difference briefly with \\todo[inline]{{...}}.
 - Write in the language given in the request; keep the technical terms customary in the field.
 - Only the body of a chapter: never \\documentclass, \\usepackage, \\begin{{document}} or \\chapter.
 
@@ -260,7 +260,7 @@ How to work:
   structure, then read_file (use start_line/end_line for long files), grep to locate text, find_related to decide
   where something belongs. Compare with the sources (list_sources, read_source, view_source_page) when correctness or
   completeness matters. Never invent content that neither the course nor the sources support; if you are not sure,
-  say so or leave a \\review{{...}} note.
+  say so or leave a \\todo[inline]{{...}} note.
 - A picture missing from the text (the import sometimes reads a slide only as text, or leaves a figure out together
   with logos and decorations) can be taken from the sources: find the page (read_source), look at it with
   view_source_page, which also lists the pictures on the page, save the one you need with extract_source_image (a
@@ -279,7 +279,7 @@ How to work:
   every important definition, formula, theorem and example kept. Structure with \\section and
   \\subsection; formal statements in the environments definition, theorem, lemma, proposition, corollary, example,
   remark and proof (e.g. \\begin{{definition}}[Name] ... \\end{{definition}}); all maths as proper LaTeX; doubts with
-  \\review{{...}}.
+  \\todo[inline]{{...}}.
 - The course is a plain LaTeX project that any editor compiles: use only standard commands and the packages of
   preamble.tex, never define macros of your own in a chapter. Pictures are small, beside the text that explains them,
   written like the figures already in the course:

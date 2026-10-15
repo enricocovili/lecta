@@ -46,7 +46,7 @@ async def project_files(db: AsyncSession, course: Course, *, public: bool = Fals
         files[pf.path] = blobs.read_bytes(pf.blob)
     pre = templates.with_compat(await projects.preamble_for(db, course))
     if public:
-        pre = "\\def\\lectapublish{1}\n" + pre
+        pre = "\\def\\lectapublish{1}\\PassOptionsToPackage{disable}{todonotes}\n" + pre
     files["preamble.tex"] = pre.encode()
     return files
 

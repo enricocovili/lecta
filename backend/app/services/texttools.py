@@ -35,7 +35,7 @@ _COMMENT_RE = re.compile(r"(?<!\\)%.*")
 # Drawings and tables go; a figure keeps its caption and the text beside its picture.
 _ENV_DROP_RE = re.compile(r"\\begin\{(tikzpicture|table|circuitikz|forest|tikzcd)\}.*?\\end\{\1\}", re.S)
 _HEADING_RE = re.compile(r"\\(chapter|section|subsection|subsubsection|paragraph)\*?\s*(\[[^\]]*\])?\s*\{([^{}]*)\}")
-_CMD_WITH_ARG_KEEP = re.compile(r"\\(textbf|textit|emph|underline|texttt|textsc|mathrm|mathbf|text|review)\s*\{([^{}]*)\}")
+_CMD_WITH_ARG_KEEP = re.compile(r"\\(textbf|textit|emph|underline|texttt|textsc|mathrm|mathbf|text|review|todo)\s*(?:\[[^\]]*\])?\s*\{([^{}]*)\}")
 _CMD_RE = re.compile(r"\\[a-zA-Z@]+\*?(\[[^\]]*\])?")
 _BRACES_RE = re.compile(r"[{}]")
 _WS_RE = re.compile(r"[ \t]+")

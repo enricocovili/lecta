@@ -19,11 +19,11 @@ async def _course(admin, name, body):
 
 
 async def test_admin_full_text_search(admin, anon):
-    c, ch = await _course(admin, "Analisi", "\\chapter{Uno}\nIl teorema di Lagrange afferma che esiste un punto intermedio.\n\\review{rivedere}\n")
+    c, ch = await _course(admin, "Analisi", "\\chapter{Uno}\nIl teorema di Lagrange afferma che esiste un punto intermedio.\n\\todo[inline]{rivedere}\n")
     r = (await admin.get("/api/search", params={"q": "teorema Lagrange"})).json()
     hit = next(f for f in r["files"] if f["course_id"] == c["id"])
     assert hit["path"] == ch["path"] and hit["line"] == 2 and "<<" in hit["snippet"]
-    r = (await admin.get("/api/search", params={"q": "\\review"})).json()  # LaTeX commands (substring fallback)
+    r = (await admin.get("/api/search", params={"q": "\\todo"})).json()  # LaTeX commands (substring fallback)
     assert any(f["course_id"] == c["id"] for f in r["files"])
     r = (await admin.get("/api/search", params={"q": "Analisi"})).json()
     assert any(t["title"] == "Analisi" for t in r["titles"])

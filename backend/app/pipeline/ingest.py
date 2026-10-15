@@ -143,7 +143,7 @@ async def extract(ctx: JobContext, upload_id: int) -> dict[str, Any]:
                     latex = latex.replace(placeholder, f"\\begin{{verbatim}}\n{code}\n\\end{{verbatim}}")
                     notes = notes.replace(placeholder, f"```{b['type']}\n{b['code']}\n```")
                 else:
-                    latex = latex.replace(placeholder, f"\\review{{Immagine citata negli appunti, non disponibile: {templates.tex_escape(b.get('path', ''))}}}")
+                    latex = latex.replace(placeholder, f"\\todo[inline]{{Immagine citata negli appunti, non disponibile: {templates.tex_escape(b.get('path', ''))}}}")
                     notes = notes.replace(placeholder, f"(immagine citata negli appunti, non disponibile: {b.get('path', '')})")
             await _set_pages(f.id, None, r.get("language"))
             items.append(
@@ -489,7 +489,7 @@ async def _bundle_step(ctx: JobContext, g: dict[str, Any], items: list[IngestIte
     body, status = read.stitch([{"unit": f"c{n}", "body": b, "drops": []} for n, b in enumerate(text["bodies"])], known, title,
                                append_unplaced=False)
     if not body.strip():
-        body = "\\review{Nessun contenuto riconosciuto nel materiale caricato.}"
+        body = "\\todo[inline]{Nessun contenuto riconosciuto nel materiale caricato.}"
     by_fig = {f.key: f for f in [*figures, *notes_figures]}
     images = {k: {"blob": by_fig[k].crop_blob, "ext": image_ext(by_fig[k].crop_blob)} for k, st in status.items() if st != "dropped"}
     return {

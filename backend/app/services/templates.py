@@ -59,6 +59,7 @@ DEFAULT_PREAMBLE = r"""% Lecta default preamble.
 \usepackage{float}
 \usepackage{enumitem}
 \usepackage[most]{tcolorbox}
+\usepackage{todonotes}  % review notes: \todo[inline]{...}, hidden when published (option disable)
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,shapes,shapes.geometric,fit,backgrounds,
   decorations.pathreplacing,automata,matrix,patterns,intersections,quotes,angles,babel}
@@ -176,11 +177,12 @@ DEFAULT_PREAMBLE = r"""% Lecta default preamble.
 """
 
 # Appended to every preamble at build time: courses with their own preamble (written before
-# \lectaimage existed) still compile chapters that use it. Needs only graphicx.
+# \lectaimage existed, or before review notes were todonotes) still compile chapters that use them.
 COMPAT_TAIL = r"""
 % ---- added by Lecta at build time ------------------------------------------
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 \makeatletter
+\@ifpackageloaded{todonotes}{}{\RequirePackage{todonotes}}
 \@ifundefined{lectaimage}{%
   \@ifpackageloaded{graphicx}{}{\RequirePackage{graphicx}}%
   \newcommand{\lectaimage}[2][]{\par\begin{center}\IfFileExists{#2}{\includegraphics[width=.85\linewidth,height=.6\textheight,keepaspectratio]{#2}}{\fbox{image not available}}%

@@ -147,7 +147,7 @@ class FakeAdapter(Adapter):
                 head.append(f"%%FIGURE {fid} {pg['page']} 0.1 0.55 0.9 0.8")
                 parts.append(f"La relazione $y = f(x)$ descrive il sistema.\n\n\\lectaimage[Schema]{{{fid}}}")
         if not parts:
-            parts = ["\\review{Nessun contenuto riconosciuto.}"]
+            parts = ["\\todo[inline]{Nessun contenuto riconosciuto.}"]
         return "\n".join(head) + "\n" + "\n\n".join(parts) + "\n%%END\n"
 
     def _read_handwriting(self, m: dict[str, Any]) -> str:

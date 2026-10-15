@@ -25,7 +25,7 @@ async def _put(admin, cid, path, content):
 async def test_compile_ok_and_incremental_includeonly(admin):
     c = await _course(admin)
     ch1, ch2 = c["chapters"]
-    await _put(admin, c["id"], ch1["path"], "\\chapter{Primo}\nCiao $e^{i\\pi}+1=0$.\n\\begin{definition}[Gruppo]Un insieme.\\end{definition}\n\\review{controllare}\n")
+    await _put(admin, c["id"], ch1["path"], "\\chapter{Primo}\nCiao $e^{i\\pi}+1=0$.\n\\begin{definition}[Gruppo]Un insieme.\\end{definition}\n\\todo[inline]{controllare}\n")
     await _put(admin, c["id"], ch2["path"], "\\chapter{Secondo}\nSecondo capitolo.\n")
     r = await admin.post(f"/api/courses/{c['id']}/compile", json={"full": True})
     res = r.json()
@@ -35,7 +35,7 @@ async def test_compile_ok_and_incremental_includeonly(admin):
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
     text = "".join(p.get_text() for p in fitz.open(stream=pdf.content, filetype="pdf"))
     assert "Primo" in text and "Secondo capitolo" in text
-    assert "Review" in text and "controllare" in text  # draft builds show review markers
+    assert "controllare" in text  # draft builds show review notes
 
     # Editing a chapter compiles only that chapter.
     r = await admin.post(f"/api/courses/{c['id']}/compile", json={"file": ch2["path"]})
@@ -182,7 +182,7 @@ async def test_publish_flow(admin, anon, worker):
     c = await _course(admin, "Pubblicato", chapters=("Alfa", "Beta"))
     cid = c["id"]
     a, b = c["chapters"]
-    await _put(admin, cid, a["path"], "\\chapter{Alfa}\nTesto alfa.\n\\review{nota privata di revisione}\n\\newpage Altra pagina.\n")
+    await _put(admin, cid, a["path"], "\\chapter{Alfa}\nTesto alfa.\n\\todo[inline]{nota privata di revisione}\n\\newpage Altra pagina.\n")
     await _put(admin, cid, b["path"], "\\chapter{Beta}\nTesto beta.\n")
     assert (await admin.get(f"/api/courses/{cid}/publish")).json()["state"] == "off"
 
@@ -202,7 +202,7 @@ async def test_publish_flow(admin, anon, worker):
     assert full.status_code == 200 and full.headers["content-type"] == "application/pdf"
     text = "".join(p.get_text() for p in fitz.open(stream=full.content, filetype="pdf"))
     assert "Testo alfa" in text and "Testo beta" in text
-    assert "nota privata" not in text and "Review" not in text  # markers stripped
+    assert "nota privata" not in text  # review notes hidden
     ch_pdf = await anon.get(detail["chapters"][1]["pdf_url"])
     ch_text = "".join(p.get_text() for p in fitz.open(stream=ch_pdf.content, filetype="pdf"))
     assert "Testo beta" in ch_text and "Testo alfa" not in ch_text

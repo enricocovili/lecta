@@ -891,6 +891,8 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      check, so what is checked and stored is plain LaTeX. The assistant writes the same figures itself (its prompt
      gives the three forms), and the import keeps `\includegraphics{images/…}`, the pictures of the previous version of
      a lesson that it copies when generating the lesson again. A missing picture is now a compile error instead of
-     a box saying so. *Alternatives:* keeping the macros and shipping their definitions with every download (still
+     a box saying so. Review notes (a doubt, a picture the notes cite but nobody uploaded) are todonotes'
+     `\todo[inline]{…}` instead of `\review{…}`; a published build (and the public source download) hides them by
+     passing `disable` to the package with `\PassOptionsToPackage`, a kernel command, before the preamble. *Alternatives:* keeping the macros and shipping their definitions with every download (still
      useless in another template, and any change to them changes old text); `wrapfig`/`subcaption` (closer to what an
      author would write, but wrapfig floats badly next to lists and theorem boxes).

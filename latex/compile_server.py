@@ -282,7 +282,8 @@ async def do_compile(req: dict) -> dict:
         return {"status": "error", "log": f"{main} not found", "figures": figures}
     pre = []
     if mode == "publish":
-        pre.append("\\def\\lectapublish{1}")
+        # Review notes (todonotes) are hidden in the published PDF.
+        pre.append("\\def\\lectapublish{1}\\PassOptionsToPackage{disable}{todonotes}")
     only = req.get("includeonly") or []
     if only:
         for p in only:
