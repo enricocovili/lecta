@@ -57,6 +57,7 @@ _DEFAULT_PREAMBLE = r"""% Lecta default preamble.
 \usepackage{float}
 \usepackage{enumitem}
 \usepackage[most]{tcolorbox}
+\setlength{\marginparwidth}{2cm}  % what todonotes wants, or it warns on every build
 \usepackage{todonotes}  % review notes: \todo[inline]{...}, hidden when published (option disable)
 \usepackage{soul}       % \ul{...} underlines, \hl{...} highlights: unlike \underline, they break across lines
 \usepackage{tikz}
@@ -123,7 +124,7 @@ COMPAT_TAIL = r"""
 \@ifpackageloaded{graphicx}{}{\RequirePackage{graphicx}}
 \@ifpackageloaded{adjustbox}{}{\RequirePackage[export]{adjustbox}}
 \@ifpackageloaded{float}{}{\RequirePackage{float}}
-\@ifpackageloaded{todonotes}{}{\RequirePackage{todonotes}}
+\@ifpackageloaded{todonotes}{}{\setlength{\marginparwidth}{2cm}\RequirePackage{todonotes}}
 \@ifpackageloaded{soul}{}{\RequirePackage{soul}}
 \makeatother
 """

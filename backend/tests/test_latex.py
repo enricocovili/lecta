@@ -44,6 +44,7 @@ async def test_compile_ok_and_incremental_includeonly(admin):
     assert "Primo" in text and "Secondo capitolo" in text
     assert "controllare" in text  # draft builds show review notes
     assert "Definizione 1.1" in text  # the default preamble names the environments in the course's language
+    assert not [d for d in res["diagnostics"] if d["level"] == "warning"], res["diagnostics"]  # todonotes included
 
     # Editing a chapter compiles only that chapter.
     r = await admin.post(f"/api/courses/{c['id']}/compile", json={"file": ch2["path"]})
