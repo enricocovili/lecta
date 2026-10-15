@@ -105,18 +105,35 @@ async def test_sign_out_everywhere(app, admin):
     assert (await admin.get("/api/auth/me")).json()["authenticated"]  # someone else's sessions only
 
 
-async def test_a_user_with_courses_is_disabled_not_deleted(app, admin):
+async def test_a_user_with_courses_is_deleted_after_handing_them_over(app, admin):
     ed = await signed_in(app, "usr-ed", "editor")
+    heir = await signed_in(app, "usr-heir", "editor")
+    await ensure_user("usr-read", "viewer")
     course = (await ed.post("/api/courses", json={"name": "Corso di usr-ed", "chapters": ["Uno"]})).json()
     uid = await user_id("usr-ed")
     r = await admin.delete(f"/api/users/{uid}")
     assert r.status_code == 409 and "materie" in r.json()["detail"]
-    assert (await ed.post(f"/api/courses/{course['id']}/delete", json={"confirm_slug": course["slug"]})).status_code == 200
-    assert (await admin.delete(f"/api/users/{uid}")).status_code == 200
+    # Only to someone else who may own a course: an author or an admin, not disabled.
+    for to in (uid, await user_id("usr-read"), 999999):
+        assert (await admin.delete(f"/api/users/{uid}", params={"courses_to": to})).status_code == 422
+    assert (await admin.post(f"/api/users/{await user_id('usr-heir')}/disable")).status_code == 200
+    assert (await admin.delete(f"/api/users/{uid}", params={"courses_to": await user_id("usr-heir")})).status_code == 422
+    assert (await admin.post(f"/api/users/{await user_id('usr-heir')}/enable")).status_code == 200
+    assert (await ed.get(f"/api/courses/{course['id']}")).status_code == 200  # nothing changed
+    assert (await admin.delete(f"/api/users/{uid}", params={"courses_to": await user_id("usr-heir")})).status_code == 200
     assert not (await ed.get("/api/auth/me")).json()["authenticated"]
     assert all(u["username"] != "usr-ed" for u in (await admin.get("/api/users")).json())
     assert (await admin.delete(f"/api/users/{uid}")).status_code == 404
+    # The course is the heir's now, with its text.
+    await login(heir, "usr-heir")
+    got = (await heir.get(f"/api/courses/{course['id']}")).json()
+    assert got["owner_id"] == await user_id("usr-heir") and [c["title"] for c in got["chapters"]] == ["Uno"]
+    assert (await heir.patch(f"/api/courses/{course['id']}", json={"name": "Corso ereditato"})).status_code == 200
+    # Without courses, no heir is needed.
+    await ensure_user("usr-empty", "editor")
+    assert (await admin.delete(f"/api/users/{await user_id('usr-empty')}")).status_code == 200
     await ed.aclose()
+    await heir.aclose()
 
 
 async def test_an_admin_does_not_delete_themselves(app, admin):

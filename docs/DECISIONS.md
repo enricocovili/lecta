@@ -665,8 +665,8 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      the pending ones, and lists the users with role, creation, last seen (latest session activity), passkeys, courses
      and the «solo passkey» and «disattivato» badges. A new role counts from the user's next request (the role is read
      with the session). Disabling drops the user's sessions and refuses every sign-in until re-enabled; «Esci ovunque»
-     only drops the sessions. Deleting is allowed only for a user who owns no courses (409 otherwise: disable instead);
-     their passkeys, sessions and conversations go with them, their jobs and invites keep a blank user. Demoting,
+     only drops the sessions. Deleting a user who owns courses hands them to another user first (138); their
+     passkeys, sessions and conversations go with them, their jobs and invites keep a blank user. Demoting,
      disabling or deleting the last active (not disabled) admin is a 409, checked under a Postgres transaction-level
      advisory lock so two admins demoting each other at once leave one. An admin may demote or disable themselves when
      another active admin remains (disabling signs them out), but **never delete their own account**: someone else does
@@ -870,3 +870,15 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      Who may set them is unchanged (whoever may change the lesson). *Why:* with several users on one lesson (its owner
      and an admin), one user's mark or reading position showed up for the other. *Alternative:* keeping them on the
      page and the lesson, seen by everybody (a mark is a note to oneself, not part of the notes).
+138. **Deleting a user hands their courses to someone else first (#90).** `DELETE /api/users/{id}?courses_to=<user>`
+     moves every course the user owns to `courses_to`, then deletes the user, in one transaction: the courses keep
+     their text, lessons, labs, jobs and publication, and only the owner changes. The heir must be another user, an
+     author or an admin, and not disabled (422 otherwise), since only they may change a course; without `courses_to`
+     a user who owns courses is still a 409. In «Utenti» the delete button works for everybody but oneself: for a user
+     with courses the dialog asks whom they go to (the admin who deletes, by default) and confirms with «Passa le
+     materie ed elimina». What was the user's own goes with them as before: passkeys, sessions, conversations with the
+     assistant (even on the courses handed over: a conversation is its author's, 119), draft notes, «non capita» marks
+     and last open pages. *Why:* a user who left could only be disabled, and their courses stayed with nobody to look
+     after them. *Alternatives:* a separate «transfer» action (two steps where one is wanted, and a user without
+     courses is only a step away from being deleted anyway); deleting the courses with the user (the material is
+     the point of Lecta).

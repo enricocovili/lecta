@@ -71,9 +71,16 @@ export default function UsersSettings() {
   const [recovery, setRecovery] = useState<{ userId: number; url: string } | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<UserRow | null>(null);
+  const [heir, setHeir] = useState<number | null>(null);
   const [disabling, setDisabling] = useState<UserRow | null>(null);
   const userList = users.data ?? [];
   const inviteList = invites.data ?? [];
+  /** Who may take over the courses of a user being deleted: another active author or admin. */
+  const heirs = deleting ? userList.filter((u) => u.id !== deleting.id && !u.disabled_at && (u.role === "editor" || u.role === "admin")) : [];
+  const startDeleting = (u: UserRow) => {
+    setDeleting(u);
+    setHeir(userList.find((h) => h.you && h.id !== u.id)?.id ?? null);
+  };
 
   const createInvite = async () => {
     setCreating(true);
@@ -267,10 +274,10 @@ export default function UsersSettings() {
                 <button
                   className="btn sm ghost icon"
                   type="button"
-                  disabled={busy === u.id || u.courses > 0 || u.you}
-                  title={u.you ? "Non puoi eliminare il tuo account" : u.courses > 0 ? "Ha delle materie: puoi solo disattivarlo" : "Elimina"}
+                  disabled={busy === u.id || u.you}
+                  title={u.you ? "Non puoi eliminare il tuo account" : u.courses > 0 ? "Elimina, dopo aver passato le sue materie a un altro utente" : "Elimina"}
                   aria-label={`Elimina ${u.username}`}
-                  onClick={() => setDeleting(u)}
+                  onClick={() => startDeleting(u)}
                   data-testid="user-delete"
                 >
                   <Icon name="trash" />
@@ -307,11 +314,32 @@ export default function UsersSettings() {
         <Confirm
           title={`Elimina ${deleting.username}`}
           danger
-          confirmLabel="Elimina"
-          message={<>L'account, le sue passkey e le sue conversazioni con l'assistente vengono cancellati. Non si può annullare.</>}
+          confirmLabel={deleting.courses > 0 ? "Passa le materie ed elimina" : "Elimina"}
+          message={
+            <div className="set-stack" style={{ gap: ".8rem" }}>
+              {deleting.courses > 0 && (
+                <label className="field">
+                  {deleting.courses === 1 ? "La sua materia passa a" : `Le sue ${deleting.courses} materie passano a`}
+                  <select value={heir ?? ""} onChange={(e) => setHeir(e.target.value ? Number(e.target.value) : null)} data-testid="user-heir">
+                    <option value="">Scegli a chi…</option>
+                    {heirs.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.username} ({ROLE_LABEL[h.role].toLowerCase()})
+                      </option>
+                    ))}
+                  </select>
+                  <span className="hint">con lezioni, laboratori e testo: solo un autore o un amministratore attivo può riceverle</span>
+                </label>
+              )}
+              <span>L'account, le sue passkey e le sue conversazioni con l'assistente vengono cancellati. Non si può annullare.</span>
+            </div>
+          }
           onConfirm={async () => {
-            await del(`/api/users/${deleting.id}`);
-            toast(`${deleting.username} è stato eliminato`);
+            if (deleting.courses > 0 && heir === null) throw new Error("Scegli a chi passare le sue materie");
+            const to = deleting.courses > 0 ? `?courses_to=${heir}` : "";
+            await del(`/api/users/${deleting.id}${to}`);
+            const name = userList.find((h) => h.id === heir)?.username;
+            toast(deleting.courses > 0 ? `${deleting.username} è stato eliminato; le sue materie ora sono di ${name}` : `${deleting.username} è stato eliminato`);
             users.reload();
           }}
           onClose={() => setDeleting(null)}

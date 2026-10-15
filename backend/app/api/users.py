@@ -1,7 +1,8 @@
 """The users, for the admins: list, change role, disable and re-enable, sign out everywhere, delete.
 
-Users are disabled rather than deleted (they can't sign in, their sessions and pending recovery link go, their content stays); deleting is allowed
-only for a user who owns no courses (their conversations go with them, their jobs and invites forget them). The last
+A user can be disabled (they can't sign in, their sessions and pending recovery link go, their content stays) or deleted:
+a user who owns courses is deleted only by handing them to another active author or admin in the same step (their
+conversations go with them, their jobs and invites forget them). The last
 active admin can't be demoted, disabled or deleted: the check runs under a transaction-level advisory lock, so two
 admins demoting each other at the same moment can't both pass. An admin may demote or disable themselves when another
 active admin remains, but not delete their own account.
@@ -12,9 +13,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
@@ -121,13 +122,21 @@ async def logout_user(user_id: int, ctx: AuthContext = Depends(require_admin), d
 
 
 @router.delete("/users/{user_id}")
-async def delete_user(user_id: int, ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> dict:
+async def delete_user(
+    user_id: int, courses_to: int | None = Query(None), ctx: AuthContext = Depends(require_admin), db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Delete a user; their courses, if any, first go to `courses_to` (an active author or admin), in the same transaction."""
     user = await _locked_user(db, user_id)
     if user.id == ctx.user.id:
         raise HTTPException(status_code=409, detail="Non puoi eliminare il tuo account: chiedilo a un altro amministratore")
     await _keep_an_admin(db, user)
     if await db.scalar(select(func.count()).select_from(Course).where(Course.owner_id == user.id)):
-        raise HTTPException(status_code=409, detail="Ha delle materie: disattivalo invece di eliminarlo")
-    await db.delete(user)  # passkeys, sessions, conversations and draft notes go by cascade; jobs and invites keep a NULL user
+        if courses_to is None:
+            raise HTTPException(status_code=409, detail="Ha delle materie: scegli a chi passarle prima di eliminarlo")
+        heir = await db.get(User, courses_to)
+        if heir is None or heir.id == user.id or heir.role not in ("editor", "admin") or heir.disabled_at is not None:
+            raise HTTPException(status_code=422, detail="Le materie possono passare solo a un autore o a un amministratore attivo")
+        await db.execute(update(Course).where(Course.owner_id == user.id).values(owner_id=heir.id))
+    await db.delete(user)  # passkeys, sessions, conversations, draft notes, marks go by cascade; jobs and invites keep a NULL user
     await db.commit()
     return {"ok": True}

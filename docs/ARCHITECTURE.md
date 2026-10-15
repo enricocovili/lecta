@@ -85,7 +85,8 @@ reasoning behind every change since.
   make a passkey right after (the signed-in user's own passkey routes). A user without a password can't remove their
   last passkey. A **recovery link** (made from «Utenti» for a user who lost their password or passkey) is the same kind
   of link bound to that user: it sets a new password and signs out their other sessions. **Users** (Settings → Utenti, `/api/users`, admins):
-  change role, disable (drops the sessions), sign out everywhere, delete only without courses; the last active admin
+  change role, disable (drops the sessions), sign out everywhere, delete (a user's courses first go to another active
+  author or admin, in the same step); the last active admin
   can't be demoted, disabled or deleted (checked under an advisory lock). `DECISIONS.md` has the details.
 * **Model input and output**: uploaded content (including file and folder names) is wrapped in per-request random
   fences and prompts instruct models to treat it as data; model LaTeX is sanitised (no `\input`, `\write18`, preamble

@@ -223,6 +223,27 @@ test.describe("Passkey", () => {
     await expect(page.getByRole("tabpanel")).toContainText("Amministratore · accesso con password");
     expect((await page.goto("/admin/audit"))?.status()).toBe(200);
     await expect(page).toHaveURL(/\/admin\/settings#ai/);
+
+    // The author writes a subject; deleting the account hands it to someone else (the admin, chosen by default).
+    const made = await author.evaluate(async () => {
+      const csrf = (await (await fetch("/api/auth/csrf")).json()).csrf;
+      const r = await fetch("/api/courses", { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": csrf }, body: JSON.stringify({ name: "Materia di autore" }) });
+      return r.status;
+    });
+    expect(made).toBe(201);
+    await page.goto("/admin/settings#users");
+    const named = page.locator("strong", { hasText: /^autore$/ });
+    const row = page.getByTestId("user-row").filter({ has: named });
+    await expect(row).toContainText("1 materia");
+    await row.getByTestId("user-delete").click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByTestId("user-heir").locator("option:checked")).toHaveText(`${USER} (amministratore)`);
+    await expect(dialog.getByTestId("user-heir").locator("option", { hasText: "lettore" })).toHaveCount(0); // a reader can't own a subject
+    await dialog.getByRole("button", { name: "Passa le materie ed elimina" }).click();
+    await expect(row).toHaveCount(0);
+    expect(await author.evaluate(async () => (await (await fetch("/api/auth/me")).json()).authenticated)).toBe(false);
+    await page.goto("/admin");
+    await expect(page.getByText("Materia di autore")).toBeVisible();
     await rc.close();
     await ac.close();
   });
