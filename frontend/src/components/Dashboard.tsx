@@ -79,10 +79,6 @@ interface DashboardData {
   courses: CourseState[];
 }
 
-interface Concepts {
-  courses: { id: number; concept_count: number }[];
-}
-
 type Kind = "danger" | "warn" | "ok" | "";
 type Filter = "all" | "danger" | "warn" | "ok";
 
@@ -204,7 +200,7 @@ function buildRows(data: DashboardData): Row[] {
   return rows.sort((a, b) => rank[a.tone] - rank[b.tone] || new Date(b.at).getTime() - new Date(a.at).getTime());
 }
 
-function courseMeta(c: CourseState, concepts: number | undefined): string {
+function courseMeta(c: CourseState): string {
   let head: string;
   if (c.status === "error") head = c.reason === "compile" ? "Errore di compilazione" : "Importazione non riuscita";
   else if (c.status === "working" && c.active_job) head = `${translateJobTitle(c.active_job.title)} in corso`;
@@ -215,8 +211,7 @@ function courseMeta(c: CourseState, concepts: number | undefined): string {
       ? `Aggiornata oggi alle ${d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`
       : `Aggiornata il ${d.toLocaleDateString("it-IT", { day: "numeric", month: "short" })}`;
   }
-  if (concepts === undefined) return head;
-  return `${head} · ${concepts === 1 ? "1 concetto in comune" : `${concepts} concetti in comune`}`;
+  return head;
 }
 
 function pdfHref(c: CourseState) {
@@ -389,7 +384,6 @@ function ReviewLine({ c }: { c: CourseState }) {
 
 export default function Dashboard({ role, userId }: { role?: Role; userId?: number }) {
   const { data, error, loading, reload } = useApi(() => get<DashboardData>("/api/dashboard"));
-  const concepts = useApi(() => get<Concepts>("/api/concepts").catch(() => null));
   const [filter, setFilter] = useState<Filter>("all");
   const rows = useMemo(() => (data ? buildRows(data) : []), [data]);
   const busy = rows.some((r) => r.tone === "warn") || !!data?.courses.some((c) => c.ai_running);
@@ -402,7 +396,6 @@ export default function Dashboard({ role, userId }: { role?: Role; userId?: numb
   const counts = { danger: 0, warn: 0, ok: 0 };
   for (const r of rows) if (r.tone && r.tone in counts) counts[r.tone as keyof typeof counts]++;
   const shown = rows.filter((r) => filter === "all" || r.tone === filter).slice(0, 8);
-  const conceptCount = new Map((concepts.data?.courses ?? []).map((c) => [c.id, c.concept_count]));
   const aiTurns = (data.ai_activity ?? []).slice(0, 6);
   const changed = () => {
     reload();
@@ -420,9 +413,6 @@ export default function Dashboard({ role, userId }: { role?: Role; userId?: numb
     <div className="home">
       <div className="section-label" style={{ marginTop: 0 }}>
         <span>Materie</span>
-        <a href="/admin/map" className="hide-mobile">
-          Mappa collegamenti <Icon name="chevron-right" />
-        </a>
       </div>
 
       {data.courses.length === 0 ? (
@@ -446,7 +436,7 @@ export default function Dashboard({ role, userId }: { role?: Role; userId?: numb
                 </h3>
                 <p className="home-course-meta">
                   {otherOwner(c, userId) && <>di {otherOwner(c, userId)} · </>}
-                  {courseMeta(c, conceptCount.get(c.id))}
+                  {courseMeta(c)}
                 </p>
                 <OpenNotes course={c} />
                 <ReviewLine c={c} />

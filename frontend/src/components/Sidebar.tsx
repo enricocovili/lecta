@@ -60,7 +60,6 @@ export default function Sidebar({ currentPath, role, userId }: { currentPath: st
       <div className="nav">
         <NavItem href="/admin/courses" icon="folder" label="Materie" active={is("/admin/courses")} />
         <NavItem href="/admin/lessons" icon="notebook" label="Lezioni" active={is("/admin/lessons")} />
-        <NavItem href="/admin/map" icon="map" label="Mappa" active={is("/admin/map")} />
       </div>
 
       <div className="nav-group-title">

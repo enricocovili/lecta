@@ -57,7 +57,6 @@ VIEWER = """
     GET    /api/courses/{course_id}/review/latest
     GET    /api/search
     GET    /api/export
-    GET    /api/concepts
     GET    /api/courses/{course_id}/chapters/{chapter_id}/draft
     GET    /api/courses/{course_id}/draft
     GET    /api/courses/{course_id}/draft/svg/{name}

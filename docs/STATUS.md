@@ -23,7 +23,7 @@ follow the wizard. No reverse-proxy configuration was created; point yours at
 
 The whole frontend was redesigned after `docs/Lecta — nuova interfaccia.pdf`
 (DECISIONS 51–56): new top bar / sidebar / phone tab bar, Home with activity list and
-course cards, Mappa collegamenti (`/admin/map`, `GET /api/concepts`), the editor with
+course cards, Mappa collegamenti (`/admin/map`, `GET /api/concepts`; removed since, DECISIONS 133), the editor with
 side-by-side AI review, the public landing page and PDF reader (document / presentation),
 and every other page restyled and translated to Italian. New backend endpoints (additive):
 `GET /api/concepts`, `GET /api/dashboard/counts`, `GET /api/public/courses.zip`; `/api/dashboard`

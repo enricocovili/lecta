@@ -1,8 +1,7 @@
 """Workspace overview: per-course state (done / working / error) and the activity feed.
 
-Used by the admin Home, the sidebar tree and the concept map. Everything is
-derived from existing rows (jobs, builds, source links); nothing is
-stored.
+Used by the admin Home and the sidebar tree. Everything is derived from existing
+rows (jobs, builds, source links); nothing is stored.
 """
 
 from __future__ import annotations

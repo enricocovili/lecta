@@ -192,7 +192,7 @@ Format: **decision** — reason. *Alternative:* main alternative considered.
 53. **Course status (Completata / In lavorazione / Errore) is derived, not stored**
     (`services/overview.py`): the latest draft/publish build, the latest finished job and
     active jobs. A failed compile shows up in the Home activity list even without a job.
-54. **Mappa collegamenti is computed on request** (`services/concepts.py`) from section
+54. *(Removed by 133.)* **Mappa collegamenti is computed on request** (`services/concepts.py`) from section
     titles (normalised lexical match, always) plus stored embeddings when they are enabled
     (averaged per section, compared in SQL; the backend never loads the model), cached until
     a .tex file, chapter or index chunk changes.
@@ -462,7 +462,7 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 
 ## A simpler interface (#17)
 
-95. **Every place is reached one way.** The sidebar lists only the places of work (Materie, Lezioni, Mappa) and the
+95. **Every place is reached one way.** The sidebar lists only the places of work (Materie, Lezioni, Mappa; see 133) and the
     subjects; the Home opens from the «Lecta» title like on most sites, search is the bar at the top (on a phone, the
     lens in the top bar), Attività and Impostazioni are in the user menu. The phone's bottom bar has no Home either.
     *Why:* the same link in two places made the sidebar long and the app harder to read.
@@ -821,3 +821,15 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      *Alternatives:* password or passkey, one of the two (two kinds of account, and recovery would depend on which);
      the passkey ceremony inside the accept transaction (the invite routes would keep a second copy of registration for
      an optional step).
+
+## A simpler app
+
+133. **No concept map.** The «Mappa» page (`/admin/map`), `GET /api/concepts`, `services/concepts.py` and the «N concetti
+     in comune» line of the home's cards are gone (this removes 54). On real courses half of its links joined unrelated
+     sections (an operating-systems section on measuring performance with a deep-learning one on data augmentation):
+     keeping each section's mutual best match between every two courses always yields a "least bad" pair, and the
+     embedding model (short-paraphrase MiniLM, sections averaged) scores those pairs as high as the true ones, so no
+     threshold separates them. With a handful of courses it only said what their author already knows. The embeddings
+     stay for search and the assistant's retrieval. *Alternatives:* a stricter centred threshold (tuned on a few pairs,
+     wrong again with the next course); a larger embedding model (the forced best match stays); candidate pairs
+     confirmed by the AI provider and shown beside a section while reading (worth it only if the need shows up).

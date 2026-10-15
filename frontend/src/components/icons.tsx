@@ -5,7 +5,6 @@ import { MARK, MARK_VIEWBOX } from "../lib/brand";
 
 const P: Record<string, string> = {
   home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
-  map: '<circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="8" r="2.2"/><circle cx="8" cy="18" r="2.2"/><path d="M8 7l8 .8M7 8l.8 7.8M16.5 9.8l-7 6.6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
   "chevron-down": '<path d="m6 9 6 6 6-6"/>',

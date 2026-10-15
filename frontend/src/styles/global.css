@@ -2,7 +2,7 @@
  * Warm paper palette, serif display type (Newsreader), Inter for UI, JetBrains Mono for code.
  * Fonts are self-hosted (bundled from @fontsource), so the CSP stays `font-src 'self'`.
  * Theme: follows the OS unless <html data-theme="light|dark"> is set (see /theme.js).
- * Page-specific styles live next to this file (editor.css, map.css, public.css, pages.css, settings.css).
+ * Page-specific styles live next to this file (editor.css, public.css, pages.css, settings.css).
  */
 @import "@fontsource-variable/newsreader/opsz.css";
 @import "@fontsource-variable/newsreader/opsz-italic.css";
