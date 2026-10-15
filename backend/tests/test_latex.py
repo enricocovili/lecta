@@ -122,6 +122,18 @@ async def test_errors_are_parsed_with_file_and_line(admin):
     assert "Undefined control sequence" in errors[0]["message"]
 
 
+async def test_underlines_and_highlights_break_across_lines(admin):
+    c = await _course(admin, "Sottolineature", chapters=("Primo",))
+    ch = c["chapters"][0]
+    long = "una frase molto lunga che deve andare a capo più volte perché è più larga della pagina, con $x^2$ e città " * 2
+    await _put(admin, c["id"], ch["path"], f"\\chapter{{Primo}}\nPrima \\ul{{{long}}} poi \\hl{{{long}}} fine.\n\nPoi \\underline{{{long}}} fine.\n")
+    res = (await admin.post(f"/api/courses/{c['id']}/compile", json={"full": True})).json()
+    assert res["status"] == "ok", res["diagnostics"]
+    overfull = [d for d in res["diagnostics"] if d["level"] == "badbox" and d["message"].startswith("Overfull")]
+    # Only \underline (one unbreakable box) runs past the margin.
+    assert [d["line"] for d in overfull] == [4], overfull
+
+
 async def test_figures_are_tikz_files_pulled_in_with_input(admin):
     c = await _course(admin, "Figures")
     cid = c["id"]

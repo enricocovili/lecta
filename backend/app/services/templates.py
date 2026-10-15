@@ -58,6 +58,7 @@ _DEFAULT_PREAMBLE = r"""% Lecta default preamble.
 \usepackage{enumitem}
 \usepackage[most]{tcolorbox}
 \usepackage{todonotes}  % review notes: \todo[inline]{...}, hidden when published (option disable)
+\usepackage{soul}       % \ul{...} underlines, \hl{...} highlights: unlike \underline, they break across lines
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,shapes,shapes.geometric,fit,backgrounds,
   decorations.pathreplacing,automata,matrix,patterns,intersections,quotes,angles,babel}
@@ -67,6 +68,9 @@ _DEFAULT_PREAMBLE = r"""% Lecta default preamble.
 \usepackage{tikz-cd}
 \usepackage{forest}
 \usepackage{chemfig}
+
+% A line stretches its spaces a little more before running past the margin.
+\setlength{\emergencystretch}{3em}
 
 % ---- theorem-like environments (amsthm + tcolorbox) -----------------------
 % Numbered within chapters when the class has them; the names are in the course's language.
@@ -112,7 +116,7 @@ def default_preamble(language: str | None) -> str:
 
 
 # Appended to every preamble at build time: a course with its own preamble gets the packages the text the app writes
-# relies on (figures with adjustbox's limits, review notes).
+# relies on (figures with adjustbox's limits, review notes, underlines and highlights that break across lines).
 COMPAT_TAIL = r"""
 % ---- added by Lecta at build time: packages the text relies on --------------
 \makeatletter
@@ -120,6 +124,7 @@ COMPAT_TAIL = r"""
 \@ifpackageloaded{adjustbox}{}{\RequirePackage[export]{adjustbox}}
 \@ifpackageloaded{float}{}{\RequirePackage{float}}
 \@ifpackageloaded{todonotes}{}{\RequirePackage{todonotes}}
+\@ifpackageloaded{soul}{}{\RequirePackage{soul}}
 \makeatother
 """
 

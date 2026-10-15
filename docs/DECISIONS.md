@@ -912,3 +912,12 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      build defines a Lecta macro any more. *Alternatives:* keeping the macros and shipping their definitions with every download (still
      useless in another template, and any change to them changes old text); `wrapfig`/`subcaption` (closer to what an
      author would write, but wrapfig floats badly next to lists and theorem boxes).
+140. **Nothing typeset may run past the margin.** In LaTeX a line overflows when it holds something that cannot break:
+     `\underline{…}`, `\colorbox`, `\mbox` and `\fbox` box their whole argument, as do a long formula, an `l`
+     column of a table or a long `\texttt` identifier; the PDF then prints into the margin and the draft, which crops
+     each block to its ink, drew a picture wider than the page. The default preamble loads `soul`, whose `\ul{…}` and
+     `\hl{…}` underline and highlight word by word and break like normal text (the build-time tail loads it for courses
+     with their own preamble), and sets `\emergencystretch` so a paragraph stretches its spaces before overflowing.
+     Every prompt that writes LaTeX (`FIT_RULE`) says to use them and to split formulas, size table columns and keep
+     identifiers in `\url` or verbatim. *Alternatives:* `ulem`'s `\uline` (no highlight); redefining `\underline`
+     (a macro of our own again, and wrong in maths); `lua-ul` (LuaLaTeX only).

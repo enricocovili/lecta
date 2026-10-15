@@ -47,6 +47,14 @@ Reply format (plain text, not JSON, no markdown fences):
 %%END
 """.strip()
 
+# Everything the models write must fit the page: a line LaTeX cannot break runs past the margin in the PDF and the draft.
+FIT_RULE = r"""
+- Nothing may run past the right margin. To underline or highlight use \ul{...} and \hl{...}, which break across
+  lines; never \underline, \colorbox, \fbox or \mbox around running text (they can't break). Split long formulas
+  (align, multline, split); give table columns with text a width (p{..} or tabularx X columns, never l/c for long
+  text); long identifiers, paths and URLs go in \url{...} or on short lines of a verbatim block.
+""".strip()
+
 LATEX_BODY_RULES = r"""
 LaTeX body rules:
 - Only the body of a chapter: never \documentclass, \usepackage, \begin{document} or \chapter.
@@ -64,7 +72,7 @@ LaTeX body rules:
   conversion: what matters here is that nothing is lost and every formula is exact). The text may start or end
   mid-sentence (the material is split into parts): just continue it. Use \todo[inline]{...} only for something you
   really cannot read.
-""".strip()
+""".strip() + "\n" + FIT_RULE
 
 _d(
     "read.pages",
@@ -184,6 +192,7 @@ How to write:
   default style for how to place them). Leave out decorative or redundant ones. Never invent ids, never
   \\includegraphics (except in a figure copied from the previous version), never draw with TikZ. The text argument of \\lectaimagewithtext is normal text (no verbatim).
 - Code, Mermaid or ASCII diagrams in the notes: keep them in \\begin{{verbatim}} ... \\end{{verbatim}}.
+{FIT_RULE}
 - Don't invent: everything must come from the notes or the material. If they disagree, follow the material for
   formulas and definitions and flag the difference briefly with \\todo[inline]{{...}}.
 - Write in the language given in the request; keep the technical terms customary in the field.
@@ -290,7 +299,9 @@ How to work:
     \\caption{{caption}} \\end{{figure}};
   · two on a row: in one figure, two \\begin{{minipage}}[t]{{0.48\\linewidth}} \\centering, each with
     \\includegraphics[max width=\\linewidth,max height=0.32\\textheight]{{images/A.png}}\\par {{\\small caption}}, joined by \\hfill.
-  Each command on its own line. Chapter and figure files contain only
+  Each command on its own line.
+{FIT_RULE}
+- Chapter and figure files contain only
   the body: never \\documentclass, \\usepackage or \\begin{{document}} (packages go in preamble.tex; check first
   that a package is not already loaded). Drawings you write yourself are TikZ code in figures/NAME.tex (only the
   tikzpicture), placed with \\begin{{figure}}[H] \\centering \\adjustbox{{max width=\\linewidth}}{{\\input{{figures/NAME}}}}
