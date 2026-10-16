@@ -27,6 +27,12 @@ test("pages fit a phone screen and never load anything from another origin", asy
   await expect(page.getByTestId("course-overview")).toBeVisible();
   let overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow, "horizontal overflow on the course page").toBeLessThanOrEqual(2);
+  // Its «Scarica ▾» menu opens on screen.
+  await page.getByTestId("course-overview").getByRole("button", { name: "Scarica", exact: true }).click();
+  const dl = await page.getByTestId("overview-pdf").locator("..").boundingBox();
+  expect(dl!.x, "download menu off the left edge").toBeGreaterThanOrEqual(0);
+  expect(dl!.x + dl!.width, "download menu off the right edge").toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.keyboard.press("Escape");
   // The text on a phone: the document, and the assistant one tap away (tab bar).
   await page.goto(`${courseHref}/testo`);
   await expect(page.getByTestId("doc-preview")).toBeVisible();

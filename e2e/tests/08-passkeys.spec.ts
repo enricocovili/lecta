@@ -266,6 +266,11 @@ test.describe("Passkey", () => {
     await expect(overview.locator(".pub-ctl")).toHaveCount(0);
     await expect(overview.getByRole("button", { name: "Impostazioni della materia" })).toHaveCount(0);
     await expect(overview.getByRole("button", { name: "Nuova lezione" })).toHaveCount(0);
+    // Both downloads under «Scarica ▾», as in the text; the PDF is the one already compiled.
+    await overview.getByRole("button", { name: "Scarica", exact: true }).click();
+    await expect(overview.getByTestId("overview-source")).toHaveAttribute("href", /\/api\/courses\/\d+\/source\.zip$/);
+    await expect(overview.getByTestId("overview-pdf")).toHaveText("PDF (ultima versione)");
+    await reader.keyboard.press("Escape");
     await overview.getByRole("link", { name: "Apri il testo" }).first().click();
     await reader.waitForURL(/\/admin\/courses\/\d+\/testo$/);
     await expect(reader.getByTestId("read-only")).toHaveText(`Sola lettura · di ${USER}`);

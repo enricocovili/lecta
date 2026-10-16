@@ -815,6 +815,11 @@ a.pg-row-title:hover {
   .co-actions {
     width: 100%;
   }
+  /* «Scarica ▾» sits near the left edge once the actions wrap: its menu opens rightwards. */
+  .co-dl-pop {
+    left: 0;
+    right: auto;
+  }
 }
 .co-grid + section {
   margin-top: 2.25rem;

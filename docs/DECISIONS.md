@@ -495,7 +495,8 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
 101. **One «Scarica» menu for the downloads.** On the public Home a course has only «Leggi» and «Scarica ▾»; in the
      reader the same menu (PDF, LaTeX source, and the PDF of the chapter being read) replaces the two download buttons
      and the «Download» list under the index. It is a `<details>` (`DownloadMenu.tsx`), so it works without
-     JavaScript; `Public.astro` closes it on an outside click, Escape and a pick.
+     JavaScript; `Public.astro` closes it on an outside click, Escape and a pick. In the admin, the course page has
+     the same «Scarica ▾» as its text (LaTeX source, PDF compiled now or, for a reader, the latest one).
 102. **No «Scarica tutto (ZIP)».** The public Home loses the link and `/api/public/courses.zip` is gone (it served only
      that link): every course downloads from its own «Scarica» menu.
 

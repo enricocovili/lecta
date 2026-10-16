@@ -12,6 +12,7 @@ import type { Course, TreeCourse } from "./types";
 import { Confirm, Empty, ErrorBox, fmtWhen, Loading, Modal, toast, useApi } from "./ui";
 import { compileFull, latestPdf } from "./workspace/compile";
 import CourseSettings from "./workspace/CourseSettings";
+import Pop from "./workspace/Pop";
 import PublishControl from "./workspace/PublishControl";
 
 interface LessonRow {
@@ -124,14 +125,26 @@ export default function CourseOverview({ courseId, role, userId }: { courseId: n
         </div>
         <div className="row co-actions">
           {isAdmin(role) ? <PublishControl courseId={c.id} courseName={c.name} onChanged={() => void course.reload()} /> : <PublishedFlag published={c.published} />}
-          <button type="button" className="btn" onClick={downloadPdf} disabled={compiling} data-testid="overview-pdf">
-            {compiling ? <Icon name="loader" className="spin" /> : <Icon name="download" />}
-            PDF
-          </button>
-          <a className="btn" href={`/api/courses/${c.id}/source.zip`} download title="Sorgente LaTeX (.zip)">
-            <Icon name="code" />
-            LaTeX
-          </a>
+          <Pop
+            label="Scarica"
+            menuClass="co-dl-pop"
+            summary={
+              <>
+                <Icon name={compiling ? "loader" : "download"} className={compiling ? "spin" : ""} />
+                Scarica
+                <Icon name="chevron-down" />
+              </>
+            }
+          >
+            <a href={`/api/courses/${c.id}/source.zip`} download data-testid="overview-source">
+              <Icon name="code" />
+              Sorgente LaTeX (.zip)
+            </a>
+            <button type="button" onClick={downloadPdf} disabled={compiling} data-testid="overview-pdf">
+              <Icon name={compiling ? "loader" : "file-text"} className={compiling ? "spin" : ""} />
+              {canWrite ? "PDF (compila ora)" : "PDF (ultima versione)"}
+            </button>
+          </Pop>
           {canWrite && (
             <button type="button" className="btn ghost icon" onClick={() => setSettings(true)} aria-label="Impostazioni della materia" title="Impostazioni della materia">
               <Icon name="sliders" />
