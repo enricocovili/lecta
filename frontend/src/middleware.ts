@@ -44,5 +44,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (me.needs_setup && (path === "/" || path === "/login")) {
     return context.redirect("/setup");
   }
+  // A signed-in user's home is their dashboard; «?public» opens the public site as a visitor sees it.
+  if (path === "/" && me.authenticated && !context.url.searchParams.has("public")) {
+    return context.redirect("/admin");
+  }
   return next();
 });

@@ -936,3 +936,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
      is left alone. `check_build` lists the lines more than 3 pt too wide (`texlog.overfull`) and is not ok while
      there are any. The import's compile check treats them as errors for its automatic fix (the text is still written
      if they stay, with a warning in the job's log). A block written by hand is saved as written and only marked.
+141. **A signed-in user's `/` is their dashboard.** The middleware redirects `/` to `/admin` when someone is signed in
+     (as `/login` already did); anonymous visitors still get the public landing page. The public site stays reachable
+     for them as `/?public`, which «Vista pubblica» in the admin top bar and user menu opens and which the public pages'
+     back links (brand, «Materie» in the reader, the 404 page) use while signed in (`publicHome` in `lib/links.ts`).
+     *Alternatives:* redirecting without an escape hatch (a signed-in user could never preview what visitors see, and
+     «Materie» in the reader would bounce them to the dashboard); deciding from the `Referer` (not sent everywhere).

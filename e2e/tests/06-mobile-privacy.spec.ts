@@ -14,7 +14,7 @@ test("pages fit a phone screen and never load anything from another origin", asy
   await login(page);
   await page.goto("/admin");
   const courseHref = await page.locator("a.card-link").first().getAttribute("href");
-  const pages = ["/", "/search", "/admin", "/admin/jobs", "/admin/search?q=sistema", "/admin/settings", "/admin/settings#ai"];
+  const pages = ["/?public", "/search", "/admin", "/admin/jobs", "/admin/search?q=sistema", "/admin/settings", "/admin/settings#ai"];
   for (const p of pages) {
     await page.goto(p);
     await page.waitForLoadState("networkidle");

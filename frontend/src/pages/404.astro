@@ -1,6 +1,7 @@
 ---
 import Public from "../layouts/Public.astro";
 import { Icon } from "../components/icons";
+import { publicHome } from "../lib/links";
 Astro.response.status = 404;
 ---
 <Public title="Pagina non trovata">
@@ -9,7 +10,7 @@ Astro.response.status = 404;
     <h1>Pagina non trovata</h1>
     <p class="pub-lead">Questo indirizzo non esiste, oppure la pagina non è pubblica.</p>
     <div class="row">
-      <a class="btn primary" href="/"><Icon name="arrow-left" />Torna alle materie</a>
+      <a class="btn primary" href={publicHome(Astro.locals.auth?.authenticated)}><Icon name="arrow-left" />Torna alle materie</a>
       <a class="btn" href="/login">Accedi</a>
     </div>
   </section>

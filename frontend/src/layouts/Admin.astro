@@ -33,7 +33,7 @@ const initials =
       <button class="btn ghost icon" data-theme-toggle type="button" aria-label="Cambia tema" title="Tema chiaro / scuro">
         <Icon name="moon" className="i-moon" /><Icon name="sun" className="i-sun" />
       </button>
-      <a class="btn ghost hide-mobile" href="/" target="_blank" rel="noreferrer"><Icon name="eye" />Vista pubblica</a>
+      <a class="btn ghost hide-mobile" href="/?public" target="_blank" rel="noreferrer"><Icon name="eye" />Vista pubblica</a>
       <details class="dropdown" id="user-menu">
         <summary class="avatar" aria-label="Account" title={username}>{initials}</summary>
         <div class="menu-pop">
@@ -42,7 +42,7 @@ const initials =
           <a href="/admin/settings"><Icon name="sliders" />Impostazioni</a>
           <a href="/admin/jobs"><Icon name="activity" />Attività</a>
           {isAdmin(role) && <a href="/admin/settings#ai"><Icon name="coins" />AI e costi</a>}
-          <a href="/" target="_blank" rel="noreferrer"><Icon name="eye" />Vista pubblica</a>
+          <a href="/?public" target="_blank" rel="noreferrer"><Icon name="eye" />Vista pubblica</a>
           <div class="sep"></div>
           <button type="button" id="logout-btn"><Icon name="logout" />Esci</button>
         </div>

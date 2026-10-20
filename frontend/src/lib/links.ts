@@ -9,3 +9,8 @@ export function courseText(courseId: number, opts: { chapter?: number | null; ch
   const s = q.toString();
   return `/admin/courses/${courseId}/testo${s ? `?${s}` : ""}`;
 }
+
+/** The public landing page. A signed-in user is sent from `/` to their dashboard, so for them it takes `?public`. */
+export function publicHome(signedIn: boolean | undefined): string {
+  return signedIn ? "/?public" : "/";
+}

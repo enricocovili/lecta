@@ -21,6 +21,8 @@ const DPR = () => Math.min(2, window.devicePixelRatio || 1);
 
 interface Props {
   course: PubCourse & { chapters: PubChapter[] };
+  /** Where «Materie» goes back to: the public landing page (see `publicHome`). */
+  home?: string;
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -151,7 +153,7 @@ async function paint(doc: Doc, div: HTMLElement, n: number, scale: number, tasks
 
 /* ------------------------------------------------------------------ component */
 
-export default function Reader({ course }: Props) {
+export default function Reader({ course, home = "/" }: Props) {
   const chapters = course.chapters;
   const [doc, setDoc] = useState<Doc | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -364,7 +366,7 @@ export default function Reader({ course }: Props) {
     <div className={`pub-reader${indexOpen ? " index-open" : ""}`}>
       <header className="pub-rbar">
         <div className="pub-rbar-left">
-          <a className="pub-back" href="/" aria-label="Torna alle materie">
+          <a className="pub-back" href={home} aria-label="Torna alle materie">
             <Icon name="arrow-left" />
             <span className="hide-mobile">Materie</span>
           </a>

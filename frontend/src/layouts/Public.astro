@@ -2,6 +2,7 @@
 import Base from "./Base.astro";
 import { Icon, BrandMark } from "../components/icons";
 import { getSite } from "../lib/server";
+import { publicHome } from "../lib/links";
 interface Props {
   title?: string;
   /** Full-height app page (the reader): no top bar, footer or centred container. */
@@ -23,7 +24,7 @@ const q = Astro.url.pathname === "/search" ? (Astro.url.searchParams.get("q")?.s
   ) : (
     <>
       <header class="topbar pub-topbar">
-        <a class="brand" href="/"><BrandMark />Lecta</a>
+        <a class="brand" href={publicHome(auth?.authenticated)}><BrandMark />Lecta</a>
         <div class="topbar-actions">
           <form class="searchbox pub-search hide-mobile" method="get" action="/search" role="search">
             <Icon name="search" />

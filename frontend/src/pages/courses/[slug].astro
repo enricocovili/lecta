@@ -4,19 +4,21 @@ import Reader from "../../components/public/Reader";
 import DownloadMenu from "../../components/public/DownloadMenu";
 import { Icon } from "../../components/icons";
 import { backendGet } from "../../lib/server";
+import { publicHome } from "../../lib/links";
 import { pagesIt, type PubChapter, type PubCourse } from "../../components/public/format";
 const { slug } = Astro.params;
 const r = await backendGet<PubCourse & { chapters: PubChapter[] }>(Astro, `/api/public/courses/${encodeURIComponent(slug ?? "")}`);
 if (!r.data) return Astro.rewrite("/404");
 const c = r.data;
+const home = publicHome(Astro.locals.auth?.authenticated);
 // The fallback slot renders without JavaScript (and while the reader loads): same frame, plain links to the PDFs.
 ---
 <Public title={c.name} app>
-  <Reader client:only="react" course={c}>
+  <Reader client:only="react" course={c} home={home}>
     <div slot="fallback" class="pub-reader">
       <header class="pub-rbar">
         <div class="pub-rbar-left">
-          <a class="pub-back" href="/" aria-label="Torna alle materie"><Icon name="arrow-left" /><span class="hide-mobile">Materie</span></a>
+          <a class="pub-back" href={home} aria-label="Torna alle materie"><Icon name="arrow-left" /><span class="hide-mobile">Materie</span></a>
           <span class="pub-rbar-div hide-mobile"></span>
           <div class="pub-rtitle">
             <div class="pub-rname">{c.name}</div>
