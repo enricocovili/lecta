@@ -3,8 +3,8 @@
 Material comes in from the **lessons** only: there is no upload of loose files. What **Integra appunti** hands the
 import (slides, notes, annotated slides) and how a lesson stays linked to its chapter is in
 [LESSONS.md](LESSONS.md#from-the-lesson-to-the-text). The lesson always belongs to a course, so the text always lands in
-that course. The class notes are the backbone of the text; a lesson with slides and no notes gets a summary of the
-slides.
+that course. The class notes are the backbone of the text; a lesson with slides and no notes gets the slides written
+up in full.
 
 The job runs to the end by itself (Estrazione › Lettura › Stesura › Inserimento):
 
@@ -20,7 +20,8 @@ The job runs to the end by itself (Estrazione › Lettura › Stesura › Inseri
    A reply cut off at the output limit splits the unit in two.
 4. **Writing** (prompt `notes.compose`): the study text of each chapter, in prose. It follows the order and points of
    the class notes and completes them with the material (definitions, formulas, derivations, examples, the useful plots
-   and diagrams), compact but without losing concepts; without notes the material is summarised the same way. It is
+   and diagrams). It is complete rather than compact: the content of every slide goes in, also the slides the notes
+   never mention; without notes the material alone is written up the same way. It is
    written in the course's language (or the notes'). A long text is written in parts in parallel (slices of the notes,
    each with the relevant material), and a reply cut off splits its part.
 5. **Placement** (see below) → the picture shorthands written out as plain `figure`s (`\includegraphics`, DECISIONS

@@ -116,18 +116,21 @@ _d(
     "Stesura del testo (appunti + slide → testo da studiare)",
     "writing",
     f"""
-You write the study text of one chapter of a university course, in LaTeX: clear, readable prose that a student
-can study from for the exam.
+You write the study text of one chapter of a university course, in LaTeX: clear, readable, COMPLETE prose that a
+student can study from for the exam without opening the slides again. What the lecturer's slides say is part of the
+course whether or not the student wrote a note about it: losing it is the worst mistake you can make here.
 
 You get:
 - CLASS NOTES (when given): the bullet-point notes the student took during the lecture. They are the BACKBONE:
   follow their order and structure, and every point in them must appear in the text. They show what the
   lecturer stressed.
 - MATERIAL: the lecture's slides, handouts or photos, already converted to LaTeX (formulas, tables and pictures).
-  Use it to complete and explain the points of the notes: definitions, formulas, the steps of derivations,
-  conditions, examples. Add material the notes don't mention only when it matters for understanding them (a
-  definition or result they rely on). Skip agendas, repetitions, greetings, references and administrative slides.
-- Without class notes the material alone is the source: turn it into the same kind of text, following its topics.
+  Use it to complete and explain the points of the notes (definitions, formulas, the steps of derivations,
+  conditions, examples) AND as a source in its own right: every slide's content goes into the text, including the
+  slides the notes say nothing about (the student often takes notes only where something needed adding). Skip only
+  agendas, greetings, references, administrative slides and what is a pure repetition.
+- Without class notes the material alone is the source: turn all of it into the same kind of text, following its
+  topics, losing nothing.
 - Notes taken on a slide deck are organised under headings such as "Slide 5" or "Pagina aggiunta dopo la slide 5":
   each section is what the student wrote at that slide, and the material marks the same slides with `% slide 5`
   comments. Use it to pair every note with its slide. Remarks in the material that come from the student's
@@ -145,8 +148,9 @@ You get:
   work out what the slide says and what the notes add, then write one merged account:
   · a point present in both: state it a single time, in the notes' order and emphasis, with the slide's exact
     formula, definition, name or number (the notes may be sloppy, the slide is precise);
-  · a point only on the slide: include it if it matters for understanding (a definition, result, condition or
-    example the discussion relies on), otherwise drop it;
+  · a point only on the slide: include it, in full (definition, result, condition, formula, derivation step,
+    example, table row, the reasoning the slide lays out). A slide the notes never mention is written up as
+    completely as one they discuss, in the place of the lecture's order where it comes; drop only decoration;
   · a point only in the notes: keep it, it is what the lecturer said aloud or what the student found important;
   · the same idea restated on consecutive slides, or a slide repeated as a recap, is one idea: don't repeat it;
   · the same picture or table that appears on the slide and in the notes is shown once.
@@ -169,9 +173,11 @@ You get:
 
 How to write:
 - Default style (the student's guidelines, when given, take precedence over it):
-  · Concise but clear: every important concept, definition, formula, theorem, condition and example stays, but
-    in as few words as the idea allows. No filler, no repetitions, no "in this lecture we will see". Short
-    connected paragraphs that say what a thing is, why and when it applies; not a transcript of the slides.
+  · Complete and clear, not a summary: every concept, definition, formula, theorem, condition, derivation step,
+    example (with its numbers and its result), exception and remark of the sources stays, in connected paragraphs
+    that say what a thing is, why and when it applies. Explain what the slides only hint at (bullets are
+    shorthand: write them out as sentences), but compress nothing the sources develop. No filler, no
+    repetitions, no "in this lecture we will see".
   · Tables over lists: whenever the sources list items that share attributes or fall into categories (types,
     cases, classifications, properties, parameters, advantages/disadvantages, comparisons, steps with inputs and
     outputs) write a table, not itemize: \\begin{{tabular}} with booktabs (\\toprule, \\midrule, \\bottomrule),

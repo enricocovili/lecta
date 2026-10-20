@@ -6,7 +6,7 @@
 3. Reading             every unit (≈10 pages of one file, or one handwritten page) → LaTeX, all in
                        parallel: a faithful conversion of the material, formulas and pictures included
 4. Writing             per group, the study text in prose: the class notes are its backbone, the
-                       material fills it in (without notes the material is summarised)
+                       material fills it in (without notes the material alone is written up)
 5. Per group           placement → compile check (≤ 1 AI fix) → written into the course
                        (a new chapter of the lesson's course, or appended to one of its chapters)
 
@@ -477,7 +477,7 @@ async def _bundle_step(ctx: JobContext, g: dict[str, Any], items: list[IngestIte
     labels = list(dict.fromkeys((i.meta or {}).get("file_label") or i.label for i in items))
     notes_labels = [(i.meta or {}).get("file_label") or i.label for i in notes_items]
     if not notes_items:
-        await ctx.log(f"“{title}”: no class notes (.md/.txt) in this group, the text is a summary of the material", stage="compose",
+        await ctx.log(f"“{title}”: no class notes (.md/.txt) in this group, the text is written from the material alone", stage="compose",
                       item=title, kind="no_notes")
     if notes.strip() or material.strip():
         text = await compose.compose(ctx, g["key"], notes=notes, material=material, title=title, language=language, budget_chars=budget,

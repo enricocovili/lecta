@@ -160,7 +160,7 @@ The owner manages the links in «Condividi»: create, copy, replace (the old lin
 Then the usual pipeline runs: everything of one lesson is **one group** (one chapter), reading, writing, placement (**the first time a new chapter: one lesson, one chapter**;
 `chapter_id` puts the text in that chapter, `placement: "auto"` lets the usual placement compare with the existing chapters), compile check. The bond between notes and slides is kept end to end: the reading step marks every
 slide with a `% slide N` comment, the notes have `Slide N` headings, and the writing prompt is told to pair them and to treat the
-student's handwriting as notes; neither the numbers nor the markers appear in the text. Slides and notes overlap (the notes copy or rephrase the slide): the writing prompt (`notes.compose`) tells the model to merge them, stating each fact once in the notes' order with the slide's exact formulas and names, and never to repeat a recap slide or a picture that comes from both. When the job ends the lesson
+student's handwriting as notes; neither the numbers nor the markers appear in the text. Slides and notes overlap (the notes copy or rephrase the slide): the writing prompt (`notes.compose`) tells the model to merge them, stating each fact once in the notes' order with the slide's exact formulas and names, and never to repeat a recap slide or a picture that comes from both. What only a slide says is written up in full (a slide without notes loses nothing). When the job ends the lesson
 remembers `generated_at` and `last_result` (chapters written).
 
 ## Lesson ↔ chapter: changing a lesson that is already in the course

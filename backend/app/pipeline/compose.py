@@ -3,7 +3,7 @@
 The class notes (.md/.txt, the bullet points taken during the lecture) are the
 backbone: the text follows their order and structure, and the material read
 from slides, handouts and photos fills in definitions, formulas and examples.
-Without notes the material alone is summarised into the same kind of text.
+Without notes the material alone is turned into the same kind of text.
 
 A group whose text wouldn't fit one reply is written in parts, in parallel:
 with notes, each part covers a slice of the notes and sees all the material
@@ -27,10 +27,10 @@ from .read import LANG_NAMES, MAX_SPLITS, parse_reply
 from .requests import RequestBuilder
 
 NOTES_EXT = (".md", ".markdown", ".mdown", ".txt")
-# Expected length of the text relative to its sources: notes get expanded into prose, the material summarised.
+# Expected length of the text relative to its sources: notes get expanded into prose, the material written out almost whole.
 NOTES_GROWTH = 2.5
-MATERIAL_WITH_NOTES = 0.35
-MATERIAL_ALONE = 0.45
+MATERIAL_WITH_NOTES = 0.7
+MATERIAL_ALONE = 0.9
 PART_FILL = 0.7  # of the output budget, to leave room for a longer than expected reply
 MAX_MATERIAL_CHARS = 150_000  # material sent with each part (the most relevant sections beyond this)
 MAX_PARTS = 12
@@ -184,7 +184,7 @@ async def _part(ctx: JobContext, key: str, p: dict[str, str], *, part: int, part
     if with_notes:
         instr.append("The student's class notes are given: they are the backbone of the text.")
     else:
-        instr.append("No class notes were given: the material alone is the source; summarise it into study text.")
+        instr.append("No class notes were given: the material alone is the source: write all of it up as study text, losing nothing.")
     if parts > 1:
         what = "this slice of the class notes" if with_notes else "this slice of the material"
         instr.append(f"This is part {part} of {parts}: write the text for {what} only; the other parts are written separately and joined"
