@@ -1,4 +1,4 @@
-"""Workspace overview: per-course state (done / working / error).
+"""Workspace overview: per-course state (done / wip / working / error).
 
 Used by the admin Home and the sidebar tree. Everything is derived from existing
 rows (jobs, builds, source links); nothing is stored.
@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Build, Chapter, Course, Job, SourceLink
+from ..models import Build, Chapter, Course, Job, Lesson, SourceLink
 from . import jobs as jobs_svc
 
 # Internal/maintenance jobs that don't make a course's state.
@@ -31,7 +31,7 @@ def _ts(dt: datetime | None) -> float:
 
 
 async def course_states(db: AsyncSession) -> dict[int, dict[str, Any]]:
-    """State of every course: {status: ok|working|error, reason, active_job, last_build, sources}."""
+    """State of every course: {status: ok|wip|working|error, reason, active_job, last_build, sources}."""
     courses = (await db.execute(select(Course.id, Course.updated_at))).all()
     out: dict[int, dict[str, Any]] = {
         cid: {"status": "ok", "reason": None, "active_job": None, "last_build": None, "sources": 0, "updated_at": upd}
@@ -93,6 +93,9 @@ async def course_states(db: AsyncSession) -> dict[int, dict[str, Any]]:
         if cid in out:
             out[cid]["sources"] = n
 
+    # A course with a lecture not yet «Completata» is a work in progress.
+    unfinished = set((await db.execute(select(Lesson.course_id).where(Lesson.status != "completed").distinct())).scalars())
+
     for cid, st in out.items():
         build = st["last_build"]
         failed = last_finished.get(cid)
@@ -104,4 +107,6 @@ async def course_states(db: AsyncSession) -> dict[int, dict[str, Any]]:
             st["failed_job"] = {"id": failed.id, "title": failed.title, "error": _first_line(failed.error)}
         elif st["active_job"]:
             st["status"] = "working"
+        elif cid in unfinished:
+            st["status"], st["reason"] = "wip", "lessons"
     return out

@@ -14,7 +14,7 @@ export interface CourseState {
   published: boolean;
   updated_at: string;
   chapter_count: number;
-  status: "ok" | "working" | "error" | string;
+  status: "ok" | "wip" | "working" | "error" | string;
   reason: string | null;
   active_job: { id: number; kind: string; title: string; status: string; progress: number; progress_text: string } | null;
   last_build: { id: number; status: string; at: string; errors: number; first_error: { file: string | null; line: number | null; message: string; chapter_id?: number; chapter_title?: string } | null } | null;
@@ -30,8 +30,8 @@ export function useCourseStates() {
   return useApi(() => get<{ courses: CourseState[] }>("/api/dashboard").then((d) => d.courses ?? []), []);
 }
 
-export const COURSE_TONE: Record<string, Tone> = { ok: "ok", working: "warn", error: "danger" };
-export const COURSE_LABEL: Record<string, string> = { ok: "Completata", working: "In lavorazione", error: "Errore" };
+export const COURSE_TONE: Record<string, Tone> = { ok: "ok", wip: "warn", working: "warn", error: "danger" };
+export const COURSE_LABEL: Record<string, string> = { ok: "Completata", wip: "In corso", working: "In lavorazione", error: "Errore" };
 
 export function CoursePill({ status, size = "" }: { status: string | undefined; size?: "" | "sm" }) {
   const s = status ?? "ok";

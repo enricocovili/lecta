@@ -189,9 +189,11 @@ Format: **decision** — reason. *Alternative:* main alternative considered.
     bundled from `@fontsource-variable/*`, so the CSP stays `font-src 'self'`.
 52. **Theme: system by default, forced light/dark via the moon/sun button**, remembered
     per browser (`public/theme.js`, a blocking script in `<head>` so the page never flashes).
-53. **Course status (Completata / In lavorazione / Errore) is derived, not stored**
-    (`services/overview.py`): the latest draft/publish build, the latest finished job and
-    active jobs. A failed compile shows up on the course's card even without a job (134).
+53. **Course status (Completata / In corso / In lavorazione / Errore) is derived, not stored**
+    (`services/overview.py`): the latest draft/publish build, the latest finished job, active jobs and the lessons.
+    A failed compile shows up on the course's card even without a job (134). A course with a lesson not yet
+    «Completata» is «In corso» (`wip`, yellow, reason `lessons`): it is a work in progress, not a finished subject.
+    An error or a running job takes precedence, and `wip` is not polled (nothing is running).
 54. *(Removed by 133.)* **Mappa collegamenti is computed on request** (`services/concepts.py`) from section
     titles (normalised lexical match, always) plus stored embeddings when they are enabled
     (averaged per section, compared in SQL; the backend never loads the model), cached until

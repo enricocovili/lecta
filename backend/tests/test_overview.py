@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.models import Build, Job
+from app.models import Build, Job, Lesson
 
 
 async def _course(admin, name: str) -> dict:
@@ -54,3 +54,24 @@ async def test_failed_job_after_build_marks_error(admin, db):
     d = (await admin.get("/api/dashboard")).json()
     st = next(x for x in d["courses"] if x["id"] == c["id"])
     assert st["status"] == "error" and st["reason"] == "job" and st["failed_job"]["error"] == "boom"
+
+
+async def test_unfinished_lesson_makes_course_wip(admin, db):
+    c = await _course(admin, "Corso In Corso")
+    db.add(Lesson(course_id=c["id"], number=1, title="Lezione 1", status="completed"))
+    await db.commit()
+
+    async def state():
+        d = (await admin.get("/api/dashboard")).json()
+        return next(x for x in d["courses"] if x["id"] == c["id"])
+
+    assert (await state())["status"] == "ok"
+
+    db.add(Lesson(course_id=c["id"], number=2, title="Lezione 2", status="working"))
+    await db.commit()
+    st = await state()
+    assert st["status"] == "wip" and st["reason"] == "lessons"
+
+    db.add(Build(course_id=c["id"], kind="draft", status="error", engine="pdflatex"))
+    await db.commit()
+    assert (await state())["status"] == "error"

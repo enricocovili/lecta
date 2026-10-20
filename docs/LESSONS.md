@@ -84,7 +84,8 @@ sets it, unless «Segna la lezione come completata» is off in the «Integra app
 `mark_completed`). It then stays completed, also when the lesson is edited again:
 only the user moves it back. The owner sees a «Completata» switch (on = completed) in the list and in the editor's top
 bar, and can turn it on or off at any time without a generation (`PATCH … {status}`); the shared read-only view shows
-the state as a pill.
+the state as a pill. A subject with a lesson that is not completed is «In corso» (yellow) on the home page and in the
+sidebar, instead of «Completata»; it becomes «Completata» again when every lesson is.
 
 ## Ink format
 
