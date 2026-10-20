@@ -21,7 +21,10 @@ The job runs to the end by itself (Estrazione › Lettura › Stesura › Inseri
 4. **Writing** (prompt `notes.compose`): the study text of each chapter, in prose. It follows the order and points of
    the class notes and completes them with the material (definitions, formulas, derivations, examples, the useful plots
    and diagrams). It is complete rather than compact: the content of every slide goes in, also the slides the notes
-   never mention; without notes the material alone is written up the same way. It is
+   never mention; without notes the material alone is written up the same way. Its form follows the content:
+   definitions, theorems, examples and remarks in their blocks, tables for what shares attributes, derivations as
+   aligned steps with the result boxed, `\textbf` on the terms being introduced and a restrained `\hl` on what the
+   lecturer or the student stressed. It is
    written in the course's language (or the notes'). A long text is written in parts in parallel (slices of the notes,
    each with the relevant material), and a reply cut off splits its part.
 5. **Placement** (see below) → the picture shorthands written out as plain `figure`s (`\includegraphics`, DECISIONS

@@ -178,11 +178,29 @@ How to write:
     that say what a thing is, why and when it applies. Explain what the slides only hint at (bullets are
     shorthand: write them out as sentences), but compress nothing the sources develop. No filler, no
     repetitions, no "in this lecture we will see".
-  · Tables over lists: whenever the sources list items that share attributes or fall into categories (types,
-    cases, classifications, properties, parameters, advantages/disadvantages, comparisons, steps with inputs and
-    outputs) write a table, not itemize: \\begin{{tabular}} with booktabs (\\toprule, \\midrule, \\bottomrule),
-    a short header row, one row per item, columns sized to fit the page (p{{..}} columns or tabularx for text
-    cells). Use itemize/enumerate only for a real sequence or a few short, unrelated points.
+  · Structure that can be seen at a glance: the chapter is not a wall of paragraphs. Give every piece of
+    content the form that shows its shape:
+    - each term the lecturer defines is a definition block, each rule, law or result a theorem, lemma,
+      proposition or corollary block, each worked case an example block (with its data and its result), and each
+      warning, intuition, common mistake, exception, special case or aside of the lecturer a remark block;
+      a paragraph introducing a block says why it matters, the block itself holds the precise statement;
+    - tables over lists: whenever the sources list items that share attributes or fall into categories (types,
+      cases, classifications, properties, parameters, advantages/disadvantages, comparisons, steps with inputs and
+      outputs, a notation with its meaning) write a table, not itemize: \\begin{{tabular}} with booktabs
+      (\\toprule, \\midrule, \\bottomrule), a short header row, one row per item, columns sized to fit the page
+      (p{{..}} columns or tabularx for text cells). A comparison of two or three things is a table with the
+      things as columns. Use itemize/enumerate only for a real sequence or a few short, unrelated points;
+    - a derivation is an align block, one step per line with the justification of the step beside it, not a
+      paragraph; the final result of a derivation or the formula to remember is framed with \\boxed{{...}};
+    - a classification, hierarchy or procedure that the slides show as a scheme is written as a table or a nested
+      list that keeps its shape, and its picture is placed next to it when the material has one.
+  · Emphasis, for studying: put \\textbf{{...}} on the term being introduced the first time it is explained, on the
+    name of each method, case or property, and on the condition or number that decides an answer; use
+    \\hl{{...}} (highlight) for the few sentences or formulas the student must not forget: what the lecturer
+    stressed, what the student underlined, circled or starred in the notes or on a slide, the conclusion of a
+    section. Highlight with restraint (a couple per page at most, short, never a whole paragraph); \\ul{{...}}
+    is for a single word that contrasts with another. Never nest them, and don't use them inside math or
+    in a heading.
   · Pictures are small and explained: the plots, diagrams and schemes that help understanding go beside the
     text that explains them, as \\lectaimagewithtext[short caption]{{id}}{{two to four sentences saying what the
     picture shows and what to notice}}. Two related pictures go on one row with
