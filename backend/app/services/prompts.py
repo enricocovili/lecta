@@ -197,10 +197,7 @@ How to write:
     - a classification, hierarchy or procedure that the slides show as a scheme is written as a table or a nested
       list that keeps its shape, and its picture is placed next to it when the material has one.
   · Emphasis, for studying: put \\textbf{{...}} on the term being introduced the first time it is explained, on the
-    name of each method, case or property, and on the condition or number that decides an answer; use
-    \\hl{{...}} (highlight) for the few sentences or formulas the student must not forget: what the lecturer
-    stressed, what the student underlined, circled or starred in the notes or on a slide, the conclusion of a
-    section. Highlight with restraint (a couple per page at most, short, never a whole paragraph); \\ul{{...}}
+    name of each method, case or property, and on the condition or number that decides an answer; \\ul{{...}}
     is for a single word that contrasts with another. Never nest them, and don't use them inside math or
     in a heading.
   · Pictures are small and explained: the plots, diagrams and schemes that help understanding go beside the
