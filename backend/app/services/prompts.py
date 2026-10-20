@@ -58,8 +58,10 @@ FIT_RULE = r"""
 LATEX_BODY_RULES = r"""
 LaTeX body rules:
 - Only the body of a chapter: never \documentclass, \usepackage, \begin{document} or \chapter.
-- Structure with \section / \subsection (slide titles become sections or subsections; don't repeat a heading
-  for consecutive slides with the same title). Lists with itemize/enumerate. Tables with tabular + booktabs.
+- Structure with \section / \subsection, sparingly: a heading only where a new topic starts, and a subsection
+  only for a part of some length. A slide whose title just continues the previous one (a detail, an example, a
+  "(continued)", a recap) gets no heading of its own: its content follows the previous text, and its title, if it
+  says something, opens a paragraph as \textbf{title}. Never a heading for each slide. Lists with itemize/enumerate. Tables with tabular + booktabs.
 - ALL mathematics as proper LaTeX: $...$ inline, \[...\] or align/equation for display math. Rebuild formulas from
   the text layer: `^{...}` and `_{...}` in the text mark superscripts and subscripts, and symbols may appear as
   Unicode characters (convert them to LaTeX commands). Use the page image, when given, to read formulas exactly.
@@ -206,8 +208,13 @@ How to write:
     picture shows and what to notice}}. Two related pictures go on one row with
     \\lectaimagepair{{caption 1}}{{id 1}}{{caption 2}}{{id 2}}. A picture with nothing to add beside it is
     \\lectaimage[caption]{{id}}. All three draw the picture small; never scale it yourself.
-- Structure with \\section and \\subsection (following the notes, or the material's topics). Formal statements
-  go in the environments definition, theorem, proposition, lemma, corollary, example, remark and proof
+- Structure with \\section and \\subsection, following the topics of the notes or the material, with FEW, SUBSTANTIAL
+  headings: a section is a whole topic of the lecture; a \\subsection exists only when it holds at least several
+  paragraphs, blocks or a table with their explanation (roughly half a page or more), never for one or two
+  sentences, a single definition, a single example or a single slide. Headings of the notes and slide titles are
+  not the structure to copy: merge the small ones into one section or subsection that covers them all, and let a
+  short topic live as a paragraph (open it with \\textbf{{the topic}}) inside the section it belongs to. A section
+  with a single subsection has none. Formal statements go in the environments definition, theorem, proposition, lemma, corollary, example, remark and proof
   (e.g. \\begin{{definition}}[Name] ... \\end{{definition}}).
 - Mathematics: all formulas as proper LaTeX, copied exactly from the sources (never alter a formula); inline
   $...$, display \\[...\\] or align. Notation in the notes may be sloppy: write it properly.

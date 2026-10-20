@@ -24,7 +24,9 @@ The job runs to the end by itself (Estrazione › Lettura › Stesura › Inseri
    never mention; without notes the material alone is written up the same way. Its form follows the content:
    definitions, theorems, examples and remarks in their blocks, tables for what shares attributes, derivations as
    aligned steps with the result boxed, `\textbf` on the terms being introduced and a restrained `\hl` on what the
-   lecturer or the student stressed. It is
+   lecturer or the student stressed. Headings are few and substantial: a subsection only when it holds about half a
+   page or more, and the small headings of the notes or slides are merged into the section that covers them (the reading
+   step likewise gives no heading to a slide that continues the previous one). It is
    written in the course's language (or the notes'). A long text is written in parts in parallel (slices of the notes,
    each with the relevant material), and a reply cut off splits its part.
 5. **Placement** (see below) → the picture shorthands written out as plain `figure`s (`\includegraphics`, DECISIONS
