@@ -126,13 +126,14 @@ points per page, sane coordinates, colour and width.
 | `GET /api/lessons/{id}/pdf` | the slides |
 | `GET /api/lessons/{id}/annotated.pdf` | slides and added pages in order with the strokes and the typed text drawn on them |
 | `GET /api/lessons/{id}/notes.md` | the typed notes as the import receives them |
+| `GET /api/lessons/{id}/bundle.zip` | both in one zip: the annotated PDF and the notes (`«Scarica» ▸ Entrambi (ZIP)`) |
 | `POST /api/lessons/{id}/generate` `{guidelines?, save_guidelines, chapter_id?, placement?, mark_completed=true, lab_comments=false}` | starts the import → `{job_id}`; `placement`: `update` (default when the lesson has a chapter), `new_chapter` (default otherwise), `auto` |
 
 ## Sharing a lesson
 
 A lesson can be opened by someone who is not signed in, through a link `/s/<token>` (a random 192-bit secret, stored in `lesson_shares`;
 one link per mode and lesson). **Sola lettura**: slides, notes (rendered Markdown) and strokes, refreshed every few seconds so a
-classmate can follow the lecture; downloads of the annotated PDF and the notes. **Può modificare**: the same editor as the owner's
+classmate can follow the lecture; downloads of the annotated PDF, the notes and both in a zip. **Può modificare**: the same editor as the owner's
 (notes, pen, highlighter, eraser, undo, added and removed pages) without what is the owner's alone (generating the text, the title,
 sharing, moving or deleting the lesson). Edits of different people are merged page by page (the polling brings in the pages others saved;
 a page one is editing is not replaced until it has been saved, and saving replaces that page's notes or strokes: the last save wins).
@@ -142,7 +143,7 @@ The owner manages the links in «Condividi»: create, copy, replace (the old lin
 |------|-|
 | `GET/POST /api/lessons/{id}/shares` `{mode: read\|write, new_link?}` · `DELETE /api/lessons/{id}/shares/{mode}` | the owner's links |
 | `POST /api/lessons/{id}/sync` `{known: {page_id: version}}` | the order of the pages and the pages whose version differs (the owner's editor uses it while the lesson has links) |
-| `GET /api/public/lesson/{token}` · `/pdf` · `/annotated.pdf` · `/notes.md` | what a link shows (no guidelines, chapter or ids of the owner's side; `has_lab`) |
+| `GET /api/public/lesson/{token}` · `/pdf` · `/annotated.pdf` · `/notes.md` · `/bundle.zip` | what a link shows (no guidelines, chapter or ids of the owner's side; `has_lab`) |
 | `POST …/sync` · `PUT …/pages/{pid}` · `POST …/pages` · `POST …/pages/restore` · `DELETE …/pages/{pid}` | the same as the owner's, **write links only** (403 on a read link) |
 
 ## From the lesson to the text

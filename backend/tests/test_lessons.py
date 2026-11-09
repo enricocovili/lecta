@@ -3,6 +3,9 @@ the lesson as the input of the import (annotated slides, handwritten pages, note
 
 from __future__ import annotations
 
+import io
+import zipfile
+
 import fitz
 import pytest
 from PIL import Image, ImageChops, ImageOps
@@ -276,6 +279,7 @@ async def test_share_links_open_the_lesson_without_signing_in(admin, anon):
     assert (await anon.get(f"/api/public/lesson/{read['token']}/pdf")).headers["content-type"] == "application/pdf"
     assert (await anon.get(f"/api/public/lesson/{read['token']}/notes.md")).status_code == 200
     assert (await anon.get(f"/api/public/lesson/{read['token']}/annotated.pdf")).content[:5] == b"%PDF-"
+    assert (await anon.get(f"/api/public/lesson/{read['token']}/bundle.zip")).content[:2] == b"PK"
     assert (await anon.get("/api/public/lesson/not-a-token")).status_code == 404
 
     # A read link does not write; a write link writes notes and strokes, adds, removes and restores pages.
@@ -398,6 +402,14 @@ async def test_lesson_downloads(admin):
     assert ann.status_code == 200 and fitz.open(stream=ann.content, filetype="pdf").page_count == 3
     md = await admin.get(f"/api/lessons/{lid}/notes.md")
     assert md.text == "# Campionamento\n\n## Slide 1\n\n- Nyquist\n"
+    # Both in one zip: the annotated PDF and the notes, the same bytes as the single downloads.
+    bundle = await admin.get(f"/api/lessons/{lid}/bundle.zip")
+    assert bundle.status_code == 200 and bundle.headers["content-type"] == "application/zip"
+    assert bundle.headers["content-disposition"] == 'attachment; filename="campionamento.zip"'
+    z = zipfile.ZipFile(io.BytesIO(bundle.content))
+    assert sorted(z.namelist()) == ["campionamento.md", "campionamento.pdf"]
+    assert z.read("campionamento.md").decode() == md.text
+    assert fitz.open(stream=z.read("campionamento.pdf"), filetype="pdf").page_count == 3
 
 
 async def test_a_lesson_without_slides_and_bad_slides(admin):

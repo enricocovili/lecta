@@ -67,6 +67,7 @@ VIEWER = """
     GET    /api/lessons/{lesson_id}/pdf
     GET    /api/lessons/{lesson_id}/annotated.pdf
     GET    /api/lessons/{lesson_id}/notes.md
+    GET    /api/lessons/{lesson_id}/bundle.zip
     GET    /api/lessons/{lesson_id}/lab
     GET    /api/courses/{course_id}/lessons/{number}/lab
     GET    /api/lessons/{lesson_id}/lab/files/{file_id}

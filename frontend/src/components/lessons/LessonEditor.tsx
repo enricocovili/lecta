@@ -486,6 +486,10 @@ export function Editor({ lesson, access, source, labHref, admin = false }: { les
               <Icon name="file" />
               Appunti (.md)
             </a>
+            <a href={`${source.base}/bundle.zip`} download data-testid="download-bundle">
+              <Icon name="archive" />
+              Entrambi (ZIP)
+            </a>
           </Pop>
           {(owner || (inApp && lesson.lab) || labHref) && (
             <a
@@ -537,6 +541,10 @@ export function Editor({ lesson, access, source, labHref, admin = false }: { les
             <a href={`${source.base}/notes.md`} download className="les-narrow">
               <Icon name="file" />
               Scarica gli appunti (.md)
+            </a>
+            <a href={`${source.base}/bundle.zip`} download className="les-narrow">
+              <Icon name="archive" />
+              Scarica entrambi (ZIP)
             </a>
             {shares && (
               <button type="button" onClick={() => setShowShare(true)} className="les-narrow">

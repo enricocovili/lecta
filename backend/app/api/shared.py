@@ -74,6 +74,12 @@ async def shared_notes(token: str, db: AsyncSession = Depends(get_db)):
     return await owner.notes_md(lesson.id, db)
 
 
+@router.get("/bundle.zip")
+async def shared_bundle(token: str, db: AsyncSession = Depends(get_db)):
+    lesson, _ = await _open(db, token)
+    return await owner.bundle_zip(lesson.id, db)
+
+
 @router.put("/pages/{page_id}")
 async def shared_save(token: str, page_id: int, body: owner.PageSave, db: AsyncSession = Depends(get_db)) -> dict:
     lesson, _ = await _open(db, token, write=True)

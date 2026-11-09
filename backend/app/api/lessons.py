@@ -5,10 +5,12 @@ from the notes and the annotated slides."""
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import os
 import re
 import secrets
+import zipfile
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -502,22 +504,44 @@ def _file_stem(title: str) -> str:
     return slugify(title, 60)
 
 
+async def _annotated_bytes(db: AsyncSession, lesson: Lesson) -> bytes:
+    pages = [page_out(p) for p in await _pages(db, lesson.id)]
+    path = blobs.path_for(lesson.pdf_blob) if lesson.pdf_blob and blobs.exists(lesson.pdf_blob) else None
+    return await asyncio.to_thread(ls.annotated_pdf, path, pages)
+
+
+async def _notes_text(db: AsyncSession, lesson: Lesson) -> str:
+    pages = [page_out(p) for p in await _pages(db, lesson.id)]
+    return ls.notes_markdown(lesson.title, pages) or f"# {lesson.title}\n"
+
+
 @router.get("/lessons/{lesson_id}/annotated.pdf")
 async def annotated_pdf(lesson_id: int, db: AsyncSession = Depends(get_db)) -> Response:
     """The lesson as a PDF: the slides (and the pages added by hand) with the strokes on them."""
     lesson = await _lesson(db, lesson_id)
-    pages = [page_out(p) for p in await _pages(db, lesson.id)]
-    path = blobs.path_for(lesson.pdf_blob) if lesson.pdf_blob and blobs.exists(lesson.pdf_blob) else None
-    data = await asyncio.to_thread(ls.annotated_pdf, path, pages)
+    data = await _annotated_bytes(db, lesson)
     return Response(data, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{_file_stem(lesson.title)}.pdf"'})
 
 
 @router.get("/lessons/{lesson_id}/notes.md")
 async def notes_md(lesson_id: int, db: AsyncSession = Depends(get_db)) -> Response:
     lesson = await _lesson(db, lesson_id)
-    pages = [page_out(p) for p in await _pages(db, lesson.id)]
-    md = ls.notes_markdown(lesson.title, pages) or f"# {lesson.title}\n"
+    md = await _notes_text(db, lesson)
     return Response(md, media_type="text/markdown; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{_file_stem(lesson.title)}.md"'})
+
+
+@router.get("/lessons/{lesson_id}/bundle.zip")
+async def bundle_zip(lesson_id: int, db: AsyncSession = Depends(get_db)) -> Response:
+    """Both downloads in one: the annotated PDF and the notes (.md), in a zip."""
+    lesson = await _lesson(db, lesson_id)
+    stem = _file_stem(lesson.title)
+    pdf, md = await _annotated_bytes(db, lesson), await _notes_text(db, lesson)
+    buf = io.BytesIO()
+    now = datetime.now(UTC).timetuple()[:6]
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
+        z.writestr(zipfile.ZipInfo(f"{stem}.pdf", date_time=now), pdf, compress_type=zipfile.ZIP_DEFLATED)
+        z.writestr(zipfile.ZipInfo(f"{stem}.md", date_time=now), md.encode(), compress_type=zipfile.ZIP_DEFLATED)
+    return Response(buf.getvalue(), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{stem}.zip"'})
 
 
 # --------------------------------------------------------------------------- generate the text
