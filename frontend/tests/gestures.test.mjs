@@ -1,7 +1,7 @@
 // Finger gestures of the lesson editor (palm or finger, the glide after a flick, the pinch zoom): run with `npm test`.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clampZoom, glide, isPalm, PALM_AFTER_PEN_MS, pinchView, reachable, releaseSpeed, stepZoom, wheelZoom, ZOOM_MAX, ZOOM_MIN } from "../src/components/lessons/gestures.ts";
+import { clampZoom, glide, isPalm, PALM_AFTER_PEN_MS, PALM_SIZE_PEN_MS, pinchView, reachable, releaseSpeed, stepZoom, wheelZoom, ZOOM_MAX, ZOOM_MIN } from "../src/components/lessons/gestures.ts";
 
 const finger = { width: 12, height: 14 };
 
@@ -14,11 +14,17 @@ test("a finger right after the pen left the screen scrolls; a touch while the pe
   assert.equal(isPalm({ down: false, upAt: -Infinity }, 5, finger), false);
 });
 
-test("a wide contact is a palm, whatever the pen does; screens that report no size count as a fingertip", () => {
-  const idle = { down: false, upAt: -Infinity };
-  assert.equal(isPalm(idle, 0, { width: 70, height: 50 }), true);
-  assert.equal(isPalm(idle, 0, { width: 1, height: 1 }), false);
-  assert.equal(isPalm(idle, 0, { width: 0, height: 0 }), false);
+test("a wide contact is a palm while the pen is in use; screens that report no size count as a fingertip", () => {
+  const writing = { down: false, upAt: 1000 };
+  const now = 1000 + PALM_AFTER_PEN_MS + 1;
+  assert.equal(isPalm(writing, now, { width: 70, height: 50 }), true);
+  assert.equal(isPalm(writing, now, { width: 1, height: 1 }), false);
+  assert.equal(isPalm(writing, now, { width: 0, height: 0 }), false);
+});
+
+test("with no pen around a wide contact is a finger (Chromium on Linux reports fingertips far wider than they are)", () => {
+  assert.equal(isPalm({ down: false, upAt: -Infinity }, 0, { width: 70, height: 50 }), false);
+  assert.equal(isPalm({ down: false, upAt: 1000 }, 1000 + PALM_SIZE_PEN_MS + 1, { width: 70, height: 50 }), false);
 });
 
 test("the speed of a flick comes from the last moments of the drag, and is zero if the finger stopped before lifting", () => {

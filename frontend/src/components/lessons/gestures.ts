@@ -12,8 +12,11 @@ import { flushSync } from "react-dom";
 export const PALM_AFTER_PEN_MS = 300;
 /** The pen landing this soon after a touch began means the touch was the palm: its scrolling is undone. */
 export const PALM_BEFORE_PEN_MS = 1500;
-/** A contact wider than this (CSS px, on screens that report it) is a palm, not a fingertip. */
+/** A contact wider than this (CSS px, on screens that report it) is a palm, not a fingertip… */
 export const PALM_SIZE = 40;
+/** … but only while the pen is in use (on the screen, or lifted this recently): with no pen around a wide contact is a
+ *  finger. Some browsers report a fingertip far wider than it is (Chromium on Linux passes the touchscreen's raw units). */
+export const PALM_SIZE_PEN_MS = 10_000;
 /** A finger moves this far before the page follows (a palm settling down does not scroll). */
 export const SLOP = 8;
 /** The glide after a flick slows down by this factor every 16 ms, and stops under MIN_SPEED (px/ms). */
@@ -96,9 +99,11 @@ export interface PenState {
   upAt: number;
 }
 
-/** Whether a touch landing now is a palm: the pen is writing or has just lifted between strokes, or the contact is large. */
+/** Whether a touch landing now is a palm: the pen is writing or has just lifted between strokes, or the contact is large
+ *  while the pen is in use. */
 export function isPalm(pen: PenState, now: number, contact: { width: number; height: number }): boolean {
-  return pen.down || now - pen.upAt < PALM_AFTER_PEN_MS || Math.max(contact.width || 0, contact.height || 0) > PALM_SIZE;
+  if (pen.down || now - pen.upAt < PALM_AFTER_PEN_MS) return true;
+  return now - pen.upAt < PALM_SIZE_PEN_MS && Math.max(contact.width || 0, contact.height || 0) > PALM_SIZE;
 }
 
 export interface Sample {

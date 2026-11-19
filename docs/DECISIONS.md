@@ -364,7 +364,9 @@ with an assistant that can touch everything. API contract in `docs/AI-WORKSPACE.
     switching to scroll felt slow. Now a touch is a palm only while the pen touches the screen, 0.3 s after it lifted, or
     when the contact is wide; a palm that lands first and scrolls is caught when the pen lands (the scroll is undone), and
     a finger has to move 8 px before the page follows, so a palm settling down does not scroll. The stylus' eraser end
-    erases whatever tool is selected.
+    erases whatever tool is selected. The contact's size counts only while the pen is in use (lifted under 10 s ago):
+    Chromium on Linux reports a touchscreen's raw units as the contact size, so every fingertip looked like a palm and a
+    finger could not scroll at all, while Firefox (no size reported) worked.
 84. **Guidelines are per subject and asked at generation time.** `courses.guidelines` (empty = automatic). Every
     generation into a chosen subject shows them (prefilled) with a notice when there are none, so the choice is
     conscious but never blocks; «ricorda» keeps them. They travel in the job's payload (so a run is

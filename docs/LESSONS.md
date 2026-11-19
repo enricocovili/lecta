@@ -18,7 +18,8 @@ pages added by hand (a slide never has enough room). Every page has:
   (`components/lessons/gestures.ts`): a drag scrolls as soon as it moves a few pixels and glides on when flicked, the hand tool
   also scrolls with pen and mouse. **Palm rejection** looks at what the pen does, not at when it was last seen: a touch is the
   palm while the pen touches the screen, within 0.3 s after it left it (between two strokes), or when the contact is as wide as
-  a palm; the pen landing within 1.5 s of a touch that started scrolling puts the page back. A pen hovering over the screen
+  a palm while the pen is in use (lifted less than 10 s ago: with no pen around a wide contact is a finger, as Chromium on
+  Linux reports fingertips far wider than they are); the pen landing within 1.5 s of a touch that started scrolling puts the page back. A pen hovering over the screen
   does not block the finger, so switching from writing to scrolling is immediate. Pressure changes the width of pen strokes. **Shape recognition** (toggle «Forme», on by default), as in Xournal++: when a stroke is let go and it is a straight line (an underline; a line within 3° of level or plumb is made exactly so), a rectangle (also tilted), a triangle or an ellipse (a circle when the axes differ by under 12 %), it is replaced by the clean shape (`components/lessons/shapes.ts`, tested with `npm test`). Anything small (under 5 % of the page width) is handwriting and is left alone, like scribbles and open arcs; undo takes the whole shape away.
 
 The screen is kept on (Wake Lock) while the editor is open, and the layout is chosen by the user: slide + notes side by
